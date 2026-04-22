@@ -1,0 +1,228 @@
+<?php
+
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\HouseholdController;
+use App\Http\Controllers\InstitutionController;
+use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\BusinessController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\PublishQueueController;
+use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\SurveyOptionsController;
+use App\Http\Controllers\Admin\RolePermissionsController;
+use App\Http\Controllers\EditRequestController;
+use App\Http\Controllers\Public\AnalyticsController;
+use App\Http\Controllers\Public\BusinessReportController;
+use App\Http\Controllers\Public\InstitutionReportController;
+use App\Http\Controllers\Public\ReportController;
+use App\Http\Controllers\Public\ReportExportController;
+use Illuminate\Support\Facades\Route;
+
+// Public analytics portal (no auth required)
+Route::prefix('public')->name('public.')->middleware('maintenance')->group(function () {
+    Route::get('/', [AnalyticsController::class, 'index'])->name('dashboard');
+    Route::get('/profile',         [AnalyticsController::class, 'profile'])->name('profile');
+    Route::get('/representatives', [AnalyticsController::class, 'representatives'])->name('representatives');
+    Route::get('/employees',       [AnalyticsController::class, 'employees'])->name('employees');
+    Route::get('/gallery',         [AnalyticsController::class, 'gallery'])->name('gallery');
+    Route::get('/downloads',       [AnalyticsController::class, 'downloads'])->name('downloads');
+    Route::get('/housing', [AnalyticsController::class, 'housing'])->name('housing');
+    Route::get('/map',             [AnalyticsController::class, 'map'])->name('map');
+    Route::get('/institution-map', [AnalyticsController::class, 'institutionMap'])->name('institution-map');
+    Route::get('/ward/{ward}', [AnalyticsController::class, 'ward'])->name('ward');
+    Route::get('/data/population', [AnalyticsController::class, 'population'])->name('data.population');
+    Route::get('/data/institutions', [AnalyticsController::class, 'institutions'])->name('data.institutions');
+
+    // ── Public Cross-Tab Reports ─────────────────────────────────────────
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/',              [ReportController::class, 'index'])       ->name('index');
+        Route::get('/demographics',  [ReportController::class, 'demographics'])->name('demographics');
+        Route::get('/age-groups',    [ReportController::class, 'ageGroups'])   ->name('age-groups');
+        Route::get('/education',     [ReportController::class, 'education'])   ->name('education');
+        Route::get('/health',        [ReportController::class, 'health'])      ->name('health');
+        Route::get('/employment',    [ReportController::class, 'employment'])  ->name('employment');
+        Route::get('/housing',       [ReportController::class, 'housing'])     ->name('housing');
+        Route::get('/utilities',     [ReportController::class, 'utilities'])   ->name('utilities');
+        Route::get('/economics',     [ReportController::class, 'economics'])   ->name('economics');
+        Route::get('/export/{category}', [ReportExportController::class, 'download'])->name('export');
+    });
+
+    // ── Public Business Reports ──────────────────────────────────────────────
+    Route::prefix('business-reports')->name('business-reports.')->group(function () {
+        Route::get('/',             [BusinessReportController::class, 'index'])       ->name('index');
+        Route::get('/by-type',      [BusinessReportController::class, 'byType'])      ->name('by-type');
+        Route::get('/by-field',     [BusinessReportController::class, 'byField'])     ->name('by-field');
+        Route::get('/by-location',  [BusinessReportController::class, 'byLocation'])  ->name('by-location');
+        Route::get('/registration', [BusinessReportController::class, 'registration'])->name('registration');
+    });
+
+    // ── Public Institution Reports ───────────────────────────────────────────
+    Route::prefix('institution-reports')->name('institution-reports.')->group(function () {
+        Route::get('/',              [InstitutionReportController::class, 'index'])         ->name('index');
+        Route::get('/by-type',       [InstitutionReportController::class, 'byType'])        ->name('by-type');
+        Route::get('/by-ownership',  [InstitutionReportController::class, 'byOwnership'])   ->name('by-ownership');
+        Route::get('/infrastructure',[InstitutionReportController::class, 'infrastructure'])->name('infrastructure');
+        Route::get('/services',      [InstitutionReportController::class, 'services'])      ->name('services');
+        Route::get('/staff',         [InstitutionReportController::class, 'staff'])         ->name('staff');
+    });
+});
+
+// Auth routes
+Route::get('/', function () {
+    return redirect()->route('public.dashboard');
+});
+
+Route::middleware(['auth'])->group(function () {
+
+    // Dashboard — redirects based on role
+    Route::get('/dashboard', function () {
+        $role = auth()->user()->role;
+        return match($role) {
+            'enumerator'      => redirect()->route('households.index'),
+            'ward_reviewer'   => redirect()->route('review.index'),
+            'municipal_admin',
+            'super_admin'     => redirect()->route('admin.dashboard'),
+            default           => view('dashboard'),
+        };
+    })->name('dashboard');
+
+    // Profile
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // ─── Enumerator Routes ───────────────────────────────────────────────────
+    Route::middleware(['role:enumerator,municipal_admin,super_admin', 'ward.scope'])->group(function () {
+        Route::get('households/{household}/preview', [HouseholdController::class, 'preview'])->name('households.preview');
+        Route::get('households/{household}/members/{member}', [HouseholdController::class, 'showMember'])->name('households.members.show');
+        Route::resource('households', HouseholdController::class);
+        Route::post('households/{household}/submit', [HouseholdController::class, 'submit'])->name('households.submit');
+        Route::resource('institutions', InstitutionController::class);
+        Route::post('institutions/{institution}/submit', [InstitutionController::class, 'submit'])->name('institutions.submit');
+
+        // ── Business ──────────────────────────────────────────────────────
+        Route::resource('businesses', BusinessController::class);
+        Route::post('businesses/{business}/submit', [BusinessController::class, 'submit'])->name('businesses.submit');
+        Route::get('api/businesses/households',         [BusinessController::class, 'householdsForWard'])    ->name('businesses.api.households');
+        Route::get('api/businesses/members',            [BusinessController::class, 'membersForHousehold']) ->name('businesses.api.members');
+        Route::get('api/businesses/ward-settlements',   [BusinessController::class, 'settlementsForWard'])  ->name('businesses.api.ward-settlements');
+    });
+
+    // ─── Edit Requests (Ward Reviewer can submit) ────────────────────────────
+    Route::middleware(['role:ward_reviewer,municipal_admin,super_admin'])
+        ->post('edit-requests', [EditRequestController::class, 'store'])
+        ->name('edit-requests.store');
+
+    // ─── Ward Reviewer Routes ────────────────────────────────────────────────
+    Route::middleware(['role:ward_reviewer,municipal_admin,super_admin', 'ward.scope'])
+        ->prefix('review')->name('review.')->group(function () {
+            Route::get('/', [ReviewController::class, 'index'])->name('index');
+            Route::get('/households', [ReviewController::class, 'households'])->name('households');
+            Route::get('/institutions', [ReviewController::class, 'institutions'])->name('institutions');
+            Route::get('/businesses',  [ReviewController::class, 'businesses'])->name('businesses');
+            Route::patch('/households/{household}/approve', [ReviewController::class, 'approveHousehold'])->name('households.approve');
+            Route::patch('/households/{household}/reject', [ReviewController::class, 'rejectHousehold'])->name('households.reject');
+            Route::patch('/households/{household}/escalate', [ReviewController::class, 'escalateHousehold'])->name('households.escalate');
+            Route::patch('/institutions/{institution}/approve', [ReviewController::class, 'approveInstitution'])->name('institutions.approve');
+            Route::patch('/institutions/{institution}/reject', [ReviewController::class, 'rejectInstitution'])->name('institutions.reject');
+            Route::patch('/businesses/{business}/approve',     [ReviewController::class, 'approveBusiness'])   ->name('businesses.approve');
+            Route::patch('/businesses/{business}/reject',      [ReviewController::class, 'rejectBusiness'])    ->name('businesses.reject');
+        });
+
+    // ─── Admin Routes ────────────────────────────────────────────────────────
+    Route::middleware(['role:municipal_admin,super_admin'])
+        ->prefix('admin')->name('admin.')->group(function () {
+            Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+            Route::resource('users', UserController::class);
+            Route::patch('/users/{user}/toggle-active',  [UserController::class, 'toggleActive'])->name('users.toggle-active');
+            Route::patch('/users/{user}/reset-password', [UserController::class, 'resetPassword'])->name('users.reset-password');
+            Route::get('/role-permissions',              [RolePermissionsController::class, 'index'])->name('role-permissions');
+            Route::patch('/role-permissions',            [RolePermissionsController::class, 'update'])->name('role-permissions.update');
+            Route::patch('/households/{household}/publish', [HouseholdController::class, 'publish'])->name('households.publish');
+            Route::patch('/institutions/{institution}/publish', [InstitutionController::class, 'publish'])->name('institutions.publish');
+            Route::patch('/businesses/{business}/publish', [BusinessController::class, 'publish'])->name('businesses.publish');
+
+            // Publish Queue
+            Route::get('/publish-queue', [PublishQueueController::class, 'index'])->name('publish-queue');
+            Route::patch('/publish-queue/households/{household}/publish', [PublishQueueController::class, 'publishHousehold'])->name('publish-queue.households.publish');
+            Route::patch('/publish-queue/households/{household}/reject',  [PublishQueueController::class, 'rejectHousehold']) ->name('publish-queue.households.reject');
+            Route::patch('/publish-queue/institutions/{institution}/publish', [PublishQueueController::class, 'publishInstitution'])->name('publish-queue.institutions.publish');
+            Route::patch('/publish-queue/institutions/{institution}/reject',  [PublishQueueController::class, 'rejectInstitution']) ->name('publish-queue.institutions.reject');
+            Route::patch('/publish-queue/businesses/{business}/publish',      [PublishQueueController::class, 'publishBusiness'])    ->name('publish-queue.businesses.publish');
+            Route::patch('/publish-queue/businesses/{business}/reject',       [PublishQueueController::class, 'rejectBusiness'])     ->name('publish-queue.businesses.reject');
+
+            // Edit Requests (reviewer → admin workflow)
+            Route::get('/edit-requests',                          [EditRequestController::class, 'index'])  ->name('edit-requests.index');
+            Route::patch('/edit-requests/{editRequest}/approve',  [EditRequestController::class, 'approve'])->name('edit-requests.approve');
+            Route::patch('/edit-requests/{editRequest}/reject',   [EditRequestController::class, 'reject']) ->name('edit-requests.reject');
+
+            // Survey Options (super_admin only)
+            Route::get('/survey-options',                        [SurveyOptionsController::class, 'index'])           ->name('survey-options');
+            Route::post('/survey-options',                       [SurveyOptionsController::class, 'store'])           ->name('survey-options.store');
+            Route::get('/survey-options/template',               [SurveyOptionsController::class, 'downloadTemplate'])->name('survey-options.template');
+            Route::post('/survey-options/import',                [SurveyOptionsController::class, 'import'])          ->name('survey-options.import');
+            Route::put('/survey-options/{surveyOption}',         [SurveyOptionsController::class, 'update'])          ->name('survey-options.update');
+            Route::patch('/survey-options/{surveyOption}/toggle',[SurveyOptionsController::class, 'toggle'])          ->name('survey-options.toggle');
+            Route::delete('/survey-options/{surveyOption}',      [SurveyOptionsController::class, 'destroy'])         ->name('survey-options.destroy');
+
+            // Bulk Import
+            Route::get('/bulk-import', function () {
+                return view('admin.bulk-import');
+            })->name('bulk-import');
+            Route::get('/institution-bulk-import', function () {
+                return view('admin.institution-bulk-import');
+            })->name('institution-bulk-import');
+            Route::get('/business-bulk-import', function () {
+                return view('admin.business-bulk-import');
+            })->name('business-bulk-import');
+
+            // Maintenance Mode
+            Route::patch('/settings/maintenance',        [SettingsController::class, 'updateMaintenance'])   ->name('settings.maintenance');
+            Route::post('/settings/maintenance/bg',      [SettingsController::class, 'uploadMaintenanceBg']) ->name('settings.maintenance.bg');
+            Route::delete('/settings/maintenance/bg',    [SettingsController::class, 'deleteMaintenanceBg']) ->name('settings.maintenance.bg.delete');
+
+            // Municipal Settings
+            Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+            Route::post('/settings/lock',   [SettingsController::class, 'lock'])  ->name('settings.lock');
+            Route::post('/settings/unlock', [SettingsController::class, 'unlock'])->name('settings.unlock');
+            Route::patch('/settings/general', [SettingsController::class, 'updateGeneral'])->name('settings.general');
+            Route::post('/settings/logo', [SettingsController::class, 'uploadLogo'])->name('settings.logo');
+            Route::patch('/settings/profile', [SettingsController::class, 'updateProfile'])->name('settings.profile');
+            Route::patch('/settings/map', [SettingsController::class, 'updateMap'])->name('settings.map');
+            Route::patch('/settings/photo-dir',  [SettingsController::class, 'updatePhotoDir'])   ->name('settings.photo-dir');
+            Route::patch('/settings/welcome',     [SettingsController::class, 'updateWelcome'])    ->name('settings.welcome');
+            Route::post('/settings/leader-photo', [SettingsController::class, 'uploadLeaderPhoto'])->name('settings.leader-photo');
+            Route::post('/settings/map-image',    [SettingsController::class, 'uploadMapImage'])   ->name('settings.map-image');
+            Route::delete('/settings/map-image',  [SettingsController::class, 'deleteMapImage'])   ->name('settings.map-image.delete');
+            Route::post('/settings/wards', [SettingsController::class, 'storeWard'])->name('settings.wards.store');
+            Route::patch('/settings/wards/{ward}', [SettingsController::class, 'updateWard'])->name('settings.wards.update');
+            Route::delete('/settings/wards/{ward}', [SettingsController::class, 'destroyWard'])->name('settings.wards.destroy');
+            Route::get('/settings/wards/template',               [SettingsController::class, 'downloadWardsTemplate'])           ->name('settings.wards.template');
+            Route::post('/settings/wards/import',                [SettingsController::class, 'importWards'])                     ->name('settings.wards.import');
+            Route::get('/settings/wards-settlements/template',   [SettingsController::class, 'downloadWardSettlementsTemplate'])  ->name('settings.wards-settlements.template');
+            Route::post('/settings/wards-settlements/import',    [SettingsController::class, 'importWardsAndSettlements'])        ->name('settings.wards-settlements.import');
+            Route::delete('/settings/wards/bulk',                [SettingsController::class, 'bulkDestroyWards'])           ->name('settings.wards.bulk-destroy');
+            Route::delete('/settings/settlements/bulk',          [SettingsController::class, 'bulkDestroySettlements'])       ->name('settings.settlements.bulk-destroy');
+            Route::post('/settings/wards/{ward}/settlements',   [SettingsController::class, 'storeSettlement'])          ->name('settings.settlements.store');
+            Route::patch('/settings/settlements/{settlement}',   [SettingsController::class, 'updateSettlement'])         ->name('settings.settlements.update');
+            Route::delete('/settings/settlements/{settlement}',  [SettingsController::class, 'destroySettlement'])        ->name('settings.settlements.destroy');
+            Route::get('/settings/settlements/template',         [SettingsController::class, 'downloadSettlementsTemplate'])->name('settings.settlements.template');
+            Route::post('/settings/settlements/import',          [SettingsController::class, 'importSettlements'])        ->name('settings.settlements.import');
+            Route::get('/settings/api/local-governments', [SettingsController::class, 'apiLocalGovernments'])->name('settings.api.lgs');
+            Route::post('/settings/representatives',                  [SettingsController::class, 'storeRepresentative'])  ->name('settings.representatives.store');
+            Route::post('/settings/representatives/{representative}', [SettingsController::class, 'updateRepresentative']) ->name('settings.representatives.update');
+            Route::delete('/settings/representatives/{representative}',[SettingsController::class, 'destroyRepresentative'])->name('settings.representatives.destroy');
+            Route::post('/settings/employees',              [SettingsController::class, 'storeEmployee'])  ->name('settings.employees.store');
+            Route::post('/settings/employees/{employee}',   [SettingsController::class, 'updateEmployee']) ->name('settings.employees.update');
+            Route::delete('/settings/employees/{employee}', [SettingsController::class, 'destroyEmployee'])->name('settings.employees.destroy');
+            Route::post('/settings/gallery',                [SettingsController::class, 'storePhoto'])     ->name('settings.gallery.store');
+            Route::post('/settings/gallery/{lgPhoto}',      [SettingsController::class, 'updatePhoto'])    ->name('settings.gallery.update');
+            Route::delete('/settings/gallery/{lgPhoto}',    [SettingsController::class, 'destroyPhoto'])   ->name('settings.gallery.destroy');
+            Route::post('/settings/download-links',                    [SettingsController::class, 'storeDownloadLink'])  ->name('settings.download-links.store');
+            Route::post('/settings/download-links/{downloadLink}',     [SettingsController::class, 'updateDownloadLink']) ->name('settings.download-links.update');
+            Route::delete('/settings/download-links/{downloadLink}',   [SettingsController::class, 'destroyDownloadLink'])->name('settings.download-links.destroy');
+        });
+});
+
+require __DIR__.'/auth.php';

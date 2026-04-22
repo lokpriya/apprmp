@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Print styles ─────────────────────────────────────────────────────────── */
+@media print {
+  /* Hide the navigation sidebar completely */
+  aside { display: none !important; }
+
+  /* Make the main content fill the full page width */
+  .flex.h-screen { display: block !important; }
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Page setup */
+  @page {
+    size: A4 portrait;
+    margin: 15mm 12mm;
+  }
+
+  /* Reset background colours for ink saving */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Hide helper elements */
+  .no-print { display: none !important; }
+
+  /* Show elements only visible in print */
+  .print-only { display: block !important; }
+
+  /* Avoid page breaks inside cards */
+  section, .bg-white { break-inside: avoid; }
+}

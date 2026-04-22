@@ -1,0 +1,1581 @@
+<!DOCTYPE html>
+<html lang="ne">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>रोङ गाउँपालिका संस्थागत सर्वेक्षण २०८२</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@300;400;500;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: #1a3a5c;
+    --primary-light: #2d5a8e;
+    --accent: #c8922a;
+    --accent-light: #e8b84b;
+    --bg: #f4f1eb;
+    --bg-card: #fdfcf8;
+    --text: #1e1e1e;
+    --text-muted: #6b6b6b;
+    --border: #d4c9b8;
+    --border-focus: #2d5a8e;
+    --success: #2e7d52;
+    --red: #c0392b;
+    --section-bg: #eef2f7;
+    --input-bg: #ffffff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans Devanagari', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.7;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  .site-header {
+    background: var(--primary);
+    background-image: linear-gradient(135deg, #0f2540 0%, #1a3a5c 50%, #254e7a 100%);
+    color: white;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .site-header::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 300px; height: 300px;
+    border-radius: 50%;
+    background: rgba(200,146,42,0.12);
+  }
+  .site-header::after {
+    content: '';
+    position: absolute;
+    bottom: -40px; left: 20%;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+  }
+  .header-inner {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 36px 32px 30px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    position: relative;
+    z-index: 1;
+  }
+  .header-emblem {
+    width: 70px; height: 70px;
+    background: rgba(255,255,255,0.12);
+    border: 2px solid rgba(200,146,42,0.5);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+    flex-shrink: 0;
+  }
+  .header-text h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    margin-bottom: 4px;
+  }
+  .header-text .subtitle {
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.7);
+    font-weight: 300;
+  }
+  .header-badge {
+    margin-left: auto;
+    background: var(--accent);
+    color: white;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+  }
+
+  /* PROGRESS BAR */
+  .progress-bar {
+    background: rgba(0,0,0,0.3);
+    height: 4px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent-light);
+    width: 0%;
+    transition: width 0.5s ease;
+  }
+
+  /* INSTRUCTIONS BANNER */
+  .instructions {
+    background: #fff8ed;
+    border-left: 4px solid var(--accent);
+    max-width: 900px;
+    margin: 24px auto 0;
+    padding: 16px 20px;
+    border-radius: 0 8px 8px 0;
+  }
+  .instructions h3 { color: var(--accent); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  .instructions ol { padding-left: 18px; color: var(--text-muted); font-size: 0.88rem; }
+  .instructions ol li { margin-bottom: 4px; }
+
+  /* FORM WRAPPER */
+  .form-wrapper {
+    max-width: 900px;
+    margin: 24px auto 48px;
+    padding: 0 16px;
+  }
+
+  /* SECTION CARD */
+  .section-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    transition: box-shadow 0.2s;
+  }
+  .section-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+
+  .section-header {
+    background: var(--primary);
+    background-image: linear-gradient(90deg, #1a3a5c, #2d5a8e);
+    color: white;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .section-header.accent-header {
+    background-image: linear-gradient(90deg, #8b4513, var(--accent));
+  }
+  .section-number {
+    width: 28px; height: 28px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    flex: 1;
+  }
+  .section-toggle {
+    font-size: 1.1rem;
+    transition: transform 0.3s;
+  }
+  .section-toggle.open { transform: rotate(180deg); }
+
+  .section-body {
+    padding: 24px;
+  }
+  .section-body.collapsed { display: none; }
+
+  /* SUBSECTION */
+  .subsection {
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px dashed var(--border);
+  }
+  .subsection:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .subsection-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--primary-light);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .subsection-title::before {
+    content: '';
+    width: 4px; height: 18px;
+    background: var(--accent);
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  /* FORM GRID */
+  .form-grid { display: grid; gap: 16px; }
+  .form-grid-2 { grid-template-columns: 1fr 1fr; }
+  .form-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .form-grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+  @media(max-width: 640px) {
+    .form-grid-2, .form-grid-3, .form-grid-4 { grid-template-columns: 1fr; }
+    .header-inner { flex-wrap: wrap; }
+    .header-badge { margin-left: 0; }
+  }
+
+  /* FIELD */
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field.full { grid-column: 1 / -1; }
+
+  label {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.01em;
+  }
+  label .required { color: var(--red); margin-left: 2px; }
+
+  input[type="text"],
+  input[type="number"],
+  input[type="date"],
+  select,
+  textarea {
+    width: 100%;
+    padding: 9px 13px;
+    border: 1.5px solid var(--border);
+    border-radius: 7px;
+    background: var(--input-bg);
+    font-family: 'Noto Sans Devanagari', sans-serif;
+    font-size: 0.9rem;
+    color: var(--text);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+    -webkit-appearance: none;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 3px rgba(45,90,142,0.1);
+  }
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6b6b' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+    cursor: pointer;
+  }
+  textarea { resize: vertical; min-height: 80px; }
+
+  /* RADIO & CHECKBOX GROUPS */
+  .radio-group, .checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .radio-option, .checkbox-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    transition: all 0.2s;
+    background: white;
+  }
+  .radio-option:hover, .checkbox-option:hover {
+    border-color: var(--primary-light);
+    background: var(--section-bg);
+  }
+  .radio-option input, .checkbox-option input {
+    width: 16px; height: 16px;
+    accent-color: var(--primary);
+    flex-shrink: 0;
+  }
+
+  /* RADIO/CHECKBOX COLUMNS */
+  .options-cols {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .options-cols .radio-option,
+  .options-cols .checkbox-option {
+    padding: 7px 12px;
+    font-size: 0.85rem;
+  }
+
+  /* GPS BLOCK */
+  .gps-block {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 12px;
+    background: var(--section-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  @media(max-width: 640px) { .gps-block { grid-template-columns: 1fr 1fr; } }
+
+  /* INSTITUTION ID DISPLAY */
+  .inst-id {
+    background: var(--primary);
+    color: var(--accent-light);
+    font-size: 1.3rem;
+    font-weight: 700;
+    padding: 14px 20px;
+    border-radius: 8px;
+    letter-spacing: 0.05em;
+    font-family: monospace;
+    display: inline-block;
+  }
+
+  /* CONDITIONAL SECTION */
+  .conditional-section {
+    display: none;
+    margin-top: 20px;
+    padding: 20px;
+    background: var(--section-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .conditional-section.visible { display: block; }
+  .conditional-section .section-label {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border);
+  }
+
+  /* REPEAT BLOCK */
+  .repeat-block {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    background: white;
+    margin-bottom: 12px;
+    position: relative;
+  }
+  .repeat-block-header {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--primary-light);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .btn-add, .btn-remove {
+    padding: 7px 16px;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Noto Sans Devanagari', sans-serif;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .btn-add { background: var(--primary); color: white; }
+  .btn-add:hover { background: var(--primary-light); }
+  .btn-remove { background: #fdecea; color: var(--red); border: 1px solid #f5c6c6; }
+  .btn-remove:hover { background: #f9d3d0; }
+
+  /* YES/NO INLINE */
+  .yes-no {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .yes-no label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 16px;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 400;
+    color: var(--text);
+    background: white;
+    transition: all 0.2s;
+  }
+  .yes-no label:has(input:checked) { border-color: var(--primary); background: var(--section-bg); color: var(--primary); }
+  .yes-no input { width: 14px; height: 14px; accent-color: var(--primary); }
+
+  /* INFO NOTE */
+  .info-note {
+    background: #fffbeb;
+    border: 1px solid #f6d860;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    color: #7a5c00;
+    margin-bottom: 16px;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  /* FILE UPLOAD */
+  .file-upload-area {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: white;
+  }
+  .file-upload-area:hover { border-color: var(--primary-light); background: var(--section-bg); }
+  .file-upload-area .upload-icon { font-size: 2rem; margin-bottom: 8px; }
+  .file-upload-area p { font-size: 0.85rem; color: var(--text-muted); }
+  .file-upload-area input[type="file"] { display: none; }
+
+  /* SUBMIT FOOTER */
+  .form-footer {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    margin-top: 24px;
+  }
+  .success-note {
+    background: #edf7f1;
+    border: 1px solid #a3d9b5;
+    border-radius: 8px;
+    padding: 14px 20px;
+    color: var(--success);
+    font-size: 0.88rem;
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+  .btn-submit {
+    background: var(--primary);
+    background-image: linear-gradient(135deg, #1a3a5c, #2d5a8e);
+    color: white;
+    border: none;
+    padding: 14px 48px;
+    border-radius: 8px;
+    font-family: 'Noto Sans Devanagari', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(26,58,92,0.3);
+    letter-spacing: 0.02em;
+  }
+  .btn-submit:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(26,58,92,0.4);
+  }
+  .btn-submit:active { transform: translateY(0); }
+
+  /* HELPER TEXT */
+  .field-help {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  /* DIVIDER LABEL */
+  .divider-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0 16px;
+    font-size: 0.82rem;
+    color: var(--accent);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .divider-label::before, .divider-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* WARD BADGE */
+  .ward-display {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--primary);
+    display: block;
+    line-height: 1;
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="site-header">
+  <div class="header-inner">
+    <div class="header-emblem">🏛️</div>
+    <div class="header-text">
+      <h1>रोङ गाउँपालिका</h1>
+      <p class="subtitle">संस्थागत विस्तृत वस्तुस्थिति सर्वेक्षण</p>
+    </div>
+    <div class="header-badge">२०८२</div>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+</header>
+
+<!-- MAIN FORM -->
+<div class="form-wrapper">
+
+  <!-- INSTRUCTIONS -->
+  <div class="instructions">
+    <h3>📋 निर्देशन</h3>
+    <ol>
+      <li>व्यक्ति वा संस्थाको नाम प्रस्टसँग अंग्रेजीमा लेख्नुहोला; नाम थरका सुरुका अक्षर क्यापिटल हुनुपर्ने छ।</li>
+      <li>संस्था वा घरधनीलाई सोधेर प्रस्ट भएपछिमात्र जानकारी भर्नुहोला।</li>
+      <li>भौगोलिक अवस्थिति रेकर्ड गर्न GPS अन गर्नुहोस।</li>
+    </ol>
+  </div>
+
+  <form id="surveyForm" onsubmit="submitForm(event)">
+
+  <!-- ===================== SECTION 1: LOCATION ===================== -->
+  <div class="section-card">
+    <div class="section-header" onclick="toggleSection(this)">
+      <div class="section-number">१</div>
+      <div class="section-title">स्थान र पहिचान</div>
+      <div class="section-toggle open">▼</div>
+    </div>
+    <div class="section-body">
+
+      <div class="subsection">
+        <div class="subsection-title">वार्ड जानकारी</div>
+        <div class="form-grid form-grid-3">
+          <div class="field">
+            <label>वार्ड नम्बर <span class="required">*</span></label>
+            <select name="ward_no" required>
+              <option value="">छान्नुहोस्</option>
+              <option>वार्ड १</option>
+              <option>वार्ड २</option>
+              <option>वार्ड ३</option>
+              <option>वार्ड ४</option>
+              <option>वार्ड ५</option>
+              <option>वार्ड ६</option>
+            </select>
+            <span class="field-help">वार्ड १ देखि ६ सम्म मात्र</span>
+          </div>
+          <div class="field">
+            <label>साबिकको मुख्य बसोबासको क्षेत्र <span class="required">*</span></label>
+            <input type="text" name="sabik_area" placeholder="क्षेत्रको नाम लेख्नुहोस्">
+          </div>
+          <div class="field">
+            <label>टोलको नाम</label>
+            <input type="text" name="tole_name" placeholder="टोलको नाम">
+          </div>
+          <div class="field">
+            <label>सूचिमा नभएको बस्तीको नाम</label>
+            <input type="text" name="unlisted_settlement" placeholder="यदि सूचिमा छैन भने">
+          </div>
+          <div class="field">
+            <label>संस्था सिरियल नम्बर <span class="required">*</span></label>
+            <input type="text" name="inst_serial" placeholder="उदा: 1-110-11010" id="serialInput" oninput="updateSerial()">
+          </div>
+          <div class="field">
+            <label>संस्था सि.न. (Auto)</label>
+            <div class="inst-id" id="instIdDisplay">1-110-11010---INST-</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-title">📍 भौगोलिक अवस्थिति (GPS)</div>
+        <div class="gps-block">
+          <div class="field">
+            <label>Latitude (x.y °)</label>
+            <input type="number" name="latitude" step="0.000001" placeholder="00.000000">
+          </div>
+          <div class="field">
+            <label>Longitude (x.y °)</label>
+            <input type="number" name="longitude" step="0.000001" placeholder="000.000000">
+          </div>
+          <div class="field">
+            <label>Altitude (m)</label>
+            <input type="number" name="altitude" placeholder="मिटरमा">
+          </div>
+          <div class="field">
+            <label>Accuracy (m)</label>
+            <input type="number" name="gps_accuracy" step="0.1" placeholder="सटीकता">
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================== SECTION 2: INSTITUTION TYPE ===================== -->
+  <div class="section-card">
+    <div class="section-header" onclick="toggleSection(this)">
+      <div class="section-number">२</div>
+      <div class="section-title">संस्थाको प्रकार र स्थापना</div>
+      <div class="section-toggle open">▼</div>
+    </div>
+    <div class="section-body">
+
+      <div class="field">
+        <label>संस्था स्थापना भएको मिति <span class="required">*</span></label>
+        <input type="date" name="est_date" style="max-width:220px">
+      </div>
+
+      <div class="divider-label">कुन संस्थाको रिपोर्ट गर्ने हो छान्नुहोस्</div>
+
+      <div class="options-cols" id="institutionTypeGroup">
+        <label class="radio-option"><input type="radio" name="inst_type" value="शिक्षासंग सम्बन्धित संस्था" onchange="showConditional('edu')"> शिक्षासंग सम्बन्धित संस्था</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="स्वास्थ्यसंग सम्बन्धित संस्था" onchange="showConditional('health')"> स्वास्थ्यसंग सम्बन्धित संस्था</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="सामुदायिक भवन" onchange="showConditional('common')"> सामुदायिक भवन</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="होम स्टे" onchange="showConditional('common')"> होम स्टे</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="पार्क" onchange="showConditional('common')"> पार्क</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="कोहिबोधि" onchange="showConditional('common')"> कोहिबोधि</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="समाज घर" onchange="showConditional('common')"> समाज घर</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="संग्रहालय" onchange="showConditional('common')"> संग्रहालय</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="सार्बजनिक संचार" onchange="showConditional('media')"> सार्बजनिक संचार</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="बन जंगल" onchange="showConditional('forest')"> बन जंगल</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="खानेपानी" onchange="showConditional('water')"> खानेपानी</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="धार्मिक संस्था" onchange="showConditional('religion')"> धार्मिक संस्था</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="सरकारी कार्यालय" onchange="showConditional('govoffice')"> सरकारी कार्यालय</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="गैरसरकारी संस्था" onchange="showConditional('ngo')"> गैरसरकारी संस्था</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="सहकारी संस्था" onchange="showConditional('cooperative')"> सहकारी संस्था</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="रेडक्रस सोसाइटी" onchange="showConditional('redcross')"> रेडक्रस सोसाइटी</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="राजनीतिक दल" onchange="showConditional('political')"> राजनीतिक दल</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="बजार" onchange="showConditional('market')"> बजार</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="उधोग" onchange="showConditional('industry')"> उधोग</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="ब्यापार ब्यबसाय" onchange="showConditional('business')"> ब्यापार ब्यबसाय</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="बितिय संस्था" onchange="showConditional('finance')"> बितिय संस्था</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="खेलकुद" onchange="showConditional('sports')"> खेलकुद</label>
+        <label class="radio-option"><input type="radio" name="inst_type" value="other_type" onchange="showConditional('other_inst')"> Other</label>
+      </div>
+
+      <div class="field" style="margin-top:12px; max-width:320px" id="otherInstField" style="display:none">
+        <label>अन्य संस्थाको विवरण</label>
+        <input type="text" name="inst_type_other" placeholder="Specify other...">
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================== SECTION 3: BUILDING ===================== -->
+  <div class="section-card">
+    <div class="section-header" onclick="toggleSection(this)">
+      <div class="section-number">३</div>
+      <div class="section-title">भवन संरचना</div>
+      <div class="section-toggle open">▼</div>
+    </div>
+    <div class="section-body">
+
+      <div class="subsection">
+        <div class="field" style="margin-bottom:16px">
+          <label>संस्थासँग भवन संरचना छ ? <span class="required">*</span></label>
+          <div class="yes-no">
+            <label><input type="radio" name="has_building" value="yes" onchange="toggleBuildingDetails(true)"> हो अथवा छ</label>
+            <label><input type="radio" name="has_building" value="no" onchange="toggleBuildingDetails(false)"> होइन अथवा छैन</label>
+          </div>
+        </div>
+
+        <div id="buildingDetails">
+          <div class="form-grid form-grid-3">
+            <div class="field">
+              <label>ढलाई गरेको पक्की भवनको संख्या</label>
+              <input type="number" name="rcc_building_count" min="0" placeholder="०">
+            </div>
+            <div class="field">
+              <label>ढलाई नगरेको सामान्य भवनको संख्या</label>
+              <input type="number" name="normal_building_count" min="0" placeholder="०">
+            </div>
+            <div class="field">
+              <label>टाटी र माटोको भवनको संख्या</label>
+              <input type="number" name="mud_building_count" min="0" placeholder="०">
+            </div>
+            <div class="field">
+              <label>पक्की भवनमा जम्मा कोठाको संख्या</label>
+              <input type="number" name="rcc_rooms" min="0" placeholder="०">
+            </div>
+            <div class="field">
+              <label>सामान्य भवनमा कोठाको संख्या</label>
+              <input type="number" name="normal_rooms" min="0" placeholder="०">
+            </div>
+            <div class="field">
+              <label>टाटी र माटोको भवनमा कोठाको संख्या</label>
+              <input type="number" name="mud_rooms" min="0" placeholder="०">
+            </div>
+          </div>
+
+          <div class="divider-label">भवनको स्वामित्व</div>
+          <div class="radio-group">
+            <label class="radio-option"><input type="radio" name="building_ownership" value="संस्था आफ्नै"> संस्था आफ्नै</label>
+            <label class="radio-option"><input type="radio" name="building_ownership" value="भाडामा" onchange="toggleRent(true)"> भाडामा</label>
+            <label class="radio-option"><input type="radio" name="building_ownership" value="च्यारिटी वा दान गरेको" onchange="toggleRent(false)"> च्यारिटी वा दान गरेको</label>
+          </div>
+          <div class="field" style="max-width:220px; margin-top:12px" id="rentField">
+            <label>भवनको मासिक भाडा (रु.)</label>
+            <input type="number" name="monthly_rent" min="0" placeholder="रकम">
+          </div>
+        </div>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-title">शौचालयको व्यवस्था</div>
+        <div class="form-grid form-grid-2">
+          <div class="field">
+            <label>शौचालयको व्यवस्था <span class="required">*</span></label>
+            <div class="yes-no">
+              <label><input type="radio" name="has_toilet" value="yes"> हो अथवा छ</label>
+              <label><input type="radio" name="has_toilet" value="no"> होइन अथवा छैन</label>
+            </div>
+          </div>
+          <div class="field">
+            <label>कति वटा शौचालय छन् ?</label>
+            <input type="number" name="toilet_count" min="0" placeholder="०" style="max-width:120px">
+          </div>
+          <div class="field">
+            <label>महिलाहरुको लागि छुट्टै शौचालय छ ?</label>
+            <div class="yes-no">
+              <label><input type="radio" name="female_toilet" value="yes"> हो</label>
+              <label><input type="radio" name="female_toilet" value="no"> होइन</label>
+            </div>
+          </div>
+          <div class="field">
+            <label>शौचालय अपांग मैत्री छ ?</label>
+            <div class="yes-no">
+              <label><input type="radio" name="disabled_toilet" value="yes"> हो</label>
+              <label><input type="radio" name="disabled_toilet" value="no"> होइन</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================== CONDITIONAL: EDUCATION ===================== -->
+  <div class="section-card" id="edu-section" style="display:none">
+    <div class="section-header accent-header" onclick="toggleSection(this)">
+      <div class="section-number">📚</div>
+      <div class="section-title">शिक्षासंग सम्बन्धित संस्थाको विवरण</div>
+      <div class="section-toggle open">▼</div>
+    </div>
+    <div class="section-body">
+
+      <div class="subsection">
+        <div class="subsection-title">शिक्षा संस्थाको प्रकार</div>
+        <div class="radio-group">
+          <label class="radio-option"><input type="radio" name="edu_type" value="बालविकास केन्द्र" onchange="showEduDetail('ecd')"> बालविकास केन्द्र</label>
+          <label class="radio-option"><input type="radio" name="edu_type" value="विधालय" onchange="showEduDetail('school')"> विधालय</label>
+          <label class="radio-option"><input type="radio" name="edu_type" value="क्याम्पस" onchange="showEduDetail('campus')"> क्याम्पस</label>
+          <label class="radio-option"><input type="radio" name="edu_type" value="कोचिंग सेन्टर" onchange="showEduDetail('coaching')"> कोचिंग सेन्टर</label>
+          <label class="radio-option"><input type="radio" name="edu_type" value="कम्प्युटर इन्स्टिच्युट" onchange="showEduDetail('computer')"> कम्प्युटर इन्स्टिच्युट</label>
+          <label class="radio-option"><input type="radio" name="edu_type" value="पोलीटेक्निक इन्स्टिच्युट" onchange="showEduDetail('polytechnic')"> पोलीटेक्निक इन्स्टिच्युट</label>
+        </div>
+      </div>
+
+      <!-- ECD Details -->
+      <div class="conditional-section" id="ecd-detail">
+        <div class="section-label">🧒 बालक विकासको विस्तृत विवरण</div>
+        <div class="form-grid form-grid-3">
+          <div class="field"><label>बालकको संख्या</label><input type="number" name="ecd_boys" min="0" placeholder="०"></div>
+          <div class="field"><label>बालिकाको संख्या</label><input type="number" name="ecd_girls" min="0" placeholder="०"></div>
+          <div class="field"><label>दलित बालबालिका</label><input type="number" name="ecd_dalit" min="0" placeholder="०"></div>
+          <div class="field"><label>जनजाती बालबालिका</label><input type="number" name="ecd_janajati" min="0" placeholder="०"></div>
+          <div class="field"><label>अन्य बालबालिका</label><input type="number" name="ecd_other" min="0" placeholder="०"></div>
+        </div>
+        <div class="form-grid form-grid-2" style="margin-top:12px">
+          <div class="field"><label>सम्पर्क व्यक्तिको नाम</label><input type="text" name="ecd_contact_name" placeholder="पूरा नाम"></div>
+          <div class="field"><label>सम्पर्क व्यक्तिको मोबाइल नम्बर</label><input type="text" name="ecd_contact_phone" placeholder="98XXXXXXXX"></div>
+        </div>
+      </div>
+
+      <!-- School Details -->
+      <div class="conditional-section" id="school-detail">
+        <div class="section-label">🏫 विधालयको विवरण</div>
+        <div class="form-grid form-grid-2">
+          <div class="field">
+            <label>विधालय/क्याम्पसको नाम <span class="required">*</span></label>
+            <input type="text" name="school_name" placeholder="विधालयको पूरा नाम">
+          </div>
+          <div class="field">
+            <label>विधालयको किसिम</label>
+            <select name="school_type">
+              <option value="">छान्नुहोस्</option>
+              <option>सरकारी विधालय</option>
+              <option>प्राइभेट बोर्डिंग स्कुल</option>
+              <option>मिसन स्कुल</option>
+              <option>गुरुकुल स्कुल</option>
+              <option>मदरसा स्कुल</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>विधालयको तह</label>
+            <select name="school_level">
+              <option value="">छान्नुहोस्</option>
+              <option>वालविकास</option>
+              <option>आधारभुत तह १ देखि ५</option>
+              <option>आधारभुत तह १ देखि ८</option>
+              <option>माध्यमिक तह १ देखि १०</option>
+              <option>माध्यमिक तह १ देखि १२</option>
+              <option>Other</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="divider-label">कक्षागत विद्यार्थीको विवरण</div>
+        <div id="studentRows">
+          <div class="repeat-block">
+            <div class="repeat-block-header"><span>विद्यार्थी विवरण — कक्षा १</span></div>
+            <div class="form-grid form-grid-3">
+              <div class="field"><label>कक्षा <span class="required">*</span></label><input type="text" name="class_name[]" placeholder="उदा: कक्षा ५"></div>
+              <div class="field"><label>पुरुष</label><input type="number" name="student_male[]" min="0" placeholder="०"></div>
+              <div class="field"><label>महिला</label><input type="number" name="student_female[]" min="0" placeholder="०"></div>
+              <div class="field"><label>दलित पुरुष</label><input type="number" name="dalit_male[]" min="0" placeholder="०"></div>
+              <div class="field"><label>दलित महिला</label><input type="number" name="dalit_female[]" min="0" placeholder="०"></div>
+              <div class="field"><label>जनजाती पुरुष</label><input type="number" name="janajati_male[]" min="0" placeholder="०"></div>
+              <div class="field"><label>जनजाती महिला</label><input type="number" name="janajati_female[]" min="0" placeholder="०"></div>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn-add" onclick="addStudentRow()">+ कक्षा थप्नुहोस्</button>
+
+        <div class="divider-label">शिक्षकको अवस्था</div>
+        <div class="form-grid form-grid-3">
+          <div class="field"><label>पुरुष शिक्षक</label><input type="number" name="teacher_male" min="0" placeholder="०"></div>
+          <div class="field"><label>महिला शिक्षक</label><input type="number" name="teacher_female" min="0" placeholder="०"></div>
+          <div class="field"><label>दलित पुरुष शिक्षक</label><input type="number" name="dalit_teacher_male" min="0" placeholder="०"></div>
+          <div class="field"><label>दलित महिला शिक्षक</label><input type="number" name="dalit_teacher_female" min="0" placeholder="०"></div>
+          <div class="field"><label>जनजाती पुरुष शिक्षक</label><input type="number" name="janajati_teacher_male" min="0" placeholder="०"></div>
+          <div class="field"><label>जनजाती महिला शिक्षक</label><input type="number" name="janajati_teacher_female" min="0" placeholder="०"></div>
+        </div>
+
+        <div class="divider-label">शिक्षकको पदको अवस्था</div>
+        <div class="form-grid form-grid-3">
+          <div class="field"><label>स्थायी पुरुष शिक्षक</label><input type="number" name="permanent_m" min="0" placeholder="०"></div>
+          <div class="field"><label>स्थायी महिला शिक्षक</label><input type="number" name="permanent_f" min="0" placeholder="०"></div>
+          <div class="field"><label>अस्थायी पुरुष शिक्षक</label><input type="number" name="temp_m" min="0" placeholder="०"></div>
+          <div class="field"><label>अस्थायी महिला शिक्षक</label><input type="number" name="temp_f" min="0" placeholder="०"></div>
+          <div class="field"><label>राहत पुरुष शिक्षक</label><input type="number" name="relief_m" min="0" placeholder="०"></div>
+          <div class="field"><label>राहत महिला शिक्षक</label><input type="number" name="relief_f" min="0" placeholder="०"></div>
+          <div class="field"><label>स्थानीय स्रोतबाट पुरुष</label><input type="number" name="local_m" min="0" placeholder="०"></div>
+          <div class="field"><label>स्थानीय स्रोतबाट महिला</label><input type="number" name="local_f" min="0" placeholder="०"></div>
+          <div class="field"><label>तालिम प्राप्त पुरुष</label><input type="number" name="trained_m" min="0" placeholder="०"></div>
+          <div class="field"><label>तालिम प्राप्त महिला</label><input type="number" name="trained_f" min="0" placeholder="०"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================== CONDITIONAL: HEALTH ===================== -->
+  <div class="section-card" id="health-section" style="display:none">
+    <div class="section-header accent-header" onclick="toggleSection(this)">
+      <div class="section-number">🏥</div>
+      <div class="section-title">स्वास्थ्य संस्थाको विवरण</div>
+      <div class="section-toggle open">▼</div>
+    </div>
+    <div class="section-body">
+      <div class="form-grid form-grid-2">
+        <div class="field">
+          <label>स्वास्थ्य संस्थाको प्रकार <span class="required">*</span></label>
+          <select name="health_type">
+            <option value="">छान्नुहोस्</option>
+            <option>अस्पताल</option>
+            <option>स्वास्थ्य चौकी</option>
+            <option>उप स्वास्थ्य चौकी</option>
+            <option>आयुर्वेद अस्पताल</option>
+            <option>नर्सिंग होम</option>
+            <option>दन्त अस्पताल</option>
+            <option>आखाँ अस्पताल</option>
+            <option>पोली क्लिनिक</option>
+            <option>प्राकृतिक चिकित्सा</option>
+            <option>परम्परागत उपचार केन्द्र</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>स्वास्थ्य संस्थाको प्रकार (सरकारी/निजी)</label>
+          <select name="health_ownership">
+            <option value="">छान्नुहोस्</option>
+            <option>सरकारी</option>
+            <option>निजी</option>
+            <option>सामुदायिक</option>
+            <option>अनुदान च्यारिटी</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field full">
+          <label>स्वास्थ्य संस्थाको नाम <span class="required">*</span></label>
+          <input type="text" name="health_name" placeholder="पूरा नाम">
+        </div>
+        <div class="field">
+          <label>पुरुष कर्मचारी</label>
+          <input type="number" name="health_male_staff" min="0" placeholder="०">
+        </div>
+        <div class="field">
+          <label>महिला कर्मचारी</label>
+          <input type="number" name="health_female_staff" min="0" placeholder="०">
+        </div>
+      </div>
+
+      <div class="divider-label">उपलब्ध मानव साधन</div>
+      <div class="options-cols">
+        <label class="checkbox-option"><input type="checkbox" name="health_hr[]" value="विशेषज्ञ तह"> विशेषज्ञ तह</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_hr[]" value="एमबीबिएस"> एमबीबिएस</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_hr[]" value="एचए"> एचए</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_hr[]" value="स्टाफ नर्स"> स्टाफ नर्स</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_hr[]" value="सीएमए"> सीएमए</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_hr[]" value="अनमी"> अनमी</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_hr[]" value="सामुदायिक स्वास्थ्य कार्य कर्ता"> सामुदायिक स्वास्थ्य कार्यकर्ता</label>
+      </div>
+
+      <div class="divider-label">उपलब्ध विभागहरु</div>
+      <div class="options-cols">
+        <label class="checkbox-option"><input type="checkbox" name="health_dept[]" value="ओपिडी"> ओपिडी</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_dept[]" value="आपतकालीन सेवा"> आपतकालीन सेवा</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_dept[]" value="नाक कान घाटी"> नाक कान घाटी</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_dept[]" value="नसा तथा मस्तिस्क"> नसा तथा मस्तिस्क</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_dept[]" value="मुटु सम्बन्धी"> मुटु सम्बन्धी</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_dept[]" value="पेट तथा पाचन प्रणाली"> पेट तथा पाचन प्रणाली</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_dept[]" value="सामान्य अप्रेशन"> सामान्य अप्रेशन</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_dept[]" value="स्त्रीरोग विभाग"> स्त्रीरोग विभाग</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_dept[]" value="रक्त परिक्षण"> रक्त परिक्षण</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_dept[]" value="मातृशिशु विभाग"> मातृशिशु विभाग</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_dept[]" value="आखाँ विभाग"> आखाँ विभाग</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_dept[]" value="औषधि विभाग"> औषधि विभाग</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_dept[]" value="पोषण तथा खाना"> पोषण तथा खाना</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_dept[]" value="हड्डी तथा मांसपेशी"> हड्डी तथा मांसपेशी</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_dept[]" value="रेडियो थेरापी"> रेडियो थेरापी</label>
+      </div>
+
+      <div class="divider-label">उपलब्ध परिक्षण सेवाहरु</div>
+      <div class="options-cols">
+        <label class="checkbox-option"><input type="checkbox" name="health_test[]" value="सिटि स्क्यान"> सिटि स्क्यान</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_test[]" value="एक्स रे सेवा"> एक्स रे सेवा</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_test[]" value="भिडियो एक्स रे"> भिडियो एक्स रे</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_test[]" value="ल्याब सेवा"> ल्याब सेवा</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_test[]" value="इसिजी सेवा"> इसिजी सेवा</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_test[]" value="आइसियु सेवा"> आइसियु सेवा</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_test[]" value="सिसियु सेवा"> सिसियु सेवा</label>
+        <label class="checkbox-option"><input type="checkbox" name="health_test[]" value="एमआरआइ सेवा"> एमआरआइ सेवा</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== CONDITIONAL: NGO ===================== -->
+  <div class="section-card" id="ngo-section" style="display:none">
+    <div class="section-header accent-header" onclick="toggleSection(this)">
+      <div class="section-number">🤝</div>
+      <div class="section-title">गैर-सरकारी संस्थाको विवरण</div>
+      <div class="section-toggle open">▼</div>
+    </div>
+    <div class="section-body">
+      <div class="form-grid form-grid-2">
+        <div class="field full">
+          <label>गैर-सरकारी संस्थाको नाम <span class="required">*</span></label>
+          <input type="text" name="ngo_name" placeholder="संस्थाको पूरा नाम">
+        </div>
+        <div class="field">
+          <label>संस्था दर्ता भएको छ ?</label>
+          <div class="yes-no">
+            <label><input type="radio" name="ngo_registered" value="yes"> हो</label>
+            <label><input type="radio" name="ngo_registered" value="no"> होइन</label>
+          </div>
+        </div>
+        <div class="field">
+          <label>प्यान/भ्याट मा दर्ता भएको छ ?</label>
+          <div class="yes-no">
+            <label><input type="radio" name="ngo_pan" value="yes"> हो</label>
+            <label><input type="radio" name="ngo_pan" value="no"> होइन</label>
+          </div>
+        </div>
+        <div class="field">
+          <label>दर्ता भएको साल</label>
+          <input type="text" name="ngo_reg_year" placeholder="२०__">
+        </div>
+        <div class="field">
+          <label>दर्ता नम्बर</label>
+          <input type="text" name="ngo_reg_no" placeholder="दर्ता नम्बर">
+        </div>
+      </div>
+
+      <div class="divider-label">संस्थाको कार्य क्षेत्र</div>
+      <div class="options-cols">
+        <label class="checkbox-option"><input type="checkbox" name="ngo_sector[]" value="शिक्षा"> शिक्षा</label>
+        <label class="checkbox-option"><input type="checkbox" name="ngo_sector[]" value="स्वास्थ्य"> स्वास्थ्य</label>
+        <label class="checkbox-option"><input type="checkbox" name="ngo_sector[]" value="अपांग र असहायको सहयोग"> अपांग र असहायको सहयोग</label>
+        <label class="checkbox-option"><input type="checkbox" name="ngo_sector[]" value="आयआर्जन तथा जीविकोपार्जन"> आयआर्जन तथा जीविकोपार्जन</label>
+        <label class="checkbox-option"><input type="checkbox" name="ngo_sector[]" value="जैविक विविधता र वातावरण"> जैविक विविधता र वातावरण</label>
+        <label class="checkbox-option"><input type="checkbox" name="ngo_sector[]" value="मानवअधिकार"> मानवअधिकार</label>
+        <label class="checkbox-option"><input type="checkbox" name="ngo_sector[]" value="महिला तथा बालबालिका"> महिला तथा बालबालिका</label>
+        <label class="checkbox-option"><input type="checkbox" name="ngo_sector[]" value="बैदेशिक रोजगार"> बैदेशिक रोजगार</label>
+        <label class="checkbox-option"><input type="checkbox" name="ngo_sector[]" value="ग्रामीण तथा सामुदायिक विकास"> ग्रामीण तथा सामुदायिक विकास</label>
+        <label class="checkbox-option"><input type="checkbox" name="ngo_sector[]" value="युवा शसक्तिकरण"> युवा शसक्तिकरण</label>
+        <label class="checkbox-option"><input type="checkbox" name="ngo_sector[]" value="कानुनी सहायता तथा परामर्श"> कानुनी सहायता तथा परामर्श</label>
+        <label class="checkbox-option"><input type="checkbox" name="ngo_sector[]" value="मानव समसधान विकास"> मानव समसधान विकास</label>
+      </div>
+
+      <div class="form-grid form-grid-3" style="margin-top:16px">
+        <div class="field">
+          <label>साधारण सदस्य संख्या</label>
+          <input type="number" name="ngo_gen_members" min="0" placeholder="०">
+        </div>
+        <div class="field">
+          <label>कार्य समिति सदस्य संख्या</label>
+          <input type="number" name="ngo_committee_members" min="0" placeholder="०">
+        </div>
+        <div class="field">
+          <label>कतिजना कर्मचारी छन्</label>
+          <input type="number" name="ngo_staff" min="0" placeholder="०">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== CONDITIONAL: COOPERATIVE ===================== -->
+  <div class="section-card" id="cooperative-section" style="display:none">
+    <div class="section-header accent-header" onclick="toggleSection(this)">
+      <div class="section-number">🏦</div>
+      <div class="section-title">सहकारी संस्थाको विवरण</div>
+      <div class="section-toggle open">▼</div>
+    </div>
+    <div class="section-body">
+      <div class="form-grid form-grid-2">
+        <div class="field full">
+          <label>सहकारी संस्थाको नाम <span class="required">*</span></label>
+          <input type="text" name="coop_name" placeholder="संस्थाको पूरा नाम">
+        </div>
+        <div class="field">
+          <label>संस्था दर्ता भएको छ ?</label>
+          <div class="yes-no">
+            <label><input type="radio" name="coop_registered" value="yes"> हो</label>
+            <label><input type="radio" name="coop_registered" value="no"> होइन</label>
+          </div>
+        </div>
+        <div class="field">
+          <label>दर्ता भएको साल</label>
+          <input type="text" name="coop_reg_year" placeholder="२०__">
+        </div>
+        <div class="field">
+          <label>दर्ता नम्बर</label>
+          <input type="text" name="coop_reg_no" placeholder="दर्ता नम्बर">
+        </div>
+      </div>
+
+      <div class="divider-label">सहकारी संस्थाको किसिम</div>
+      <div class="options-cols">
+        <label class="radio-option"><input type="radio" name="coop_type" value="बचत तथा ऋण"> बचत तथा ऋण</label>
+        <label class="radio-option"><input type="radio" name="coop_type" value="बहुदेश्य सहकारी संस्था"> बहुदेश्य सहकारी संस्था</label>
+        <label class="radio-option"><input type="radio" name="coop_type" value="दुध उत्पादन"> दुध उत्पादन</label>
+        <label class="radio-option"><input type="radio" name="coop_type" value="फलफुल उत्पादन"> फलफुल उत्पादन</label>
+        <label class="radio-option"><input type="radio" name="coop_type" value="कृषि"> कृषि</label>
+        <label class="radio-option"><input type="radio" name="coop_type" value="साना व्यवसायी"> साना व्यवसायी</label>
+        <label class="radio-option"><input type="radio" name="coop_type" value="श्रमिक समूह"> श्रमिक समूह</label>
+        <label class="radio-option"><input type="radio" name="coop_type" value="सामाजिक उधमी"> सामाजिक उधमी</label>
+      </div>
+
+      <div class="form-grid form-grid-3" style="margin-top:16px">
+        <div class="field"><label>शेयर सदस्य संख्या</label><input type="number" name="coop_share_members" min="0" placeholder="०"></div>
+        <div class="field"><label>कार्य समिति सदस्य संख्या</label><input type="number" name="coop_committee" min="0" placeholder="०"></div>
+        <div class="field"><label>कतिजना कर्मचारी छन्</label><input type="number" name="coop_staff" min="0" placeholder="०"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== CONDITIONAL: GOVT OFFICE ===================== -->
+  <div class="section-card" id="govoffice-section" style="display:none">
+    <div class="section-header accent-header" onclick="toggleSection(this)">
+      <div class="section-number">🏢</div>
+      <div class="section-title">सरकारी कार्यालयको विवरण</div>
+      <div class="section-toggle open">▼</div>
+    </div>
+    <div class="section-body">
+      <div class="form-grid form-grid-2">
+        <div class="field full"><label>सरकारी कार्यालयको नाम <span class="required">*</span></label><input type="text" name="gov_name" placeholder="कार्यालयको पूरा नाम"></div>
+        <div class="field"><label>समेटेको वार्डहरु</label><input type="text" name="gov_wards" placeholder="उदा: १, २, ३"></div>
+        <div class="field"><label>कार्यालयको क्षेत्रफल</label><input type="text" name="gov_area" placeholder="वर्गमिटरमा"></div>
+        <div class="field"><label>कतिजना कर्मचारी छन्</label><input type="number" name="gov_staff" min="0" placeholder="०"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== CONDITIONAL: RELIGIOUS ===================== -->
+  <div class="section-card" id="religion-section" style="display:none">
+    <div class="section-header accent-header" onclick="toggleSection(this)">
+      <div class="section-number">🛕</div>
+      <div class="section-title">धार्मिक संस्थाको विवरण</div>
+      <div class="section-toggle open">▼</div>
+    </div>
+    <div class="section-body">
+      <div class="divider-label">धर्म</div>
+      <div class="options-cols">
+        <label class="radio-option"><input type="radio" name="religion_type" value="हिन्दु"> हिन्दु</label>
+        <label class="radio-option"><input type="radio" name="religion_type" value="बुधिस्ट"> बुधिस्ट</label>
+        <label class="radio-option"><input type="radio" name="religion_type" value="क्रिस्चियन"> क्रिस्चियन</label>
+        <label class="radio-option"><input type="radio" name="religion_type" value="जैन"> जैन</label>
+        <label class="radio-option"><input type="radio" name="religion_type" value="प्रकृति"> प्रकृति</label>
+        <label class="radio-option"><input type="radio" name="religion_type" value="बोने"> बोने</label>
+        <label class="radio-option"><input type="radio" name="religion_type" value="बाइ"> बाइ</label>
+        <label class="radio-option"><input type="radio" name="religion_type" value="शिख"> शिख</label>
+        <label class="radio-option"><input type="radio" name="religion_type" value="किराँत"> किराँत</label>
+        <label class="radio-option"><input type="radio" name="religion_type" value="मुस्लिम"> मुस्लिम</label>
+      </div>
+      <div class="form-grid form-grid-2" style="margin-top:16px">
+        <div class="field full"><label>धार्मिक संस्थाको नाम <span class="required">*</span></label><input type="text" name="religion_name" placeholder="संस्थाको नाम"></div>
+        <div class="field">
+          <label>धार्मिक संस्था दर्ता गरेको छ ?</label>
+          <div class="yes-no">
+            <label><input type="radio" name="religion_registered" value="yes"> हो</label>
+            <label><input type="radio" name="religion_registered" value="no"> होइन</label>
+          </div>
+        </div>
+        <div class="field"><label>दर्ता भएको मिति (वर्षमा)</label><input type="text" name="religion_reg_year" placeholder="२०__"></div>
+        <div class="field"><label>जग्गाको क्षेत्रफल</label><input type="text" name="religion_area" placeholder="रोपनीमा"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== CONDITIONAL: FOREST ===================== -->
+  <div class="section-card" id="forest-section" style="display:none">
+    <div class="section-header accent-header" onclick="toggleSection(this)">
+      <div class="section-number">🌲</div>
+      <div class="section-title">बन जंगल सम्बन्धित सूचना</div>
+      <div class="section-toggle open">▼</div>
+    </div>
+    <div class="section-body">
+      <div class="field" style="margin-bottom:16px">
+        <label>बन जंगलको किसिम <span class="required">*</span></label>
+        <div class="radio-group">
+          <label class="radio-option"><input type="radio" name="forest_type" value="निजी जंगल"> निजी जंगल</label>
+          <label class="radio-option"><input type="radio" name="forest_type" value="सामुदायिक बन उपभोक्ता समूह"> सामुदायिक बन उपभोक्ता समूह</label>
+          <label class="radio-option"><input type="radio" name="forest_type" value="सरकारी जंगल"> सरकारी जंगल</label>
+        </div>
+      </div>
+      <div class="form-grid form-grid-2">
+        <div class="field full"><label>बनको नाम</label><input type="text" name="forest_name" placeholder="बनको नाम"></div>
+        <div class="field"><label>बनको क्षेत्रफल</label><input type="text" name="forest_area" placeholder="हेक्टरमा"></div>
+        <div class="field"><label>समेटेको वार्डहरु</label><input type="text" name="forest_wards" placeholder="उदा: १, ३, ५"></div>
+        <div class="field"><label>उपभोक्ता घरधुरी संख्या</label><input type="number" name="forest_households" min="0" placeholder="०"></div>
+        <div class="field"><label>जम्मा रुखको संख्या</label><input type="number" name="forest_trees" min="0" placeholder="०"></div>
+        <div class="field"><label>वार्षिक बजेट (रु.)</label><input type="number" name="forest_budget" min="0" placeholder="०"></div>
+      </div>
+
+      <div class="divider-label">बनमा भएका रुखका किसिमहरु</div>
+      <div class="options-cols">
+        <label class="checkbox-option"><input type="checkbox" name="tree_types[]" value="चिलाउने"> चिलाउने</label>
+        <label class="checkbox-option"><input type="checkbox" name="tree_types[]" value="उत्तिस"> उत्तिस</label>
+        <label class="checkbox-option"><input type="checkbox" name="tree_types[]" value="धुपी"> धुपी</label>
+        <label class="checkbox-option"><input type="checkbox" name="tree_types[]" value="साल"> साल</label>
+        <label class="checkbox-option"><input type="checkbox" name="tree_types[]" value="सिसौ"> सिसौ</label>
+        <label class="checkbox-option"><input type="checkbox" name="tree_types[]" value="खयर"> खयर</label>
+        <label class="checkbox-option"><input type="checkbox" name="tree_types[]" value="टिक"> टिक</label>
+        <label class="checkbox-option"><input type="checkbox" name="tree_types[]" value="सिमल"> सिमल</label>
+        <label class="checkbox-option"><input type="checkbox" name="tree_types[]" value="रबर"> रबर</label>
+        <label class="checkbox-option"><input type="checkbox" name="tree_types[]" value="मसला"> मसला</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== CONDITIONAL: SPORTS ===================== -->
+  <div class="section-card" id="sports-section" style="display:none">
+    <div class="section-header accent-header" onclick="toggleSection(this)">
+      <div class="section-number">⚽</div>
+      <div class="section-title">खेलकुद संस्थाको विवरण</div>
+      <div class="section-toggle open">▼</div>
+    </div>
+    <div class="section-body">
+      <div class="form-grid form-grid-2">
+        <div class="field full"><label>खेलकुद संस्थाको नाम <span class="required">*</span></label><input type="text" name="sports_name" placeholder="संस्थाको नाम"></div>
+      </div>
+      <div class="divider-label">खेलकुद संस्थाले समेटेका खेलहरु</div>
+      <div class="options-cols">
+        <label class="checkbox-option"><input type="checkbox" name="sports_types[]" value="फुटबल"> फुटबल</label>
+        <label class="checkbox-option"><input type="checkbox" name="sports_types[]" value="भलिबल"> भलिबल</label>
+        <label class="checkbox-option"><input type="checkbox" name="sports_types[]" value="क्रिकेट"> क्रिकेट</label>
+        <label class="checkbox-option"><input type="checkbox" name="sports_types[]" value="ब्याडमिन्टन"> ब्याडमिन्टन</label>
+        <label class="checkbox-option"><input type="checkbox" name="sports_types[]" value="टेनिस"> टेनिस</label>
+        <label class="checkbox-option"><input type="checkbox" name="sports_types[]" value="एथलेटिक्स"> एथलेटिक्स</label>
+        <label class="checkbox-option"><input type="checkbox" name="sports_types[]" value="चेस वा बुद्धिचाल"> चेस वा बुद्धिचाल</label>
+      </div>
+      <div class="form-grid form-grid-3" style="margin-top:16px">
+        <div class="field"><label>पुरुष सदस्य संख्या</label><input type="number" name="sports_male_members" min="0" placeholder="०"></div>
+        <div class="field"><label>महिला सदस्य संख्या</label><input type="number" name="sports_female_members" min="0" placeholder="०"></div>
+        <div class="field"><label>संस्थाको प्रमुखको नाम</label><input type="text" name="sports_head" placeholder="नाम"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== CONDITIONAL: POLITICAL ===================== -->
+  <div class="section-card" id="political-section" style="display:none">
+    <div class="section-header accent-header" onclick="toggleSection(this)">
+      <div class="section-number">🗳️</div>
+      <div class="section-title">राजनीति दलको विवरण</div>
+      <div class="section-toggle open">▼</div>
+    </div>
+    <div class="section-body">
+      <div class="form-grid form-grid-2">
+        <div class="field full"><label>राजनीतिक दलको नाम <span class="required">*</span></label><input type="text" name="party_name" placeholder="दलको पूरा नाम"></div>
+        <div class="field">
+          <label>कमिटिको प्रकार</label>
+          <div class="radio-group">
+            <label class="radio-option"><input type="radio" name="party_committee" value="क्षेत्रीय कमिटी"> क्षेत्रीय कमिटी</label>
+            <label class="radio-option"><input type="radio" name="party_committee" value="नगर कमिटी"> नगर कमिटी</label>
+            <label class="radio-option"><input type="radio" name="party_committee" value="वार्ड कमिटी"> वार्ड कमिटी</label>
+            <label class="radio-option"><input type="radio" name="party_committee" value="टोल कमिटी"> टोल कमिटी</label>
+          </div>
+        </div>
+        <div class="field"><label>कार्य समिति सदस्य संख्या</label><input type="number" name="party_committee_members" min="0" placeholder="०"></div>
+        <div class="field"><label>कार्य समिति अध्यक्षको नाम</label><input type="text" name="party_chairperson" placeholder="अध्यक्षको नाम"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== CONDITIONAL: MARKET ===================== -->
+  <div class="section-card" id="market-section" style="display:none">
+    <div class="section-header accent-header" onclick="toggleSection(this)">
+      <div class="section-number">🛍️</div>
+      <div class="section-title">बजार सम्बन्धमा जानकारी</div>
+      <div class="section-toggle open">▼</div>
+    </div>
+    <div class="section-body">
+      <div class="form-grid form-grid-2">
+        <div class="field full"><label>बजारको नाम <span class="required">*</span></label><input type="text" name="market_name" placeholder="बजारको नाम"></div>
+        <div class="field">
+          <label>समयका आधारमा बजारको वर्गिकरण</label>
+          <select name="market_frequency">
+            <option value="">छान्नुहोस्</option>
+            <option>दैनिक</option>
+            <option>साप्ताहिक</option>
+            <option>पाक्षिक</option>
+            <option>मासिक</option>
+            <option>अर्धबार्षिक</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>बजारको किसिम</label>
+          <select name="market_type">
+            <option value="">छान्नुहोस्</option>
+            <option>साधारण हाटबजार</option>
+            <option>सुपर मार्केट</option>
+            <option>डिपार्टमेन्ट स्टोर</option>
+            <option>पशु बजार</option>
+            <option>तरकारी बजार</option>
+            <option>फलफुल बजार</option>
+            <option>माशु बजार</option>
+            <option>ट्रेड सेन्टर होलसेल बजार</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>बजारको स्वामित्व</label>
+          <select name="market_ownership">
+            <option value="">छान्नुहोस्</option>
+            <option>निजी</option>
+            <option>पब्लिक कम्पनि</option>
+            <option>सरकारी</option>
+            <option>समुदाय</option>
+          </select>
+        </div>
+        <div class="field"><label>बजार कार्य समिति अध्यक्षको नाम</label><input type="text" name="market_chairperson" placeholder="नाम"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== CONDITIONAL: FINANCE ===================== -->
+  <div class="section-card" id="finance-section" style="display:none">
+    <div class="section-header accent-header" onclick="toggleSection(this)">
+      <div class="section-number">💰</div>
+      <div class="section-title">वितिय संस्था सम्बन्धमा जानकारी</div>
+      <div class="section-toggle open">▼</div>
+    </div>
+    <div class="section-body">
+      <div class="form-grid form-grid-2">
+        <div class="field full"><label>वितिय संस्थाको नाम <span class="required">*</span></label><input type="text" name="finance_name" placeholder="संस्थाको नाम"></div>
+        <div class="field">
+          <label>वितिय संस्थाको प्रकार</label>
+          <select name="finance_type">
+            <option value="">छान्नुहोस्</option>
+            <option>विकास बैंक</option>
+            <option>बाणिज्य बैंक</option>
+            <option>वितिय संस्था/माइक्रो फिनान्स</option>
+            <option>मुद्रा सटही</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field"><label>पुरुष कर्मचारीको संख्या</label><input type="number" name="finance_male_staff" min="0" placeholder="०"></div>
+        <div class="field"><label>महिला कर्मचारीको संख्या</label><input type="number" name="finance_female_staff" min="0" placeholder="०"></div>
+        <div class="field"><label>कार्यकारी प्रमुखको नाम</label><input type="text" name="finance_ceo" placeholder="प्रमुखको नाम"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== CONDITIONAL: BUSINESS ===================== -->
+  <div class="section-card" id="business-section" style="display:none">
+    <div class="section-header accent-header" onclick="toggleSection(this)">
+      <div class="section-number">🏪</div>
+      <div class="section-title">ब्यापार ब्यबसाय सम्बन्धमा जानकारी</div>
+      <div class="section-toggle open">▼</div>
+    </div>
+    <div class="section-body">
+      <div class="form-grid form-grid-2">
+        <div class="field">
+          <label>कस्तो किसिमको ब्यबसाय गर्नु हुन्छ ? <span class="required">*</span></label>
+          <select name="business_category">
+            <option value="">छान्नुहोस्</option>
+            <option>कृषि तथा पशुपालन</option>
+            <option>सप्लायर्स (आपूर्ति)</option>
+            <option>सूचना र संचार प्रदायक</option>
+            <option>होटल तथा रेस्टुरेन्ट</option>
+            <option>सवारी तथा यातायात सेवा</option>
+            <option>शैक्षिक संस्था</option>
+            <option>विशेषज्ञ परामर्श सेवा</option>
+            <option>यन्त्र उपकरण र मर्मत</option>
+            <option>अस्पताल वा क्लिनिक</option>
+            <option>वितिय संस्था</option>
+            <option>बैदेशिक रोजगारी र सुरक्षा गार्ड</option>
+            <option>फ्यान्सी व्यवसाय</option>
+            <option>अन्य पसल व्यवसाय</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>ब्यबसायको नाम</label>
+          <input type="text" name="business_name" placeholder="ब्यबसायको नाम">
+        </div>
+        <div class="field">
+          <label>ब्यबसाय धनीको नाम</label>
+          <input type="text" name="business_owner" placeholder="मालिकको नाम">
+        </div>
+        <div class="field">
+          <label>ब्यावसाय गरेको स्थान</label>
+          <select name="business_location">
+            <option value="">छान्नुहोस्</option>
+            <option>सहर क्षेत्र</option>
+            <option>साधारण बजार क्षेत्र</option>
+            <option>ग्रामिण क्षेत्र</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>ब्यबसाय दर्ता गरेको छ ?</label>
+          <div class="yes-no">
+            <label><input type="radio" name="business_registered" value="yes"> हो</label>
+            <label><input type="radio" name="business_registered" value="no"> होइन</label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== SECTION: CONTACT & COMMITTEE ===================== -->
+  <div class="section-card">
+    <div class="section-header" onclick="toggleSection(this)">
+      <div class="section-number">४</div>
+      <div class="section-title">सम्पर्क व्यक्ति तथा कार्यसमितिको विवरण</div>
+      <div class="section-toggle open">▼</div>
+    </div>
+    <div class="section-body">
+
+      <div class="subsection">
+        <div class="subsection-title">सम्पर्क व्यक्ति</div>
+        <div class="form-grid form-grid-2">
+          <div class="field">
+            <label>सम्पर्क व्यक्तिको नाम <span class="required">*</span></label>
+            <input type="text" name="contact_name" placeholder="पूरा नाम">
+          </div>
+          <div class="field">
+            <label>सम्पर्क व्यक्तिको मोबाइल नम्बर <span class="required">*</span></label>
+            <input type="text" name="contact_phone" placeholder="98XXXXXXXX">
+          </div>
+        </div>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-title">कार्यसमितिको विवरण</div>
+        <div class="field" style="margin-bottom:14px">
+          <label>संस्थाको संचालन, व्यवस्थापन वा कार्यसमिति छ ?</label>
+          <div class="yes-no">
+            <label><input type="radio" name="has_committee" value="yes"> हो</label>
+            <label><input type="radio" name="has_committee" value="no"> होइन</label>
+          </div>
+        </div>
+        <div class="form-grid form-grid-3">
+          <div class="field"><label>पुरुषको संख्या</label><input type="number" name="committee_male" min="0" placeholder="०"></div>
+          <div class="field"><label>महिलाको संख्या</label><input type="number" name="committee_female" min="0" placeholder="०"></div>
+          <div class="field"><label>अन्य लिङ्ग (तेस्रो लिंगी)</label><input type="number" name="committee_other_gender" min="0" placeholder="०"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================== SECTION: PHOTO UPLOAD ===================== -->
+  <div class="section-card">
+    <div class="section-header" onclick="toggleSection(this)">
+      <div class="section-number">५</div>
+      <div class="section-title">लोकेशनको फोटो</div>
+      <div class="section-toggle open">▼</div>
+    </div>
+    <div class="section-body">
+      <div class="info-note">
+        ⚠️ <span>फोटो लिनु भन्दा अघि आधिकारिक व्यक्तिसँग अनुमति लिनुहोला</span>
+      </div>
+      <div class="file-upload-area" onclick="document.getElementById('photoUpload').click()">
+        <div class="upload-icon">📸</div>
+        <p>फोटो अपलोड गर्न यहाँ क्लिक गर्नुहोस् (5MB भन्दा कम)</p>
+        <p style="font-size:0.75rem; margin-top:4px; color:#aaa">JPG, PNG, JPEG स्वीकार्य</p>
+        <input type="file" id="photoUpload" name="location_photo" accept="image/*" onchange="showFileName(this)">
+      </div>
+      <p id="fileName" style="font-size:0.82rem; color:var(--success); margin-top:8px; display:none"></p>
+    </div>
+  </div>
+
+  <!-- FOOTER / SUBMIT -->
+  <div class="form-footer">
+    <div class="success-note">
+      ✅ तथ्यांक संकलन पुरा गर्नु भएकोमा तपाइलाई धन्यबाद!<br>
+      यस तथ्यांकलाई सर्भरमा पठाउन भन्दा अगाडी सम्म सुरक्षित राख्नुहोस्।<br>
+      मोबाइललाइ बाल बालिका वा अरु कसैले भेट्ने गरि नछोड्नुहोस्।
+    </div>
+    <button type="submit" class="btn-submit">📤 तथ्यांक पठाउनुहोस्</button>
+  </div>
+
+  </form>
+</div>
+
+<script>
+// Toggle section open/close
+function toggleSection(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.section-toggle');
+  body.classList.toggle('collapsed');
+  toggle.classList.toggle('open');
+}
+
+// Show/hide conditional sections based on institution type
+const sectionMap = {
+  'शिक्षासंग सम्बन्धित संस्था': 'edu',
+  'स्वास्थ्यसंग सम्बन्धित संस्था': 'health',
+  'गैरसरकारी संस्था': 'ngo',
+  'सहकारी संस्था': 'cooperative',
+  'सरकारी कार्यालय': 'govoffice',
+  'धार्मिक संस्था': 'religion',
+  'बन जंगल': 'forest',
+  'खेलकुद': 'sports',
+  'राजनीतिक दल': 'political',
+  'बजार': 'market',
+  'बितिय संस्था': 'finance',
+  'ब्यापार ब्यबसाय': 'business',
+};
+
+const allSections = ['edu','health','ngo','cooperative','govoffice','religion','forest','sports','political','market','finance','business'];
+
+function showConditional(type) {
+  allSections.forEach(s => {
+    const el = document.getElementById(s + '-section');
+    if(el) el.style.display = 'none';
+  });
+  if(type && type !== 'common' && type !== 'media' && type !== 'water' && type !== 'other_inst') {
+    const el = document.getElementById(type + '-section');
+    if(el) el.style.display = 'block';
+  }
+  updateProgress();
+}
+
+// Edu sub-type details
+function showEduDetail(type) {
+  ['ecd','school','campus','coaching','computer','polytechnic'].forEach(t => {
+    const el = document.getElementById(t + '-detail');
+    if(el) el.classList.remove('visible');
+  });
+  const target = document.getElementById(type + '-detail');
+  if(target) target.classList.add('visible');
+}
+
+// Building details toggle
+function toggleBuildingDetails(show) {
+  document.getElementById('buildingDetails').style.display = show ? 'block' : 'none';
+}
+
+// Rent field toggle
+function toggleRent(show) {
+  document.getElementById('rentField').style.display = show ? 'block' : 'none';
+}
+
+// Serial number auto-update
+function updateSerial() {
+  const val = document.getElementById('serialInput').value || '1-110-11010';
+  document.getElementById('instIdDisplay').textContent = val + '---INST-';
+}
+
+// Student row add
+let studentRowCount = 1;
+function addStudentRow() {
+  studentRowCount++;
+  const container = document.getElementById('studentRows');
+  const div = document.createElement('div');
+  div.className = 'repeat-block';
+  div.innerHTML = `
+    <div class="repeat-block-header">
+      <span>विद्यार्थी विवरण — कक्षा ${studentRowCount}</span>
+      <button type="button" class="btn-remove" onclick="this.closest('.repeat-block').remove()">✕ हटाउनुहोस्</button>
+    </div>
+    <div class="form-grid form-grid-3">
+      <div class="field"><label>कक्षा *</label><input type="text" name="class_name[]" placeholder="उदा: कक्षा ५"></div>
+      <div class="field"><label>पुरुष</label><input type="number" name="student_male[]" min="0" placeholder="०"></div>
+      <div class="field"><label>महिला</label><input type="number" name="student_female[]" min="0" placeholder="०"></div>
+      <div class="field"><label>दलित पुरुष</label><input type="number" name="dalit_male[]" min="0" placeholder="०"></div>
+      <div class="field"><label>दलित महिला</label><input type="number" name="dalit_female[]" min="0" placeholder="०"></div>
+      <div class="field"><label>जनजाती पुरुष</label><input type="number" name="janajati_male[]" min="0" placeholder="०"></div>
+      <div class="field"><label>जनजाती महिला</label><input type="number" name="janajati_female[]" min="0" placeholder="०"></div>
+    </div>`;
+  container.appendChild(div);
+}
+
+// File name display
+function showFileName(input) {
+  const el = document.getElementById('fileName');
+  if(input.files && input.files[0]) {
+    el.textContent = '✅ फाइल चयन: ' + input.files[0].name;
+    el.style.display = 'block';
+  }
+}
+
+// Progress calculation
+function updateProgress() {
+  const inputs = document.querySelectorAll('input[required], select[required]');
+  let filled = 0;
+  inputs.forEach(inp => { if(inp.value) filled++; });
+  const pct = Math.min(100, Math.round((filled / inputs.length) * 100));
+  document.getElementById('progressFill').style.width = pct + '%';
+}
+
+document.querySelectorAll('input, select').forEach(el => {
+  el.addEventListener('change', updateProgress);
+  el.addEventListener('input', updateProgress);
+});
+
+// Form submit
+function submitForm(e) {
+  e.preventDefault();
+  const btn = document.querySelector('.btn-submit');
+  btn.textContent = '✅ पठाइयो!';
+  btn.style.background = 'linear-gradient(135deg, #2e7d52, #3d9e6a)';
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.textContent = '📤 तथ्यांक पठाउनुहोस्';
+    btn.style.background = '';
+    btn.disabled = false;
+  }, 3000);
+}
+
+// Init
+toggleBuildingDetails(false);
+document.getElementById('rentField').style.display = 'none';
+updateProgress();
+</script>
+</body>
+</html>

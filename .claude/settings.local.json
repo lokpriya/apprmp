@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(composer --version)",
+      "Bash(php --version)",
+      "Bash(mysql --version)",
+      "Bash(/d/xampp/php/php --version)",
+      "Bash(/d/xampp/php/php -r \"echo PHP_BINARY;\")"
+    ]
+  }
+}
