@@ -3,6 +3,7 @@
 namespace App\Imports;
 
 use App\Imports\Sheets\BusinessesSheet;
+use App\Services\SurveyValueValidator;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
 class BusinessImport implements WithMultipleSheets
@@ -12,8 +13,9 @@ class BusinessImport implements WithMultipleSheets
     public function __construct(
         private readonly int  $enumeratorId,
         private readonly ?int $wardId = null,
+        private readonly ?SurveyValueValidator $validator = null,
     ) {
-        $this->businessesSheet = new BusinessesSheet($enumeratorId, $wardId);
+        $this->businessesSheet = new BusinessesSheet($enumeratorId, $wardId, $this->validator);
     }
 
     public function sheets(): array

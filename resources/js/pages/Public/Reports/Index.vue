@@ -43,7 +43,7 @@
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         <a v-for="cat in categories" :key="cat.href"
-          :href="cat.href"
+          :href="filteredHref(cat.href)"
           class="group bg-white border border-[#e6e7e9] rounded-xl p-5
                  hover:border-[#206bc4]/50 hover:shadow-md transition-all no-underline">
 
@@ -99,6 +99,15 @@ const props = defineProps({
   wards:      { type: Array,  default: () => [] },
   filters:    { type: Object, default: () => ({}) },
 })
+
+// Carry active ward/settlement filter into category card links
+function filteredHref(base) {
+  const p = new URLSearchParams()
+  if (props.filters?.ward_id)       p.set('ward_id',       props.filters.ward_id)
+  if (props.filters?.settlement_id) p.set('settlement_id', props.filters.settlement_id)
+  const qs = p.toString()
+  return base + (qs ? '?' + qs : '')
+}
 
 // ── Stat cards ────────────────────────────────────────────────────────────────
 const statCards = computed(() => [

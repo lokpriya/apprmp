@@ -115,7 +115,7 @@
       </p>
       <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
         <a v-for="cat in otherCategories" :key="cat.href"
-          :href="cat.href"
+          :href="filteredHref(cat.href)"
           class="flex items-center gap-2.5 px-3 py-2.5 bg-white border border-[#e6e7e9]
                  rounded-lg hover:border-[#206bc4]/40 hover:bg-[#206bc4]/4 transition
                  no-underline group">
@@ -154,6 +154,15 @@ const props = defineProps({
   tables:      { type: Array,   default: () => [] },
   frequencies: { type: Array,   default: () => [] },
 })
+
+// Carry active ward/settlement filter into category navigation links
+function filteredHref(base) {
+  const p = new URLSearchParams()
+  if (props.filters?.ward_id)       p.set('ward_id',       props.filters.ward_id)
+  if (props.filters?.settlement_id) p.set('settlement_id', props.filters.settlement_id)
+  const qs = p.toString()
+  return base + (qs ? '?' + qs : '')
+}
 
 // ── Category metadata (icon + bg) ─────────────────────────────────────────────
 const CAT_META = {

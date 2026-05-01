@@ -5,6 +5,7 @@ namespace App\Imports\Sheets;
 use App\Models\Household;
 use App\Models\Settlement;
 use App\Models\Ward;
+use App\Services\DuplicateDetectionService;
 use App\Services\UniqueCodeService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,12 @@ class HouseholdsSheet implements ToCollection, WithHeadingRow, WithStartRow, Ski
     private array $errors     = [];
     private int   $imported   = 0;
 
+    // Pre-loaded lookup tables — populated at start of collection()
+    private array $wardMap       = [];   // ward_number => Ward
+    private array $wardById      = [];   // ward_id     => Ward
+    private array $settlementMap = [];   // "ward_id:name_lower" => Settlement
+    private array $existingCodes = [];   // unique_code => true
+
     public function __construct(
         private readonly int  $enumeratorId,
         private readonly ?int $forceWardId = null,
@@ -32,9 +39,31 @@ class HouseholdsSheet implements ToCollection, WithHeadingRow, WithStartRow, Ski
     {
         $codeService = app(UniqueCodeService::class);
 
+        // Pre-load all wards once
+        $wards = Ward::all();
+        foreach ($wards as $ward) {
+            $this->wardMap[$ward->ward_number] = $ward;
+            $this->wardById[$ward->id]         = $ward;
+        }
+
+        // If force ward, pre-load settlements for that ward only; otherwise all
+        $settlQuery = Settlement::query();
+        if ($this->forceWardId) {
+            $settlQuery->where('ward_id', $this->forceWardId);
+        }
+        foreach ($settlQuery->get() as $s) {
+            $key = $s->ward_id . ':' . mb_strtolower(trim($s->name_en));
+            $this->settlementMap[$key] = $s;
+            $key2 = $s->ward_id . ':' . mb_strtolower(trim($s->name_np));
+            $this->settlementMap[$key2] = $s;
+        }
+
+        // Pre-load all existing household codes so we can check existence in-memory
+        $this->existingCodes = Household::pluck('unique_code')->flip()->toArray();
+
         DB::transaction(function () use ($rows, $codeService) {
             foreach ($rows as $index => $row) {
-                $rowNum = $index + 2; // account for header row
+                $rowNum = $index + 2;
                 try {
                     $this->processRow($row->toArray(), $rowNum, $codeService);
                 } catch (\Throwable $e) {
@@ -46,46 +75,57 @@ class HouseholdsSheet implements ToCollection, WithHeadingRow, WithStartRow, Ski
 
     private function processRow(array $row, int $rowNum, UniqueCodeService $codeService): void
     {
-        // Resolve ward
-        $wardId = $this->forceWardId;
-        if (!$wardId) {
+        // Resolve ward — in-memory lookup
+        if ($this->forceWardId) {
+            $ward   = $this->wardById[$this->forceWardId] ?? null;
+            $wardId = $this->forceWardId;
+        } else {
             $wardNum = $row['ward_number'] ?? null;
             if (!$wardNum) {
                 $this->errors[] = "Row {$rowNum}: ward_number is required.";
                 return;
             }
-            $ward = Ward::where('ward_number', $wardNum)->first();
+            $ward = $this->wardMap[$wardNum] ?? null;
             if (!$ward) {
                 $this->errors[] = "Row {$rowNum}: Ward #{$wardNum} not found.";
                 return;
             }
             $wardId = $ward->id;
-        } else {
-            $ward = Ward::findOrFail($wardId);
         }
 
-        // Resolve settlement (optional)
-        $settlementId = null;
-        $settlementName = trim($row['settlement_name'] ?? '');
+        // Resolve settlement — in-memory lookup
+        $settlementId   = null;
+        $settlementName = mb_strtolower(trim($row['settlement_name'] ?? ''));
         if ($settlementName) {
-            $settlement = Settlement::where('ward_id', $wardId)
-                ->where(function ($q) use ($settlementName) {
-                    $q->where('name_en', 'like', $settlementName)
-                      ->orWhere('name_np', 'like', $settlementName);
-                })->first();
-            $settlementId = $settlement?->id;
+            $key = $wardId . ':' . $settlementName;
+            $settlementId = ($this->settlementMap[$key] ?? null)?->id;
         }
 
-        // Generate or use provided code
+        // Check code existence in-memory
         $code = trim($row['household_code'] ?? '');
         if (!$code) {
             $code = $codeService->generateHouseholdCode($ward);
-        } elseif (Household::where('unique_code', $code)->exists()) {
+        } elseif (isset($this->existingCodes[$code])) {
             $this->errors[] = "Row {$rowNum}: Household code '{$code}' already exists, skipped.";
             return;
         }
 
-        // Build survey_data.social from Households sheet columns
+        // Duplicate detection (still runs per-row, but only for new codes)
+        $dupCheck = [
+            'ward_id'            => $wardId,
+            'respondent_name'    => trim($row['respondent_name'] ?? ''),
+            'respondent_contact' => trim($row['respondent_contact'] ?? ''),
+            'gps_lat'            => $row['gps_lat'] ?? null,
+            'gps_lng'            => $row['gps_lng'] ?? null,
+        ];
+        $dup = app(DuplicateDetectionService::class)->checkHousehold($dupCheck);
+        if ($dup['found']) {
+            $codes   = implode(', ', array_column($dup['matches'], 'unique_code'));
+            $reasons = implode('; ', $dup['matches'][0]['reasons'] ?? []);
+            $this->errors[] = "Row {$rowNum}: Probable duplicate of [{$codes}] ({$reasons}) — skipped.";
+            return;
+        }
+
         $socialSnap = array_filter([
             'family_head' => trim($row['family_head'] ?? '') ?: null,
             'family_type' => trim($row['family_type'] ?? '') ?: null,
@@ -111,6 +151,8 @@ class HouseholdsSheet implements ToCollection, WithHeadingRow, WithStartRow, Ski
             'survey_data'        => $socialSnap ? ['social' => $socialSnap] : null,
         ]);
 
+        // Track new code so subsequent rows in same batch don't get false "exists" pass
+        $this->existingCodes[$code] = true;
         $this->codeToId[$code] = $household->id;
         $this->imported++;
     }
@@ -118,7 +160,6 @@ class HouseholdsSheet implements ToCollection, WithHeadingRow, WithStartRow, Ski
     private function parseDate(mixed $val): ?string
     {
         if (!$val) return null;
-        // Excel may give float (OLE date serial) or string
         if (is_numeric($val)) {
             try {
                 return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($val)
@@ -129,7 +170,6 @@ class HouseholdsSheet implements ToCollection, WithHeadingRow, WithStartRow, Ski
         return $d ? $d->format('Y-m-d') : null;
     }
 
-    // ─── Accessors for dependent sheets ──────────────────────────────────────
     public function getCodeToIdMap(): array { return $this->codeToId; }
     public function getErrors(): array       { return $this->errors; }
     public function getImportedCount(): int  { return $this->imported; }

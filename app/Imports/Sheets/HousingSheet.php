@@ -3,6 +3,7 @@
 namespace App\Imports\Sheets;
 
 use App\Models\HouseholdHousing;
+use App\Services\SurveyValueValidator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\ToCollection;
@@ -17,7 +18,10 @@ class HousingSheet implements ToCollection, WithHeadingRow, WithStartRow, SkipsE
     private array $errors   = [];
     private int   $imported = 0;
 
-    public function __construct(private readonly HouseholdsSheet $householdsSheet) {}
+    public function __construct(
+        private readonly HouseholdsSheet $householdsSheet,
+        private readonly ?SurveyValueValidator $validator = null,
+    ) {}
 
     public function collection(Collection $rows): void
     {
@@ -33,6 +37,22 @@ class HousingSheet implements ToCollection, WithHeadingRow, WithStartRow, SkipsE
                         continue;
                     }
                     $householdId = $codeMap[$code];
+
+                    // ── Survey option validation ──────────────────────────────
+                    if ($this->validator) {
+                        $errs = $this->validator->checkFields([
+                            'house_type'      => trim($row['house_type']      ?? ''),
+                            'roof_type'       => trim($row['roof_type']       ?? ''),
+                            'wall_type'       => trim($row['wall_type']       ?? ''),
+                            'foundation_type' => trim($row['foundation_type'] ?? ''),
+                            'ownership_type'  => trim($row['ownership_type']  ?? ''),
+                            'house_condition' => trim($row['house_condition'] ?? ''),
+                        ], $rowNum);
+                        if ($errs) {
+                            foreach ($errs as $e) $this->errors[] = $e;
+                            continue;
+                        }
+                    }
 
                     // Parse risk_types (comma-separated string → array)
                     $riskTypes = $this->parseArray($row['risk_types'] ?? null);

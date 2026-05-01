@@ -19,6 +19,8 @@ class LocalGovernment extends Model
         'photo_dir',
         'welcome_config',
         'maintenance_config',
+        'survey_config',
+        'google_sheets_config',
     ];
 
     protected $casts = [
@@ -29,13 +31,25 @@ class LocalGovernment extends Model
         'role_permissions'  => 'array',
         'photo_dir'         => 'array',
         'welcome_config'     => 'array',
-        'maintenance_config' => 'array',
-        'settings_locked_at' => 'datetime',
+        'maintenance_config'    => 'array',
+        'survey_config'         => 'array',
+        'google_sheets_config'  => 'array',
+        'settings_locked_at'    => 'datetime',
     ];
 
     public function isSettingsLocked(): bool
     {
         return $this->settings_locked_at !== null;
+    }
+
+    public function isSurveyFrozen(): bool
+    {
+        $config = $this->survey_config ?? [];
+        if (!empty($config['manual_freeze'])) return true;
+        $today = now()->toDateString();
+        if (!empty($config['start_date']) && $today < $config['start_date']) return true;
+        if (!empty($config['end_date'])   && $today > $config['end_date'])   return true;
+        return false;
     }
 
     /** Ordered list of narrative profile sections shown on the public portal. */

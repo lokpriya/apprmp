@@ -17,10 +17,11 @@ class RolePermissions
                     'households.create'  => ['label' => 'नयाँ थप्ने',       'en' => 'Create'],
                     'households.edit'    => ['label' => 'सम्पादन गर्ने',    'en' => 'Edit'],
                     'households.delete'  => ['label' => 'मेट्ने',           'en' => 'Delete'],
-                    'households.submit'  => ['label' => 'पेस गर्ने',        'en' => 'Submit'],
-                    'households.approve' => ['label' => 'स्वीकृत गर्ने',   'en' => 'Approve'],
-                    'households.reject'  => ['label' => 'अस्वीकार गर्ने',  'en' => 'Reject'],
-                    'households.publish' => ['label' => 'प्रकाशित गर्ने',  'en' => 'Publish'],
+                    'households.submit'        => ['label' => 'पेस गर्ने',             'en' => 'Submit'],
+                    'households.approve'       => ['label' => 'स्वीकृत गर्ने',      'en' => 'Approve'],
+                    'households.reject'        => ['label' => 'अस्वीकार गर्ने',     'en' => 'Reject'],
+                    'households.publish'       => ['label' => 'प्रकाशित गर्ने',     'en' => 'Publish'],
+                    'households.mark_deceased' => ['label' => 'मृत्यु दर्ज गर्ने', 'en' => 'Mark Member Deceased'],
                 ],
             ],
             [
@@ -136,6 +137,7 @@ class RolePermissions
                 // Households
                 'households.view','households.create','households.edit','households.delete',
                 'households.submit','households.approve','households.reject','households.publish',
+                'households.mark_deceased',
                 // Institutions
                 'institutions.view','institutions.create','institutions.edit','institutions.delete',
                 'institutions.submit','institutions.approve','institutions.reject','institutions.publish',
@@ -161,7 +163,7 @@ class RolePermissions
 
             'ward_reviewer' => [
                 // Households
-                'households.view','households.approve','households.reject',
+                'households.view','households.approve','households.reject','households.mark_deceased',
                 // Institutions
                 'institutions.view','institutions.approve','institutions.reject',
                 // Businesses

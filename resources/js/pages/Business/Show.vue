@@ -199,8 +199,12 @@
             <!-- Print -->
             <button @click="printPage"
               class="flex items-center justify-center gap-2 w-full rounded-md border border-orange-200 bg-orange-50 hover:bg-orange-100 px-4 py-2 text-sm font-medium text-orange-700 transition-colors">
-              <i class="fa-solid fa-print text-orange-400"></i> प्रिन्ट / PDF
+              <i class="fa-solid fa-print text-orange-400"></i> प्रिन्ट
             </button>
+            <a :href="`/businesses/${business.id}/pdf`" target="_blank"
+              class="flex items-center justify-center gap-2 w-full rounded-md border border-rose-200 bg-rose-50 hover:bg-rose-100 px-4 py-2 text-sm font-medium text-rose-700 transition-colors">
+              <i class="fa-solid fa-file-pdf text-rose-400"></i> PDF डाउनलोड
+            </a>
           </div>
 
           <div class="mt-4 pt-4 border-t border-gray-50">
@@ -241,6 +245,13 @@
             </div>
           </div>
         </div>
+
+        <!-- Field Verification -->
+        <FieldVerificationCard
+          :verification="fieldVerification"
+          :can-verify="canVerify"
+          :save-url="`/businesses/${business.id}/field-verify`"
+        />
 
         <!-- Workflow timeline -->
         <div class="no-print bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
@@ -346,6 +357,7 @@
 <script setup>
 import { ref, computed, h } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
+import FieldVerificationCard from '@/components/FieldVerificationCard.vue'
 
 const page = usePage()
 function printPage() { window.print() }
@@ -359,6 +371,8 @@ const props = defineProps({
   canPublish:             { type: Boolean, default: false },
   canRequestEdit:         { type: Boolean, default: false },
   hasPendingEditRequest:  { type: Boolean, default: false },
+  canVerify:              { type: Boolean, default: false },
+  fieldVerification:      { type: Object,  default: null },
   surveyOptions:          { type: Object,  default: () => ({}) },
 })
 

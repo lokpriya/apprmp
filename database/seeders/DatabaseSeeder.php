@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             NepalMasterDataSeeder::class,
             InstitutionTypesSeeder::class,
             MasterDataSeeder::class,
+            DisasterOptionSeeder::class,
             TestUsersSeeder::class,
         ]);
     }

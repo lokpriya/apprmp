@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class MemberBusiness extends Model
@@ -25,6 +26,7 @@ class MemberBusiness extends Model
         'reg_no_municipality', 'reg_no_home_cottage', 'reg_no_company_registrar',
         'reg_no_fcci', 'reg_no_govt_office',
         'has_pan_vat', 'pan_vat_number', 'paid_business_tax', 'tax_amount', 'contact_number',
+        'sync_source', 'sync_hash', 'sync_locked',
     ];
 
     protected $casts = [
@@ -36,6 +38,7 @@ class MemberBusiness extends Model
         'has_pan_vat'          => 'boolean',
         'paid_business_tax'    => 'boolean',
         'tax_amount'           => 'decimal:2',
+        'sync_locked'          => 'boolean',
     ];
 
     public function member(): BelongsTo       { return $this->belongsTo(HouseholdMember::class, 'household_member_id'); }
@@ -43,6 +46,7 @@ class MemberBusiness extends Model
     public function ward(): BelongsTo         { return $this->belongsTo(Ward::class); }
     public function settlement(): BelongsTo   { return $this->belongsTo(Settlement::class); }
     public function enumerator(): BelongsTo   { return $this->belongsTo(User::class, 'enumerator_id'); }
+    public function fieldVerification(): MorphOne { return $this->morphOne(FieldVerification::class, 'verifiable'); }
     public function wardReviewer(): BelongsTo { return $this->belongsTo(User::class, 'ward_reviewer_id'); }
     public function publisher(): BelongsTo    { return $this->belongsTo(User::class, 'published_by'); }
 

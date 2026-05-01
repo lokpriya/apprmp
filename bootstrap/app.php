@@ -17,8 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role'        => \App\Http\Middleware\EnsureRole::class,
             'ward.scope'  => \App\Http\Middleware\ScopeToWard::class,
-            'data.freeze' => \App\Http\Middleware\CheckDataFreeze::class,
-            'maintenance' => \App\Http\Middleware\CheckMaintenance::class,
+            'data.freeze'    => \App\Http\Middleware\CheckDataFreeze::class,
+            'maintenance'    => \App\Http\Middleware\CheckMaintenance::class,
+            'survey.period'  => \App\Http\Middleware\CheckSurveyPeriod::class,
+            'public.access'  => \App\Http\Middleware\CheckPublicAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

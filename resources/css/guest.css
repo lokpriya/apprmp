@@ -1,0 +1,8 @@
+/* Bootstrap 5 — self-hosted for auth/guest pages */
+@import 'bootstrap/dist/css/bootstrap.min.css';
+/* Bootstrap Icons — self-hosted */
+@import 'bootstrap-icons/font/bootstrap-icons.min.css';
+/* Inter variable font */
+@import '@fontsource-variable/inter';
+
+body { font-family: 'Inter Variable', 'Inter', sans-serif; }

@@ -3,6 +3,7 @@
 namespace App\Imports\Sheets;
 
 use App\Models\HouseholdUtility;
+use App\Services\SurveyValueValidator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\ToCollection;
@@ -17,7 +18,10 @@ class UtilitiesSheet implements ToCollection, WithHeadingRow, WithStartRow, Skip
     private array $errors   = [];
     private int   $imported = 0;
 
-    public function __construct(private readonly HouseholdsSheet $householdsSheet) {}
+    public function __construct(
+        private readonly HouseholdsSheet $householdsSheet,
+        private readonly ?SurveyValueValidator $validator = null,
+    ) {}
 
     public function collection(Collection $rows): void
     {
@@ -31,6 +35,23 @@ class UtilitiesSheet implements ToCollection, WithHeadingRow, WithStartRow, Skip
                     if (!$code || !isset($codeMap[$code])) {
                         $this->errors[] = "Row {$rowNum}: household_code '{$code}' not found.";
                         continue;
+                    }
+
+                    // ── Survey option validation ──────────────────────────────
+                    if ($this->validator) {
+                        $errs = $this->validator->checkFields([
+                            'water_source'           => trim($row['water_source']           ?? ''),
+                            'toilet_type'            => trim($row['toilet_type']            ?? ''),
+                            'sanitation_type'        => trim($row['sanitation_type']        ?? ''),
+                            'electricity_source'     => trim($row['electricity_source']     ?? ''),
+                            'cooking_fuel'           => trim($row['cooking_fuel']           ?? ''),
+                            'solid_waste_management' => trim($row['solid_waste_management'] ?? ''),
+                            'internet_type'          => trim($row['internet_type']          ?? ''),
+                        ], $rowNum);
+                        if ($errs) {
+                            foreach ($errs as $e) $this->errors[] = $e;
+                            continue;
+                        }
                     }
 
                     // Build vehicles array from individual count columns

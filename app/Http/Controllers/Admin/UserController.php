@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Ward;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
@@ -178,5 +179,52 @@ class UserController extends Controller
         ]);
         $user->update(['password' => Hash::make($data['password'])]);
         return back()->with('success', "Password reset for {$user->name}.");
+    }
+
+    public function assignments(): \Inertia\Response
+    {
+        $lgId = auth()->user()->local_government_id;
+
+        $users = User::with('assignedWards')
+            ->where('local_government_id', $lgId)
+            ->whereIn('role', ['enumerator', 'ward_reviewer'])
+            ->orderBy('role')
+            ->orderBy('name')
+            ->get()
+            ->map(fn($u) => [
+                'id'                => $u->id,
+                'name'              => $u->name,
+                'email'             => $u->email,
+                'role'              => $u->role,
+                'is_active'         => $u->is_active,
+                'assigned_ward_ids' => $u->assignedWards->pluck('id')->values()->toArray(),
+            ]);
+
+        $wards = Ward::where('local_government_id', $lgId)
+            ->orderBy('ward_number')
+            ->get(['id', 'ward_number']);
+
+        return Inertia::render('Admin/WardAssignments', compact('users', 'wards'));
+    }
+
+    public function assignWards(Request $request, User $user): JsonResponse
+    {
+        abort_unless($user->local_government_id === auth()->user()->local_government_id, 403);
+        abort_unless(in_array($user->role, ['enumerator', 'ward_reviewer']), 422);
+
+        $data = $request->validate([
+            'ward_ids'   => 'present|array',
+            'ward_ids.*' => 'integer|exists:wards,id',
+        ]);
+
+        $user->assignedWards()->sync(
+            collect($data['ward_ids'])->mapWithKeys(fn($id) => [
+                $id => ['assigned_at' => now(), 'assigned_by' => auth()->id()]
+            ])->toArray()
+        );
+
+        return response()->json([
+            'assigned_ward_ids' => $data['ward_ids'],
+        ]);
     }
 }

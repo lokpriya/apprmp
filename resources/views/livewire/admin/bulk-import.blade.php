@@ -217,12 +217,77 @@
             </div>
         </div>
 
-        {{-- Error log --}}
+        {{-- Split errors: validation vs regular --}}
         @if(!empty($errorLog))
+        @php
+            $validationErrors = collect($errorLog)
+                ->filter(fn($e) => is_array($e) && ($e['type'] ?? '') === 'invalid_option')
+                ->values()->toArray();
+            $regularErrors = collect($errorLog)
+                ->reject(fn($e) => is_array($e) && ($e['type'] ?? '') === 'invalid_option')
+                ->values()->toArray();
+            $byField = collect($validationErrors)
+                ->groupBy('field')
+                ->map(fn($rows) => [
+                    'sheet'    => $rows->first()['sheet'] ?? '',
+                    'category' => $rows->first()['category'] ?? '',
+                    'rows'     => $rows->pluck('row')->sort()->values()->toArray(),
+                    'values'   => $rows->pluck('value')->unique()->sort()->values()->toArray(),
+                ])->toArray();
+        @endphp
+
+        {{-- Validation errors (invalid option values) --}}
+        @if(!empty($validationErrors))
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h3 class="text-sm font-semibold text-amber-700 mb-1 flex items-center gap-2">
+                <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
+                Invalid Option Values — {{ count($validationErrors) }} row(s) skipped
+            </h3>
+            <p class="text-xs text-amber-600 mb-3">
+                These rows were skipped because the values below do not match any valid survey option.
+                Fix the values in your source file and re-upload.
+            </p>
+            <div class="max-h-72 overflow-y-auto rounded-lg border border-amber-200 bg-amber-50">
+                <table class="w-full text-xs">
+                    <thead class="bg-amber-100 text-amber-800 sticky top-0">
+                        <tr>
+                            <th class="px-4 py-2 text-left font-semibold">Sheet</th>
+                            <th class="px-4 py-2 text-left font-semibold">Field</th>
+                            <th class="px-4 py-2 text-left font-semibold">Invalid Value(s)</th>
+                            <th class="px-4 py-2 text-left font-semibold">Row(s)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-amber-100">
+                        @foreach($byField as $field => $info)
+                        <tr class="hover:bg-amber-100/60">
+                            <td class="px-4 py-1.5 text-amber-600 font-medium">{{ $info['sheet'] }}</td>
+                            <td class="px-4 py-1.5 font-mono text-amber-800 font-semibold">{{ $field }}</td>
+                            <td class="px-4 py-1.5">
+                                @foreach($info['values'] as $v)
+                                <span class="inline-flex items-center mr-1 mb-0.5 px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-mono text-[11px]">{{ $v }}</span>
+                                @endforeach
+                            </td>
+                            <td class="px-4 py-1.5 text-amber-600 font-mono text-[11px]">
+                                {{ count($info['rows']) > 6 ? implode(', ', array_slice($info['rows'], 0, 6)) . ' …+' . (count($info['rows']) - 6) . ' more' : implode(', ', $info['rows']) }}
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            <p class="mt-2 text-xs text-amber-600 flex items-center gap-1.5">
+                <i class="fa-solid fa-circle-info"></i>
+                Check the <strong>Valid Values</strong> sheet in the template for the list of accepted values per field.
+            </p>
+        </div>
+        @endif
+
+        {{-- Regular errors --}}
+        @if(!empty($regularErrors))
         <div class="px-6 py-4 border-b border-gray-100">
             <h3 class="text-sm font-semibold text-red-700 mb-3 flex items-center gap-2">
                 <i class="fa-solid fa-circle-exclamation"></i>
-                Import Errors ({{ count($errorLog) }})
+                Import Errors ({{ count($regularErrors) }})
             </h3>
             <div class="max-h-56 overflow-y-auto rounded-lg border border-red-100 bg-red-50">
                 <table class="w-full text-xs">
@@ -233,7 +298,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-red-100">
-                        @foreach($errorLog as $i => $err)
+                        @foreach($regularErrors as $i => $err)
                         <tr class="hover:bg-red-100/50">
                             <td class="px-4 py-1.5 text-red-400 font-mono">{{ $i + 1 }}</td>
                             <td class="px-4 py-1.5 text-red-700">{{ is_array($err) ? ($err['error'] ?? json_encode($err)) : $err }}</td>
@@ -243,6 +308,7 @@
                 </table>
             </div>
         </div>
+        @endif
         @endif
 
         <div class="px-6 pb-5 pt-3 flex gap-3">

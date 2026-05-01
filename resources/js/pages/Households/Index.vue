@@ -1,5 +1,16 @@
 <template>
   <div class="space-y-4">
+
+    <!-- Survey freeze banner -->
+    <div v-if="surveyFrozen"
+      class="flex items-center gap-3 px-4 py-3 bg-orange-50 border border-orange-200 rounded-md">
+      <i class="fa-solid fa-lock text-orange-500 shrink-0"></i>
+      <div>
+        <p class="text-[13px] font-semibold text-orange-700">सर्वेक्षण अवधि बन्द छ</p>
+        <p class="text-[11px] text-orange-500 mt-0.5">नयाँ घरधुरी थप्न वा सम्पादन गर्न सकिँदैन। थप जानकारीका लागि प्रशासकसँग सम्पर्क गर्नुहोस्।</p>
+      </div>
+    </div>
+
     <!-- Page header -->
     <div class="flex items-center justify-between mb-4">
       <div>
@@ -12,12 +23,17 @@
           घरधुरी
         </p>
       </div>
-      <a
+      <a v-if="!surveyFrozen"
         href="/households/create"
         class="inline-flex items-center gap-2 h-9 px-4 bg-[#206bc4] hover:bg-[#1a5ba8] text-white rounded text-[13px] font-medium transition"
       >
         <i class="fa-solid fa-plus"></i> नयाँ घरधुरी
       </a>
+      <span v-else
+        class="inline-flex items-center gap-2 h-9 px-4 bg-gray-200 text-gray-400 rounded text-[13px] font-medium cursor-not-allowed"
+        title="सर्वेक्षण अवधि बन्द छ">
+        <i class="fa-solid fa-lock text-[11px]"></i> नयाँ घरधुरी
+      </span>
     </div>
 
     <!-- Filters -->
@@ -58,6 +74,19 @@
           <option value="rejected">अस्वीकृत</option>
         </select>
 
+        <!-- Per-page selector -->
+        <select
+          v-model="perPage"
+          @change="applyFilters"
+          class="h-9 rounded border border-[#e6e7e9] px-3 text-[13px] text-[#1d273b] focus:ring-2 focus:ring-[#206bc4]/30 focus:border-[#206bc4] outline-none transition bg-white"
+          title="प्रति पृष्ठ"
+        >
+          <option value="10">१०</option>
+          <option value="20">२०</option>
+          <option value="50">५०</option>
+          <option value="100">१००</option>
+        </select>
+
         <!-- Clear -->
         <button
           v-if="hasActiveFilters"
@@ -75,12 +104,22 @@
         <table class="w-full">
           <thead class="border-b border-[#e6e7e9]">
             <tr>
+              <th class="pl-4 pr-2 py-2.5 w-8">
+                <input
+                  type="checkbox"
+                  :checked="selectAll"
+                  :indeterminate="selectAll === 'indeterminate'"
+                  @change="toggleSelectAll"
+                  class="w-3.5 h-3.5 rounded border-gray-300 text-[#206bc4] cursor-pointer"
+                />
+              </th>
               <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-[0.08em]">कोड</th>
               <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-[0.08em]">उत्तरदाता</th>
               <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-[0.08em]">वडा</th>
               <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-[0.08em]">बस्ती</th>
               <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-[0.08em]">मिति</th>
               <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-[0.08em]">अवस्था</th>
+              <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-[0.08em]">पूर्णता</th>
               <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-[0.08em]">गणक</th>
               <th class="px-4 py-2.5 text-right text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-[0.08em]">कार्यहरू</th>
             </tr>
@@ -89,8 +128,16 @@
             <tr
               v-for="hh in households.data"
               :key="hh.id"
-              class="hover:bg-gray-50 transition-colors"
+              :class="['hover:bg-gray-50 transition-colors', selectedIds.has(hh.id) ? 'bg-blue-50/60' : '']"
             >
+              <td class="pl-4 pr-2 py-2.5 w-8">
+                <input
+                  type="checkbox"
+                  :checked="selectedIds.has(hh.id)"
+                  @change="toggleSelect(hh.id)"
+                  class="w-3.5 h-3.5 rounded border-gray-300 text-[#206bc4] cursor-pointer"
+                />
+              </td>
               <td class="px-4 py-2.5">
                 <span class="font-mono text-[11px] bg-[#206bc4]/8 text-[#206bc4] px-2 py-0.5 rounded">{{ hh.unique_code }}</span>
               </td>
@@ -108,6 +155,12 @@
               <td class="px-4 py-2.5">
                 <span :class="['text-[11px] px-2.5 py-1 rounded font-medium', statusBadge(hh.status)]">
                   {{ statusLabel(hh.status) }}
+                </span>
+              </td>
+              <td class="px-4 py-2.5">
+                <span v-if="hh.completeness" :class="['inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full', completenessClass(hh.completeness.score)]"
+                  :title="`${hh.completeness.filled}/${hh.completeness.total} फिल्ड भरिएको`">
+                  {{ hh.completeness.score }}%
                 </span>
               </td>
               <td class="px-4 py-2.5 text-[13px] text-[#9aa0ac]">{{ hh.enumerator?.name || '—' }}</td>
@@ -207,6 +260,117 @@
     </div>
 
   </div>
+
+  <!-- ── Bulk Action Sticky Toolbar ────────────────────────────────────────── -->
+  <Teleport to="body">
+    <Transition name="bulk-bar">
+      <div
+        v-if="selectedIds.size > 0"
+        class="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 pointer-events-none"
+      >
+        <div class="pointer-events-auto bg-[#1d273b] text-white rounded-full pl-5 pr-4 py-2.5 shadow-2xl flex items-center gap-3 text-[13px]">
+          <span class="font-semibold whitespace-nowrap">
+            <i class="fa-solid fa-check-square text-[#206bc4] mr-1.5"></i>
+            {{ selectedIds.size }} चयन
+          </span>
+          <div class="w-px h-5 bg-white/20 mx-1"></div>
+
+          <!-- Submit (enumerators) -->
+          <button
+            v-if="anySelectedCanSubmit"
+            @click="bulkSubmit"
+            :disabled="bulkProcessing"
+            class="flex items-center gap-1.5 h-8 px-3 rounded-full bg-[#206bc4] hover:bg-[#1a5ba8] font-medium transition disabled:opacity-60"
+          >
+            <i :class="bulkProcessing ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-paper-plane'"></i>
+            पेस गर्नुस्
+          </button>
+
+          <!-- Approve (reviewer/admin) -->
+          <button
+            v-if="anySelectedCanApprove"
+            @click="bulkApprove"
+            :disabled="bulkProcessing"
+            class="flex items-center gap-1.5 h-8 px-3 rounded-full bg-green-600 hover:bg-green-700 font-medium transition disabled:opacity-60"
+          >
+            <i :class="bulkProcessing ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-check'"></i>
+            अनुमोदन
+          </button>
+
+          <!-- Reject (reviewer/admin) -->
+          <button
+            v-if="anySelectedCanApprove"
+            @click="openRejectModal"
+            :disabled="bulkProcessing"
+            class="flex items-center gap-1.5 h-8 px-3 rounded-full bg-red-600 hover:bg-red-700 font-medium transition disabled:opacity-60"
+          >
+            <i class="fa-solid fa-xmark"></i>
+            अस्वीकार
+          </button>
+
+          <button
+            @click="clearSelection"
+            class="w-7 h-7 ml-1 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition"
+            title="चयन हटाउनुस्"
+          >
+            <i class="fa-solid fa-xmark text-[11px]"></i>
+          </button>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Reject Reason Modal -->
+    <Transition name="qv-backdrop">
+      <div
+        v-if="rejectModalOpen"
+        class="fixed inset-0 z-50 flex items-center justify-center"
+      >
+        <div class="absolute inset-0 bg-black/40" @click="rejectModalOpen = false"></div>
+        <div class="relative bg-white rounded-xl shadow-2xl w-[460px] mx-4 p-6 z-10">
+          <h3 class="text-[15px] font-semibold text-[#1d273b] mb-1 flex items-center gap-2">
+            <i class="fa-solid fa-ban text-red-500"></i>
+            बल्क अस्वीकार
+          </h3>
+          <p class="text-[12px] text-[#9aa0ac] mb-4">{{ selectedIds.size }} घरधुरी अस्वीकार गरिनेछ।</p>
+          <label class="block text-[12px] font-medium text-[#626976] mb-1">अस्वीकार कारण <span class="text-red-500">*</span></label>
+          <!-- Preset reason chips -->
+          <div class="flex flex-wrap gap-1.5 mb-2">
+            <button
+              v-for="reason in rejectReasons" :key="reason"
+              type="button"
+              @click="rejectReason = reason"
+              :class="[
+                'text-[11px] px-2.5 py-1 rounded-full border transition-colors',
+                rejectReason === reason
+                  ? 'bg-red-600 border-red-600 text-white'
+                  : 'bg-white border-red-200 text-red-700 hover:bg-red-100'
+              ]"
+            >{{ reason }}</button>
+          </div>
+          <textarea
+            v-model="rejectReason"
+            rows="2"
+            placeholder="अस्वीकार कारण लेख्नुस् वा माथिबाट छान्नुस्..."
+            class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-[13px] text-[#1d273b] focus:ring-2 focus:ring-red-300 focus:border-red-400 outline-none resize-none"
+          ></textarea>
+          <div class="flex items-center justify-end gap-3 mt-4">
+            <button
+              @click="rejectModalOpen = false"
+              class="h-9 px-4 border border-[#e6e7e9] text-[#626976] rounded text-[13px] hover:bg-gray-50 transition"
+            >रद्द</button>
+            <button
+              @click="confirmBulkReject"
+              :disabled="!rejectReason.trim() || bulkProcessing"
+              class="h-9 px-4 bg-red-600 hover:bg-red-700 text-white rounded text-[13px] font-medium transition disabled:opacity-50 flex items-center gap-2"
+            >
+              <i :class="bulkProcessing ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-xmark'"></i>
+              अस्वीकार गर्नुस्
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 
   <!-- ── Quick-View Slide-Over ──────────────────────────────────────────────── -->
   <Teleport to="body">
@@ -772,7 +936,10 @@
 
 <script setup>
 import { ref, computed, watch, h } from 'vue'
-import { router } from '@inertiajs/vue3'
+import { router, usePage } from '@inertiajs/vue3'
+
+const page = usePage()
+const surveyFrozen = computed(() => page.props.surveyFrozen && page.props.auth?.user?.role === 'enumerator')
 
 const props = defineProps({
   households:    { type: Object, default: () => ({ data: [], meta: {}, links: [] }) },
@@ -781,10 +948,97 @@ const props = defineProps({
   surveyOptions: { type: Object, default: () => ({}) },
 })
 
-const searchQuery = ref(props.filters.search || '')
-const wardFilter = ref(props.filters.ward_id || '')
-const statusFilter = ref(props.filters.status || '')
-const submitting = ref(null)
+const searchQuery  = ref(props.filters.search   || '')
+const wardFilter   = ref(props.filters.ward_id  || '')
+const statusFilter = ref(props.filters.status   || '')
+const perPage      = ref(Number(props.filters.per_page) || 20)
+const submitting   = ref(null)
+
+// ── Multi-select ──────────────────────────────────────────────────────────────
+const selectedIds    = ref(new Set())
+const bulkProcessing = ref(false)
+const rejectModalOpen = ref(false)
+const rejectReason    = ref('')
+
+const rejectReasons = [
+  'GPS स्थान भरिएको छैन',
+  'फोटो नम्बर भरिएको छैन',
+  'डुप्लिकेट प्रविष्टि',
+  'उत्तरदाताको नाम अपूर्ण',
+  'सदस्य विवरण अपूर्ण',
+  'वडा नम्बर मेल खाँदैन',
+  'सर्वेक्षण मिति भरिएको छैन',
+  'अपूर्ण विवरण',
+]
+
+function toggleSelect(id) {
+  const next = new Set(selectedIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  selectedIds.value = next
+}
+
+const selectAll = computed(() => {
+  const data = props.households.data ?? []
+  if (!data.length) return false
+  const allSelected = data.every(hh => selectedIds.value.has(hh.id))
+  const someSelected = data.some(hh => selectedIds.value.has(hh.id))
+  return allSelected ? true : someSelected ? 'indeterminate' : false
+})
+
+function toggleSelectAll() {
+  const data = props.households.data ?? []
+  if (selectAll.value === true) {
+    // deselect all current page
+    const next = new Set(selectedIds.value)
+    data.forEach(hh => next.delete(hh.id))
+    selectedIds.value = next
+  } else {
+    const next = new Set(selectedIds.value)
+    data.forEach(hh => next.add(hh.id))
+    selectedIds.value = next
+  }
+}
+
+function clearSelection() {
+  selectedIds.value = new Set()
+}
+
+const anySelectedCanSubmit = computed(() =>
+  (props.households.data ?? []).some(hh => selectedIds.value.has(hh.id) && hh.can_submit)
+)
+const anySelectedCanApprove = computed(() =>
+  (props.households.data ?? []).some(hh => selectedIds.value.has(hh.id) && hh.can_approve)
+)
+
+function bulkSubmit() {
+  if (!confirm(`${selectedIds.value.size} घरधुरी पेस गर्ने?`)) return
+  bulkProcessing.value = true
+  router.post('/households/bulk-submit', { ids: [...selectedIds.value] }, {
+    onFinish: () => { bulkProcessing.value = false; clearSelection() },
+  })
+}
+
+function bulkApprove() {
+  if (!confirm(`${selectedIds.value.size} घरधुरी अनुमोदन गर्ने?`)) return
+  bulkProcessing.value = true
+  router.post('/households/bulk-approve', { ids: [...selectedIds.value] }, {
+    onFinish: () => { bulkProcessing.value = false; clearSelection() },
+  })
+}
+
+function openRejectModal() {
+  rejectReason.value = ''
+  rejectModalOpen.value = true
+}
+
+function confirmBulkReject() {
+  if (!rejectReason.value.trim()) return
+  bulkProcessing.value = true
+  router.post('/households/bulk-reject', { ids: [...selectedIds.value], reason: rejectReason.value }, {
+    onFinish: () => { bulkProcessing.value = false; rejectModalOpen.value = false; clearSelection() },
+  })
+}
 
 let searchTimeout = null
 
@@ -924,6 +1178,13 @@ function qvCropCount(key) {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
+function completenessClass(score) {
+  if (score >= 90) return 'bg-green-100 text-green-700'
+  if (score >= 75) return 'bg-yellow-100 text-yellow-700'
+  if (score >= 50) return 'bg-amber-100 text-amber-700'
+  return 'bg-red-100 text-red-700'
+}
+
 function statusBadge(s) {
   const map = {
     draft: 'bg-gray-100 text-gray-600',
@@ -954,12 +1215,14 @@ function formatDate(d) {
 // ── filters ───────────────────────────────────────────────────────────────────
 
 function applyFilters() {
+  clearSelection()
   router.get(
     '/households',
     {
-      search: searchQuery.value,
-      ward_id: wardFilter.value,
-      status: statusFilter.value,
+      search:   searchQuery.value,
+      ward_id:  wardFilter.value,
+      status:   statusFilter.value,
+      per_page: perPage.value,
     },
     { preserveState: true, replace: true },
   )
@@ -974,21 +1237,24 @@ watch(searchQuery, () => {
 })
 
 function clearFilters() {
-  searchQuery.value = ''
-  wardFilter.value = ''
+  searchQuery.value  = ''
+  wardFilter.value   = ''
   statusFilter.value = ''
+  perPage.value      = 20
   applyFilters()
 }
 
 // ── pagination ────────────────────────────────────────────────────────────────
 
 function goToPage(page) {
+  clearSelection()
   router.get(
     '/households',
     {
-      search: searchQuery.value,
-      ward_id: wardFilter.value,
-      status: statusFilter.value,
+      search:   searchQuery.value,
+      ward_id:  wardFilter.value,
+      status:   statusFilter.value,
+      per_page: perPage.value,
       page,
     },
     { preserveState: true, replace: true },
@@ -1044,4 +1310,10 @@ function submitHousehold(id) {
 .qv-panel-leave-active { transition: transform 0.25s ease; }
 .qv-panel-enter-from,
 .qv-panel-leave-to     { transform: translateX(100%); }
+
+/* Bulk action bar pop-up */
+.bulk-bar-enter-active,
+.bulk-bar-leave-active { transition: transform 0.2s ease, opacity 0.2s ease; }
+.bulk-bar-enter-from,
+.bulk-bar-leave-to     { transform: translateX(-50%) translateY(16px); opacity: 0; }
 </style>

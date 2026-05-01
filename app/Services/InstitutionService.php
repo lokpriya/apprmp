@@ -50,6 +50,7 @@ class InstitutionService
     {
         return DB::transaction(function () use ($institution, $data) {
             $institution->update([
+                'sync_locked'         => true,
                 'settlement_id'       => $data['settlement_id'] ?: null,
                 'institution_type_id' => $data['institution_type_id'] ?: $institution->institution_type_id,
                 'name_np'             => $data['name_np'] ?: null,

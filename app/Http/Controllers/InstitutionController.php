@@ -9,6 +9,8 @@ use App\Models\InstitutionType;
 use App\Models\Settlement;
 use App\Models\SurveyOption;
 use App\Models\Ward;
+use App\Services\CompletenessScoreService;
+use App\Services\DuplicateDetectionService;
 use App\Services\InstitutionService;
 use App\Services\WorkflowService;
 use Illuminate\Http\Request;
@@ -23,7 +25,7 @@ class InstitutionController extends Controller
         $user = auth()->user();
         $lgId = $user->local_government_id;
 
-        $query = Institution::with(['ward', 'settlement', 'institutionType', 'enumerator'])->latest();
+        $query = Institution::with(['ward', 'settlement', 'institutionType', 'enumerator', 'infrastructure'])->latest();
 
         if ($user->isEnumerator()) {
             $wardIds = $user->assignedWards()->pluck('wards.id')->toArray();
@@ -53,7 +55,8 @@ class InstitutionController extends Controller
                 'status'           => $i->status,
                 'enumerator'       => $i->enumerator ? ['name' => $i->enumerator->name] : null,
                 'can_edit'         => $user->isAdmin() || (in_array($i->status, ['draft','rejected']) && $i->enumerator_id === $user->id),
-                'can_submit'       => $i->status === 'draft' && ($user->isAdmin() || $i->enumerator_id === $user->id),
+                'can_submit'       => in_array($i->status, ['draft', 'rejected']) && ($user->isAdmin() || $i->enumerator_id === $user->id),
+                'completeness'     => CompletenessScoreService::institution($i),
             ]);
 
         return Inertia::render('Institutions/Index', [
@@ -85,7 +88,6 @@ class InstitutionController extends Controller
                                                 ->get(['value', 'label_ne', 'label_en']),
             'surveyOpts'       => SurveyOption::where(fn($q) =>
                                                     $q->where('category', 'like', 'inst_%')
-                                                      ->where('category', '!=', 'inst_building_type')
                                                       ->orWhereIn('category', ['ethnicity', 'major_occupation', 'education_level'])
                                                 )
                                                 ->where('is_active', true)
@@ -95,17 +97,18 @@ class InstitutionController extends Controller
             'initialWardId'    => $user->isEnumerator()
                                        ? $user->assignedWards()->first()?->id
                                        : null,
+            'mapConfig'        => \App\Models\LocalGovernment::find($lgId)?->map_config ?? [],
         ]);
     }
 
     public function show(Institution $institution)
     {
-        $this->authorizeView($institution);
+        $this->authorize('view', $institution);
 
         $institution->load([
             'ward', 'settlement', 'institutionType', 'enumerator',
             'infrastructure', 'healthDetail', 'services', 'staff', 'education',
-            'submissionLogs.actor',
+            'submissionLogs.actor', 'fieldVerification.verifier',
         ]);
 
         $user = auth()->user();
@@ -125,13 +128,14 @@ class InstitutionController extends Controller
         $institutionData['healthDetail']     = $institutionData['health_detail']     ?? null;
         $institutionData['submissionLogs']   = $institutionData['submission_logs']   ?? [];
 
+        $fv = $institution->fieldVerification;
         return Inertia::render('Institutions/Show', [
             'institution' => $institutionData,
             'surveyOpts'  => $surveyOpts,
             'canEdit'        => $user->isAdmin()
                                   || (in_array($institution->status, ['draft','rejected']) && $institution->enumerator_id === $user->id),
-            'canSubmit'      => $institution->status === 'draft' && ($user->isAdmin() || $institution->enumerator_id === $user->id),
-            'canPublish'     => $institution->status === 'ward_approved' && $user->isAdmin(),
+            'canSubmit'      => in_array($institution->status, ['draft', 'rejected']) && ($user->isAdmin() || $institution->enumerator_id === $user->id),
+            'canPublish'     => in_array($institution->status, ['ward_approved', 'escalated']) && $user->isAdmin(),
             'canRequestEdit' => $user->isReviewer() && $institution->status === 'published'
                                   && !EditRequest::where('requestable_type', Institution::class)
                                                  ->where('requestable_id', $institution->id)
@@ -141,12 +145,20 @@ class InstitutionController extends Controller
                                                  ->where('requestable_id', $institution->id)
                                                  ->where('status', 'pending')
                                                  ->exists(),
+            'canVerify'      => ($user->isReviewer() || $user->isAdmin()) && $institution->status !== 'draft',
+            'fieldVerification' => $fv ? [
+                'visited_at'  => $fv->visited_at?->format('Y-m-d'),
+                'is_verified' => $fv->is_verified,
+                'notes'       => $fv->notes,
+                'verifier'    => $fv->verifier ? ['name' => $fv->verifier->name] : null,
+                'created_at'  => $fv->created_at?->format('Y-m-d'),
+            ] : null,
         ]);
     }
 
     public function edit(Institution $institution)
     {
-        $this->authorizeEdit($institution);
+        $this->authorize('update', $institution);
 
         $user    = auth()->user();
         $lgId    = $user->local_government_id;
@@ -175,7 +187,6 @@ class InstitutionController extends Controller
                                                 ->get(['value', 'label_ne', 'label_en']),
             'surveyOpts'       => SurveyOption::where(fn($q) =>
                                                     $q->where('category', 'like', 'inst_%')
-                                                      ->where('category', '!=', 'inst_building_type')
                                                       ->orWhereIn('category', ['ethnicity', 'major_occupation', 'education_level'])
                                                 )
                                                 ->where('is_active', true)
@@ -183,6 +194,7 @@ class InstitutionController extends Controller
                                                 ->get(['category', 'value', 'label_ne'])
                                                 ->groupBy('category'),
             'initialWardId'    => null,
+            'mapConfig'        => \App\Models\LocalGovernment::find($lgId)?->map_config ?? [],
         ]);
     }
 
@@ -193,8 +205,21 @@ class InstitutionController extends Controller
             'name_en' => 'required|string|max:200',
         ]);
 
-        $data = $request->all();
+        $data = $request->except('duplicate_confirmed');
         $data['survey_data'] = $data['survey_data'] ?? $this->buildSurveyData($data);
+
+        // Duplicate detection — skip if user has already confirmed
+        if (!$request->boolean('duplicate_confirmed')) {
+            $dupResult = app(DuplicateDetectionService::class)->checkInstitution($data);
+            if ($dupResult['found']) {
+                return back()->withErrors([
+                    'duplicate_warning' => json_encode([
+                        'matches'    => $dupResult['matches'],
+                        'hard_block' => $dupResult['hard_block'],
+                    ]),
+                ])->withInput();
+            }
+        }
 
         $institution = app(InstitutionService::class)->create($data, auth()->user());
 
@@ -204,7 +229,7 @@ class InstitutionController extends Controller
 
     public function update(Request $request, Institution $institution)
     {
-        $this->authorizeEdit($institution);
+        $this->authorize('update', $institution);
 
         $wasPublished = $institution->status === 'published';
         $oldValues    = $wasPublished ? $institution->toArray() : null;
@@ -233,7 +258,7 @@ class InstitutionController extends Controller
 
     public function destroy(Institution $institution)
     {
-        $this->authorizeEdit($institution);
+        $this->authorize('delete', $institution);
 
         if (!$institution->isDraft()) {
             return back()->with('error', 'Only draft institutions can be deleted.');
@@ -246,7 +271,7 @@ class InstitutionController extends Controller
 
     public function submit(Request $request, Institution $institution)
     {
-        $this->authorizeEdit($institution);
+        $this->authorize('update', $institution);
 
         try {
             $this->workflow->submit($institution, auth()->user());
@@ -269,14 +294,6 @@ class InstitutionController extends Controller
         }
     }
 
-    private function authorizeView(Institution $institution): void
-    {
-        $user = auth()->user();
-        if ($user->isAdmin()) return;
-        $wardIds = $user->assignedWards()->pluck('wards.id')->toArray();
-        abort_unless(in_array($institution->ward_id, $wardIds), 403);
-    }
-
     private function buildSurveyData(array $data): ?array
     {
         // When the Vue/Inertia form sends fields flat (no survey_data wrapper),
@@ -296,11 +313,4 @@ class InstitutionController extends Controller
         return $surveyData ?: null;
     }
 
-    private function authorizeEdit(Institution $institution): void
-    {
-        $user = auth()->user();
-        if ($user->isAdmin()) return;
-        abort_unless($institution->enumerator_id === $user->id, 403);
-        abort_unless(in_array($institution->status, ['draft', 'rejected']), 403);
-    }
 }

@@ -9,44 +9,48 @@ export default defineConfig({
         laravel({
             input: [
                 'resources/css/app.css',
+                'resources/css/guest.css',
                 'resources/js/app.js',
                 'resources/js/inertia.js',
             ],
             refresh: true,
         }),
         VitePWA({
-            // Use generateSW strategy — zero custom service worker code needed
             strategies: 'generateSW',
             registerType: 'autoUpdate',
 
-            // Place generated SW + manifest inside public/build so Laravel's
-            // asset pipeline is not affected
-            outDir: 'public/build',
-            base: '/build/',
+            // Output SW to public/ root so it has scope '/' and triggers
+            // the "Add to Home Screen" install prompt
+            outDir: 'public',
+            base: '/',
+            filename: 'sw.js',
+            manifestFilename: 'manifest.webmanifest',
 
-            // Only cache static build assets — do NOT cache Inertia page requests
-            // (those must stay server-rendered to keep auth/data fresh)
             workbox: {
-                globPatterns: ['**/*.{js,css,woff2,woff,png,svg,ico}'],
-                navigateFallback: null,           // never intercept page navigations
-                runtimeCaching: [],               // no runtime caching of API/pages
+                // Cache built static assets; do NOT intercept page navigations
+                globPatterns: ['build/**/*.{js,css,woff2,woff,png,svg,ico}'],
+                navigateFallback: null,
+                runtimeCaching: [],
+                swDest: 'public/sw.js',
             },
 
             manifest: {
-                name: 'स्थानीय तह सर्वेक्षण',
-                short_name: 'सर्वेक्षण',
+                name: 'स्थानीय तह वस्तुगत विवरण प्रणाली',
+                short_name: 'LGPAS',
                 description: 'स्थानीय तह वस्तुगत विवरण तथा विश्लेषण प्रणाली',
-                theme_color: '#4f46e5',
-                background_color: '#f5f5f5',
+                theme_color: '#182433',
+                background_color: '#f4f6fb',
                 display: 'standalone',
                 orientation: 'portrait-primary',
+                lang: 'ne',
                 scope: '/',
-                start_url: '/dashboard',
+                start_url: '/public',
                 icons: [
                     {
                         src: '/pwa-192.png',
                         sizes: '192x192',
                         type: 'image/png',
+                        purpose: 'any maskable',
                     },
                     {
                         src: '/pwa-512.png',

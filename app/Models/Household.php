@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Household extends Model
@@ -19,6 +20,7 @@ class Household extends Model
         'status', 'survey_date', 'submitted_at', 'ward_reviewed_at',
         'ward_reviewer_id', 'ward_review_comment', 'published_at',
         'published_by', 'data_frozen_at', 'remarks', 'survey_data',
+        'sync_source', 'sync_hash', 'sync_locked',
     ];
 
     protected $casts = [
@@ -30,6 +32,7 @@ class Household extends Model
         'gps_lat'           => 'decimal:8',
         'gps_lng'           => 'decimal:8',
         'survey_data'       => 'array',
+        'sync_locked'       => 'boolean',
     ];
 
     public function ward(): BelongsTo      { return $this->belongsTo(Ward::class); }
@@ -46,6 +49,7 @@ class Household extends Model
     public function members(): HasMany        { return $this->hasMany(HouseholdMember::class)->orderBy('sort_order'); }
     public function livestock(): HasMany      { return $this->hasMany(HouseholdLivestock::class); }
     public function submissionLogs(): HasMany { return $this->hasMany(SubmissionLog::class, 'loggable_id')->where('loggable_type', self::class)->latest(); }
+    public function fieldVerification(): MorphOne { return $this->morphOne(FieldVerification::class, 'verifiable'); }
 
     public function isPublished(): bool   { return $this->status === 'published'; }
     public function isDraft(): bool       { return $this->status === 'draft'; }

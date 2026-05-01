@@ -128,9 +128,13 @@ async function initMap() {
   L = (await import('leaflet')).default
   await import('leaflet/dist/leaflet.css')
 
+  const cfg        = props.lg?.map_config ?? {}
+  const defLat     = cfg.center_lat ?? 27.7
+  const defLng     = cfg.center_lng ?? 85.3
+
   map = L.map(mapEl.value, {
-    center: [props.points.length ? props.points[0].lat : 27.7, props.points.length ? props.points[0].lng : 85.3],
-    zoom: 12,
+    center: [props.points.length ? props.points[0].lat : defLat, props.points.length ? props.points[0].lng : defLng],
+    zoom: cfg.zoom ?? 12,
     zoomControl: true,
   })
 
@@ -139,6 +143,69 @@ async function initMap() {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
   }).addTo(map)
+  const geojsonUrl = cfg.geojson_url
+  const wardProp   = cfg.ward_number_property ?? 'WARD_NO'
+
+  if (geojsonUrl) {
+    // Build ward_number → GPS point count lookup
+    const wardNumToCount = Object.fromEntries(
+      props.wards.map(w => [String(w.ward_number), props.wardCounts[w.id] ?? 0])
+    )
+    const maxCount = Math.max(...Object.values(wardNumToCount), 1)
+
+    const choroplethColor = cnt => {
+      const r = cnt / maxCount
+      if (r > 0.8) return '#1a4e8a'
+      if (r > 0.6) return '#2169b8'
+      if (r > 0.4) return '#4299e1'
+      if (r > 0.2) return '#90cdf4'
+      if (cnt > 0) return '#bee3f8'
+      return '#e8f0fb'
+    }
+
+    try {
+      const res = await fetch(geojsonUrl)
+      if (res.ok) {
+        const geojson = await res.json()
+        L.geoJSON(geojson, {
+          style: feature => {
+            const wNum = String(feature.properties?.[wardProp] ?? '')
+            return {
+              fillColor:   choroplethColor(wardNumToCount[wNum] ?? 0),
+              weight:      1.5,
+              opacity:     1,
+              color:       '#ffffff',
+              fillOpacity: 0.55,
+            }
+          },
+          onEachFeature: (feature, layer) => {
+            const wNum  = String(feature.properties?.[wardProp] ?? '')
+            const count = wardNumToCount[wNum] ?? 0
+            layer.bindPopup(`<b>वडा नं. ${wNum}</b><br>GPS घरधुरी: ${count.toLocaleString()}`)
+            layer.on({
+              mouseover: e => { e.target.setStyle({ weight: 2.5, fillOpacity: 0.8 }); e.target.bringToFront() },
+              mouseout:  e => { e.target.setStyle({ weight: 1.5, fillOpacity: 0.55 }) },
+            })
+          },
+        }).addTo(map)
+
+        const legend = L.control({ position: 'bottomright' })
+        legend.onAdd = () => {
+          const div = L.DomUtil.create('div')
+          div.style.cssText = 'background:rgba(255,255,255,0.92);padding:8px 10px;border-radius:6px;font-size:11px;line-height:1.8;box-shadow:0 1px 5px rgba(0,0,0,0.18)'
+          div.innerHTML =
+            '<b style="display:block;margin-bottom:2px">GPS घरधुरी</b>' +
+            [['#1a4e8a','80–100%'],['#2169b8','60–80%'],['#4299e1','40–60%'],['#90cdf4','20–40%'],['#bee3f8','0–20%']]
+              .map(([c,l]) => `<span style="display:inline-block;width:11px;height:11px;background:${c};margin-right:5px;border-radius:2px;vertical-align:middle"></span>${l}`)
+              .join('<br>')
+          return div
+        }
+        legend.addTo(map)
+      }
+    } catch {
+      // GeoJSON unavailable — markers still show without choropleth
+    }
+  }
 
   renderMarkers()
   fitBounds()

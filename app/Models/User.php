@@ -57,6 +57,15 @@ class User extends Authenticatable
     public function isReviewer(): bool    { return $this->role === 'ward_reviewer'; }
     public function isEnumerator(): bool  { return $this->role === 'enumerator'; }
 
+    public function hasPermission(string $perm): bool
+    {
+        if ($this->isSuperAdmin()) return true;
+        $lg = $this->localGovernment;
+        $saved = $lg?->role_permissions ?? [];
+        $perms = $saved[$this->role] ?? \App\Support\RolePermissions::defaults()[$this->role] ?? [];
+        return in_array($perm, $perms);
+    }
+
     public function isLocked(): bool
     {
         return $this->locked_until && $this->locked_until->isFuture();

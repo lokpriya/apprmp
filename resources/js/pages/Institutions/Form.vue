@@ -1,6 +1,71 @@
 <template>
   <div class="space-y-5">
 
+    <!-- ── Duplicate Warning Modal ── -->
+    <Teleport to="body">
+      <div v-if="duplicateMatches" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden">
+          <div :class="duplicateHardBlock ? 'bg-red-600' : 'bg-amber-500'"
+            class="px-5 py-4 flex items-center gap-3">
+            <i :class="duplicateHardBlock ? 'fa-solid fa-circle-xmark' : 'fa-solid fa-triangle-exclamation'"
+              class="text-white text-lg"></i>
+            <h2 class="text-[16px] font-bold text-white">
+              {{ duplicateHardBlock ? 'डुप्लिकेट दर्ता नम्बर — ब्लक गरियो!' : 'सम्भावित डुप्लिकेट पाइयो!' }}
+            </h2>
+          </div>
+          <div class="px-5 py-4 space-y-3 max-h-72 overflow-y-auto">
+            <p class="text-[13px] text-[#626976]">
+              {{ duplicateHardBlock
+                  ? 'यो दर्ता नम्बर भएको संस्था पहिलेनै अभिलेखमा छ। नयाँ प्रविष्टि गर्न मिल्दैन।'
+                  : 'तलका अभिलेखहरूसँग मिल्दो संस्था पहिलेनै दर्ता भएको देखिन्छ। जाँच गर्नुहोस्:' }}
+            </p>
+            <div v-for="m in duplicateMatches" :key="m.id"
+              class="border rounded-lg px-4 py-3 space-y-1"
+              :class="m.hard ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-[13px] font-semibold text-[#1d273b]">{{ m.unique_code }}</span>
+                <span class="text-[11px] px-2 py-0.5 rounded-full font-medium"
+                  :class="{
+                    'bg-green-100 text-green-700': m.status === 'published',
+                    'bg-yellow-100 text-yellow-700': m.status === 'submitted' || m.status === 'ward_approved',
+                    'bg-gray-100 text-gray-600': m.status === 'draft',
+                  }">
+                  {{ m.status }}
+                </span>
+              </div>
+              <div class="text-[12px] text-[#626976]">
+                {{ m.name || '—' }}
+                <span v-if="m.ward_number"> · वडा {{ m.ward_number }}</span>
+              </div>
+              <div class="flex flex-wrap gap-1 mt-1">
+                <span v-for="r in m.reasons" :key="r"
+                  class="text-[11px] rounded px-1.5 py-0.5"
+                  :class="m.hard ? 'bg-red-100 text-red-800 border border-red-200' : 'bg-amber-100 text-amber-800 border border-amber-200'">
+                  {{ r }}
+                </span>
+              </div>
+              <a :href="m.edit_url" target="_blank"
+                class="inline-flex items-center gap-1 text-[12px] text-blue-600 hover:underline mt-1">
+                <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                हेर्नुहोस्
+              </a>
+            </div>
+          </div>
+          <div class="px-5 py-4 border-t border-[#e6e7e9] flex justify-end gap-3 bg-gray-50">
+            <button @click="dismissDuplicate"
+              class="px-4 py-2 rounded border border-[#e6e7e9] text-[13px] text-[#626976] hover:bg-gray-100 transition">
+              फर्कनुहोस् (जाँच गर्नुहोस्)
+            </button>
+            <button v-if="!duplicateHardBlock" @click="confirmDuplicate"
+              class="px-4 py-2 rounded bg-amber-500 hover:bg-amber-600 text-white text-[13px] font-semibold transition">
+              <i class="fa-solid fa-circle-check mr-1"></i>
+              डुप्लिकेट होइन — सुरक्षित गर्नुहोस्
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- Page heading -->
     <div class="flex items-center gap-3">
       <div class="w-11 h-11 rounded-md bg-[#206bc4] flex items-center justify-center text-white shrink-0 shadow-md shadow-[#206bc4]/25">
@@ -197,6 +262,28 @@
             <label class="block text-xs text-gray-500 mb-1">Altitude</label>
             <input v-model="form.gps_altitude" type="text" placeholder="—" class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4] outline-none transition" />
           </div>
+        </div>
+
+        <!-- GPS boundary alert -->
+        <div v-if="gpsBoundaryResult && gpsBoundaryResult.status !== 'inside'"
+          class="mt-3 flex items-start gap-2 rounded px-3 py-2 text-[12px]"
+          :class="{
+            'bg-amber-50 border border-amber-200 text-amber-800':    gpsBoundaryResult.status === 'near',
+            'bg-orange-50 border border-orange-200 text-orange-800': gpsBoundaryResult.status === 'warn',
+            'bg-red-50 border border-red-200 text-red-800':          gpsBoundaryResult.status === 'far',
+          }">
+          <i class="fa-solid fa-triangle-exclamation mt-0.5 shrink-0 text-[11px]"></i>
+          <span>
+            <template v-if="gpsBoundaryResult.status === 'near'">
+              GPS वडा सीमाबाट लगभग <b>{{ gpsBoundaryResult.distanceM }}m</b> बाहिर छ — GPS accuracy को कारण हुन सक्छ। सुरक्षित गर्न मिल्छ।
+            </template>
+            <template v-else-if="gpsBoundaryResult.status === 'warn'">
+              GPS वडा सीमाबाट <b>{{ gpsBoundaryResult.distanceM }}m</b> बाहिर छ — कृपया स्थान जाँच गर्नुहोस्। सुरक्षित गर्न मिल्छ।
+            </template>
+            <template v-else>
+              GPS वडा सीमाबाट <b>{{ gpsBoundaryResult.distanceM }}m</b> टाढा छ — वडा गलत भएको हुन सक्छ। कृपया जाँच गर्नुहोस्।
+            </template>
+          </span>
         </div>
       </div>
 
@@ -1140,17 +1227,6 @@
             <label class="text-[13px] font-semibold text-[#626976] mb-1.5">विभाग / मन्त्रालय</label>
             <input v-model="form.typespecific.department" type="text" placeholder="विभाग वा मन्त्रालयको नाम"
               class="w-full rounded-md border border-[#e6e7e9] px-4 py-2.5 text-[14px] focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4]" />
-          </div>
-        </div>
-        <div class="border-t border-[#e6e7e9] pt-4">
-          <label class="block text-[13px] font-semibold text-[#626976] mb-3">प्रदान गरिने सेवाहरू</label>
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <label v-for="svc in (props.surveyOpts?.inst_service_type ?? [])" :key="svc.value"
-              class="flex items-center gap-2.5 p-3 rounded-md border border-[#e6e7e9] cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-colors"
-              :class="{ 'border-blue-400 bg-blue-50': form.services.includes(svc.value) }">
-              <input type="checkbox" :value="svc.value" v-model="form.services" class="rounded text-[#206bc4]" />
-              <span class="text-sm text-gray-700">{{ svc.label_ne }}</span>
-            </label>
           </div>
         </div>
       </template>
@@ -2225,6 +2301,7 @@ const props = defineProps({
   buildingTypes:    { type: Array,  default: () => [] },
   surveyOpts:       { type: Object, default: () => ({}) },
   initialWardId:    { type: Number, default: null },
+  mapConfig:        { type: Object, default: () => ({}) },
 })
 
 // ── Steps ──────────────────────────────────────────────────────────
@@ -2421,6 +2498,7 @@ const form = useForm({
     // generic
     additional_info:     existing?.survey_data?.typespecific?.additional_info     ?? '',
   },
+  duplicate_confirmed: false,
 })
 
 // ── Navigation guard ──────────────────────────────────────────────
@@ -2539,6 +2617,24 @@ function addHealthStaff() {
 function removeHealthStaff(idx) { form.health_staff.splice(idx, 1) }
 
 // ── GPS ───────────────────────────────────────────────────────────
+const gpsBoundaryResult = ref(null)
+
+import { useGpsBoundary } from '@/composables/useGpsBoundary.js'
+const { checkBoundary } = useGpsBoundary()
+
+watch([() => form.gps_lat, () => form.gps_lng, () => form.ward_id], async ([lat, lng, wardId]) => {
+  gpsBoundaryResult.value = null
+  if (!lat || !lng || !wardId || !props.mapConfig?.geojson_url) return
+  const wardNumber = props.wards.find(w => String(w.id) === String(wardId))?.ward_number
+  if (!wardNumber) return
+  gpsBoundaryResult.value = await checkBoundary(
+    parseFloat(lat), parseFloat(lng),
+    wardNumber,
+    props.mapConfig.geojson_url,
+    props.mapConfig.ward_number_property ?? 'WARD_NO'
+  )
+})
+
 function getGPS() {
   if (!navigator.geolocation) return
   navigator.geolocation.getCurrentPosition((pos) => {
@@ -2643,6 +2739,24 @@ function showOfflineToast(msg) {
   offlineToast.value = msg
   clearTimeout(_toastTimer)
   _toastTimer = setTimeout(() => { offlineToast.value = '' }, 4000)
+}
+
+// ── Duplicate detection ────────────────────────────────────────────
+const duplicateData = computed(() => {
+  const raw = form.errors.duplicate_warning
+  if (!raw) return null
+  try { return JSON.parse(raw) } catch { return null }
+})
+const duplicateMatches = computed(() => duplicateData.value?.matches ?? null)
+const duplicateHardBlock = computed(() => duplicateData.value?.hard_block ?? false)
+function confirmDuplicate() {
+  form.clearErrors('duplicate_warning')
+  form.duplicate_confirmed = true
+  submitForm()
+}
+function dismissDuplicate() {
+  form.clearErrors('duplicate_warning')
+  form.duplicate_confirmed = false
 }
 
 // ── Submit ─────────────────────────────────────────────────────────

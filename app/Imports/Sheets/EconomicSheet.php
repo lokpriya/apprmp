@@ -4,6 +4,7 @@ namespace App\Imports\Sheets;
 
 use App\Models\Household;
 use App\Models\HouseholdEconomic;
+use App\Services\SurveyValueValidator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\ToCollection;
@@ -18,7 +19,10 @@ class EconomicSheet implements ToCollection, WithHeadingRow, WithStartRow, Skips
     private array $errors   = [];
     private int   $imported = 0;
 
-    public function __construct(private readonly HouseholdsSheet $householdsSheet) {}
+    public function __construct(
+        private readonly HouseholdsSheet $householdsSheet,
+        private readonly ?SurveyValueValidator $validator = null,
+    ) {}
 
     public function collection(Collection $rows): void
     {
@@ -36,6 +40,19 @@ class EconomicSheet implements ToCollection, WithHeadingRow, WithStartRow, Skips
 
                     $loanSources = $this->parseArray($row['loan_sources'] ?? null);
                     $householdId = $codeMap[$code];
+
+                    // ── Survey option validation ──────────────────────────────
+                    if ($this->validator) {
+                        $errs = $this->validator->checkFields([
+                            'primary_income_source'    => trim($row['primary_income_source']    ?? ''),
+                            'annual_income_range'       => trim($row['annual_income_range']      ?? ''),
+                            'annual_expenditure_range'  => trim($row['annual_expenditure_range'] ?? ''),
+                        ], $rowNum);
+                        if ($errs) {
+                            foreach ($errs as $e) $this->errors[] = $e;
+                            continue;
+                        }
+                    }
 
                     HouseholdEconomic::updateOrCreate(
                         ['household_id' => $householdId],

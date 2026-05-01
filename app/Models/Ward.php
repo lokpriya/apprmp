@@ -36,7 +36,6 @@ class Ward extends Model
     public function assignedUsers(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'user_ward_assignments')
-            ->withPivot('assigned_at', 'assigned_by')
-            ->withTimestamps();
+            ->withPivot('assigned_at', 'assigned_by');
     }
 }

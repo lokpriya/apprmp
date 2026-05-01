@@ -6,7 +6,7 @@
     ═══════════════════════════════════════════════════════════════ -->
     <aside
       :class="[
-        'flex flex-col transition-all duration-300 ease-in-out shrink-0 z-30',
+        'hidden lg:flex flex-col transition-all duration-300 ease-in-out shrink-0 z-30',
         collapsed ? 'w-[68px]' : 'w-60',
       ]"
       style="background: linear-gradient(180deg,#182433 0%,#1a2d45 60%,#182433 100%)"
@@ -112,6 +112,12 @@
             </p>
             <div class="h-px bg-white/10 mb-2"></div>
           </div>
+          <NavItem href="/admin/progress"                 icon="fa-solid fa-chart-line"                    label="प्रगति ड्यासबोर्ड" :collapsed="collapsed" />
+          <NavItem href="/admin/data-export"              icon="fa-solid fa-file-excel"                    label="तथ्याङ्क निर्यात"   :collapsed="collapsed" />
+          <NavItem href="/admin/audit-logs"               icon="fa-solid fa-clock-rotate-left"             label="अडिट लग"           :collapsed="collapsed" />
+          <NavItem href="/admin/users"                    icon="fa-solid fa-users"                         label="प्रयोगकर्ता"       :collapsed="collapsed" />
+          <NavItem href="/admin/ward-assignments"         icon="fa-solid fa-map-pin"                       label="वडा तोकाई"         :collapsed="collapsed" />
+          <NavItem href="/admin/google-sync"              icon="fa-brands fa-google"                       label="Google Sync"       :collapsed="collapsed" />
           <NavItem href="/admin/bulk-import"             icon="fa-solid fa-file-import"                  label="बल्क आयात घर"      :collapsed="collapsed" :external="true" />
           <NavItem href="/admin/institution-bulk-import" icon="fa-solid fa-building-circle-arrow-right"  label="बल्क आयात संस्था"  :collapsed="collapsed" :external="true" />
           <NavItem href="/admin/business-bulk-import"    icon="fa-solid fa-store-slash"                   label="बल्क आयात व्यवसाय" :collapsed="collapsed" :external="true" />
@@ -181,7 +187,14 @@
     <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
 
       <!-- HEADER -->
-      <header class="bg-white border-b border-[#e6e7e9] h-14 flex items-center px-5 gap-4 shrink-0 z-20">
+      <header class="bg-white border-b border-[#e6e7e9] h-14 flex items-center px-4 gap-3 shrink-0 z-20">
+
+        <!-- Mobile hamburger -->
+        <button @click="mobileNavOpen = true"
+          class="lg:hidden w-9 h-9 flex items-center justify-center rounded border border-[#e6e7e9] text-[#626976] hover:bg-gray-50 transition shrink-0">
+          <i class="fa-solid fa-bars text-[13px]"></i>
+        </button>
+
         <!-- Page Title -->
         <div class="flex-1 min-w-0">
           <h1 class="text-[15px] font-semibold text-[#1d273b] truncate">
@@ -208,6 +221,78 @@
               class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none"
             >{{ editRequestsCount > 99 ? '99+' : editRequestsCount }}</span>
           </a>
+        </div>
+
+        <!-- Notification bell (enumerator / ward_reviewer — submission status updates) -->
+        <div
+          v-if="['enumerator','ward_reviewer'].includes(userRole)"
+          class="relative shrink-0"
+          ref="notifContainer"
+        >
+          <button
+            @click="notifOpen = !notifOpen"
+            :class="[
+              'w-9 h-9 flex items-center justify-center rounded border transition relative',
+              notifOpen ? 'bg-[#206bc4] border-[#206bc4] text-white' : 'border-[#e6e7e9] text-[#626976] hover:bg-gray-50'
+            ]"
+            title="सूचनाहरू"
+          >
+            <i class="fa-solid fa-bell text-[14px]"></i>
+            <span
+              v-if="notificationsCount > 0"
+              class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none"
+            >{{ notificationsCount > 99 ? '99+' : notificationsCount }}</span>
+          </button>
+
+          <Transition
+            enter-active-class="transition ease-out duration-150"
+            enter-from-class="opacity-0 translate-y-1 scale-95"
+            enter-to-class="opacity-100 translate-y-0 scale-100"
+            leave-active-class="transition ease-in duration-100"
+            leave-from-class="opacity-100 translate-y-0 scale-100"
+            leave-to-class="opacity-0 translate-y-1 scale-95"
+          >
+            <div
+              v-if="notifOpen"
+              class="absolute right-0 top-full mt-2 w-80 bg-white rounded-md shadow-lg border border-[#e6e7e9] z-50 overflow-hidden"
+            >
+              <!-- Header -->
+              <div class="flex items-center justify-between px-4 py-2.5 border-b border-[#e6e7e9]">
+                <p class="text-[12px] font-semibold text-[#1d273b] uppercase tracking-wider">सूचनाहरू</p>
+                <button
+                  v-if="notificationsCount > 0"
+                  @click="markAllRead"
+                  class="text-[11px] text-[#206bc4] hover:underline"
+                >सबै पढिएको</button>
+              </div>
+              <!-- List -->
+              <div class="max-h-80 overflow-y-auto divide-y divide-[#f0f1f3]">
+                <div v-if="recentNotifications.length === 0" class="px-4 py-6 text-center text-[13px] text-[#9aa0ac]">
+                  कुनै सूचना छैन।
+                </div>
+                <div
+                  v-for="n in recentNotifications"
+                  :key="n.id"
+                  :class="['flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors', !n.read_at ? 'bg-blue-50/40' : '']"
+                  @click="openNotification(n)"
+                >
+                  <!-- Icon -->
+                  <div :class="['w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-white text-[12px]', notifIconBg(n.data.color)]">
+                    <i :class="['fa-solid', 'fa-' + (n.data.icon ?? 'bell')]"></i>
+                  </div>
+                  <!-- Text -->
+                  <div class="flex-1 min-w-0">
+                    <p class="text-[13px] font-semibold text-[#1d273b] leading-tight">{{ n.data.title }}</p>
+                    <p v-if="n.data.unique_code" class="text-[11px] text-[#9aa0ac] mt-0.5">{{ n.data.unique_code }}</p>
+                    <p v-if="n.data.message" class="text-[12px] text-[#626976] mt-0.5 line-clamp-2">{{ n.data.message }}</p>
+                    <p class="text-[11px] text-[#bbb] mt-1">{{ n.created_at }}</p>
+                  </div>
+                  <!-- Unread dot -->
+                  <span v-if="!n.read_at" class="w-2 h-2 rounded-full bg-[#206bc4] shrink-0 mt-1.5"></span>
+                </div>
+              </div>
+            </div>
+          </Transition>
         </div>
 
         <!-- Gear / Admin menu -->
@@ -251,10 +336,30 @@
                   {{ editRequestsCount }}
                 </span>
               </a>
+              <a href="/admin/progress"
+                class="flex items-center gap-3 px-4 py-2.5 text-[13px] text-[#626976] hover:bg-gray-50 transition-colors">
+                <i class="fa-solid fa-chart-line w-4 text-[#9aa0ac] text-center text-xs"></i>
+                प्रगति ड्यासबोर्ड
+              </a>
+              <a href="/admin/data-export"
+                class="flex items-center gap-3 px-4 py-2.5 text-[13px] text-[#626976] hover:bg-gray-50 transition-colors">
+                <i class="fa-solid fa-file-excel w-4 text-[#9aa0ac] text-center text-xs"></i>
+                तथ्याङ्क निर्यात
+              </a>
+              <a href="/admin/audit-logs"
+                class="flex items-center gap-3 px-4 py-2.5 text-[13px] text-[#626976] hover:bg-gray-50 transition-colors">
+                <i class="fa-solid fa-clock-rotate-left w-4 text-[#9aa0ac] text-center text-xs"></i>
+                अडिट लग
+              </a>
               <a href="/admin/users"
                 class="flex items-center gap-3 px-4 py-2.5 text-[13px] text-[#626976] hover:bg-gray-50 transition-colors">
                 <i class="fa-solid fa-users w-4 text-[#9aa0ac] text-center text-xs"></i>
                 प्रयोगकर्ता
+              </a>
+              <a href="/admin/ward-assignments"
+                class="flex items-center gap-3 px-4 py-2.5 text-[13px] text-[#626976] hover:bg-gray-50 transition-colors">
+                <i class="fa-solid fa-map-pin w-4 text-[#9aa0ac] text-center text-xs"></i>
+                वडा तोकाई
               </a>
               <a href="/admin/role-permissions"
                 class="flex items-center gap-3 px-4 py-2.5 text-[13px] text-[#626976] hover:bg-gray-50 transition-colors">
@@ -328,30 +433,7 @@
         </div>
       </header>
 
-      <!-- Flash messages -->
-      <div v-if="(flash.success && !dismissedFlash.success) || (flash.error && !dismissedFlash.error)"
-        class="px-5 pt-4 shrink-0 space-y-2">
-        <div
-          v-if="flash.success && !dismissedFlash.success"
-          class="flex items-start gap-3 bg-green-50 border border-green-200 text-green-800 rounded-md px-4 py-3 text-[13px]"
-        >
-          <i class="fa-solid fa-circle-check text-green-500 mt-0.5 shrink-0"></i>
-          <span>{{ flash.success }}</span>
-          <button @click="dismissFlash('success')" class="ml-auto text-green-500 hover:text-green-700 shrink-0">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </div>
-        <div
-          v-if="flash.error && !dismissedFlash.error"
-          class="flex items-start gap-3 bg-red-50 border border-red-200 text-red-800 rounded-md px-4 py-3 text-[13px]"
-        >
-          <i class="fa-solid fa-circle-exclamation text-red-500 mt-0.5 shrink-0"></i>
-          <span>{{ flash.error }}</span>
-          <button @click="dismissFlash('error')" class="ml-auto text-red-500 hover:text-red-700 shrink-0">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </div>
-      </div>
+      <!-- Flash toasts rendered via Teleport at end of template -->
 
       <!-- Offline banner -->
       <div
@@ -390,11 +472,251 @@
       </main>
 
     </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         MOBILE DRAWER OVERLAY (lg:hidden)
+    ═══════════════════════════════════════════════════════════════ -->
+    <Transition
+      enter-active-class="transition-opacity duration-200"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity duration-150"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div v-if="mobileNavOpen" class="fixed inset-0 z-50 lg:hidden flex">
+        <!-- Backdrop -->
+        <div class="fixed inset-0 bg-black/50" @click="mobileNavOpen = false"></div>
+
+        <!-- Drawer panel -->
+        <div class="relative w-[260px] h-full flex flex-col z-10 overflow-y-auto"
+             style="background: linear-gradient(180deg,#182433 0%,#1a2d45 60%,#182433 100%)">
+
+          <!-- Header -->
+          <div class="flex items-center justify-between px-4 h-14 border-b border-white/10 shrink-0">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded bg-[#206bc4] flex items-center justify-center text-white shrink-0">
+                <i class="fa-solid fa-map-location-dot text-xs"></i>
+              </div>
+              <div>
+                <p class="text-[13px] font-semibold text-white leading-tight">APPRMP</p>
+                <p class="text-[11px] text-white/50 leading-tight truncate max-w-[150px]">
+                  {{ page.props.auth?.local_government ?? 'स्थानीय तह' }}
+                </p>
+              </div>
+            </div>
+            <button @click="mobileNavOpen = false" class="text-white/50 hover:text-white transition">
+              <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+          </div>
+
+          <!-- Navigation links -->
+          <nav class="flex-1 px-2 py-3 space-y-0.5">
+
+            <!-- Admin dashboard -->
+            <template v-if="['municipal_admin','super_admin'].includes(userRole)">
+              <a href="/admin" @click="mobileNavOpen = false"
+                :class="['flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-medium transition no-underline',
+                  page.url === '/admin' ? 'bg-white/12 text-white' : 'text-white/65 hover:bg-white/8 hover:text-white']">
+                <i class="fa-solid fa-gauge-high w-4 text-center"></i> ड्यासबोर्ड
+              </a>
+              <div class="h-px bg-white/10 my-2"></div>
+            </template>
+
+            <!-- Data entry -->
+            <template v-if="['enumerator','municipal_admin','super_admin'].includes(userRole)">
+              <p class="text-[10px] font-semibold text-white/30 uppercase tracking-widest px-3 py-1">Data Entry</p>
+              <a href="/households" @click="mobileNavOpen = false"
+                :class="['flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-medium transition no-underline',
+                  page.url.startsWith('/households') ? 'bg-white/12 text-white' : 'text-white/65 hover:bg-white/8 hover:text-white']">
+                <i class="fa-solid fa-house w-4 text-center"></i> घरधुरी विवरण
+              </a>
+              <a href="/institutions" @click="mobileNavOpen = false"
+                :class="['flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-medium transition no-underline',
+                  page.url.startsWith('/institutions') ? 'bg-white/12 text-white' : 'text-white/65 hover:bg-white/8 hover:text-white']">
+                <i class="fa-solid fa-building w-4 text-center"></i> संस्थागत विवरण
+              </a>
+              <a href="/businesses" @click="mobileNavOpen = false"
+                :class="['flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-medium transition no-underline',
+                  page.url.startsWith('/businesses') ? 'bg-white/12 text-white' : 'text-white/65 hover:bg-white/8 hover:text-white']">
+                <i class="fa-solid fa-store w-4 text-center"></i> व्यवसाय विवरण
+              </a>
+              <div class="h-px bg-white/10 my-2"></div>
+            </template>
+
+            <!-- Review -->
+            <template v-if="['ward_reviewer','municipal_admin','super_admin'].includes(userRole)">
+              <p class="text-[10px] font-semibold text-white/30 uppercase tracking-widest px-3 py-1">Review</p>
+              <a href="/review" @click="mobileNavOpen = false"
+                :class="['flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-medium transition no-underline',
+                  page.url.startsWith('/review') ? 'bg-white/12 text-white' : 'text-white/65 hover:bg-white/8 hover:text-white']">
+                <i class="fa-solid fa-magnifying-glass-chart w-4 text-center"></i> समीक्षा अवस्था
+              </a>
+              <a v-if="['municipal_admin','super_admin'].includes(userRole)" href="/admin/publish-queue" @click="mobileNavOpen = false"
+                :class="['flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-medium transition no-underline',
+                  page.url.startsWith('/admin/publish-queue') ? 'bg-white/12 text-white' : 'text-white/65 hover:bg-white/8 hover:text-white']">
+                <i class="fa-solid fa-paper-plane w-4 text-center"></i> प्रकाशन अवस्था
+              </a>
+              <div class="h-px bg-white/10 my-2"></div>
+            </template>
+
+            <!-- Admin links -->
+            <template v-if="['municipal_admin','super_admin'].includes(userRole)">
+              <p class="text-[10px] font-semibold text-white/30 uppercase tracking-widest px-3 py-1">Administration</p>
+              <a href="/admin/settings" @click="mobileNavOpen = false"
+                class="flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-medium transition no-underline text-white/65 hover:bg-white/8 hover:text-white">
+                <i class="fa-solid fa-gear w-4 text-center"></i> सेटिङ्ग
+              </a>
+              <a href="/admin/users" @click="mobileNavOpen = false"
+                class="flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-medium transition no-underline text-white/65 hover:bg-white/8 hover:text-white">
+                <i class="fa-solid fa-users w-4 text-center"></i> प्रयोगकर्ता
+              </a>
+              <div class="h-px bg-white/10 my-2"></div>
+            </template>
+
+            <!-- Public portal -->
+            <a href="/public" target="_blank"
+              class="flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-medium transition no-underline text-white/65 hover:bg-white/8 hover:text-white">
+              <i class="fa-solid fa-globe w-4 text-center"></i> सार्वजनिक पोर्टल
+              <i class="fa-solid fa-arrow-up-right-from-square text-[10px] ml-auto text-white/30"></i>
+            </a>
+          </nav>
+
+          <!-- User at bottom -->
+          <div class="shrink-0 border-t border-white/10 px-3 py-3">
+            <div class="flex items-center gap-2.5 bg-white/5 rounded px-3 py-2.5">
+              <div class="w-8 h-8 rounded bg-[#206bc4] flex items-center justify-center text-white text-xs font-bold shrink-0 uppercase">
+                {{ userInitials }}
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-white text-[13px] font-semibold truncate">{{ page.props.auth?.user?.name ?? '' }}</p>
+                <p class="text-white/50 text-[11px] truncate capitalize">{{ page.props.auth?.user?.role?.replace(/_/g,' ') ?? '' }}</p>
+              </div>
+              <button @click="logout"
+                class="shrink-0 w-7 h-7 rounded bg-white/10 hover:bg-red-500/30 text-white/65 hover:text-red-300 flex items-center justify-center transition">
+                <i class="fa-solid fa-right-from-bracket text-xs"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         FLOATING ACTION BUTTON — enumerators, mobile only
+    ═══════════════════════════════════════════════════════════════ -->
+    <div v-if="['enumerator','municipal_admin','super_admin'].includes(userRole)"
+         class="fixed bottom-6 right-5 z-40 lg:hidden flex flex-col items-end gap-2">
+
+      <!-- Speed-dial options (shown when fabOpen) -->
+      <Transition
+        enter-active-class="transition-all duration-200 ease-out"
+        enter-from-class="opacity-0 translate-y-2 scale-95"
+        enter-to-class="opacity-100 translate-y-0 scale-100"
+        leave-active-class="transition-all duration-150 ease-in"
+        leave-from-class="opacity-100 translate-y-0 scale-100"
+        leave-to-class="opacity-0 translate-y-2 scale-95"
+      >
+        <div v-if="fabOpen" class="flex flex-col items-end gap-2 mb-1">
+          <a href="/households/create"
+            class="flex items-center gap-2.5 bg-white shadow-lg rounded-full pl-3 pr-4 py-2.5 no-underline text-[13px] font-semibold text-[#1d273b] active:scale-95 transition-transform">
+            <div class="w-8 h-8 rounded-full bg-[#206bc4] flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-house-circle-plus text-white text-xs"></i>
+            </div>
+            नयाँ घरधुरी
+          </a>
+          <a href="/institutions/create"
+            class="flex items-center gap-2.5 bg-white shadow-lg rounded-full pl-3 pr-4 py-2.5 no-underline text-[13px] font-semibold text-[#1d273b] active:scale-95 transition-transform">
+            <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-building-circle-check text-white text-xs"></i>
+            </div>
+            नयाँ संस्था
+          </a>
+          <a href="/businesses/create"
+            class="flex items-center gap-2.5 bg-white shadow-lg rounded-full pl-3 pr-4 py-2.5 no-underline text-[13px] font-semibold text-[#1d273b] active:scale-95 transition-transform">
+            <div class="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-store-arrow-up text-white text-xs"></i>
+            </div>
+            नयाँ व्यवसाय
+          </a>
+        </div>
+      </Transition>
+
+      <!-- Main FAB button -->
+      <button @click="fabOpen = !fabOpen"
+        class="w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-200 active:scale-95"
+        :style="fabOpen ? 'background:#ef4444' : 'background:#206bc4'">
+        <i :class="['fa-solid text-white text-xl transition-transform duration-200', fabOpen ? 'fa-xmark rotate-90' : 'fa-plus']"></i>
+      </button>
+    </div>
+
   </div>
+
+  <!-- ── Floating toast system ──────────────────────────────────────── -->
+  <Teleport to="body">
+    <div class="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none" style="width:340px">
+
+      <!-- Success toast -->
+      <Transition
+        enter-from-class="translate-x-full opacity-0"
+        enter-active-class="transition-all duration-300 ease-out"
+        enter-to-class="translate-x-0 opacity-100"
+        leave-from-class="translate-x-0 opacity-100"
+        leave-active-class="transition-all duration-200 ease-in"
+        leave-to-class="translate-x-8 opacity-0"
+      >
+        <div v-if="flash.success && !dismissedFlash.success"
+          class="pointer-events-auto relative overflow-hidden bg-white border border-green-200 shadow-lg rounded-xl px-4 py-3.5 flex items-start gap-3">
+          <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-green-50 shrink-0">
+            <i class="fa-solid fa-circle-check text-green-500 text-sm"></i>
+          </span>
+          <div class="flex-1 min-w-0 pt-0.5">
+            <p class="text-sm font-semibold text-gray-800">सफल भयो!</p>
+            <p class="text-xs text-gray-500 mt-0.5 leading-relaxed">{{ flash.success }}</p>
+          </div>
+          <button @click="dismissFlash('success')"
+            class="text-gray-300 hover:text-gray-500 transition-colors shrink-0 mt-0.5">
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+          <!-- Auto-dismiss progress bar -->
+          <div class="absolute bottom-0 left-0 h-0.5 bg-green-400 rounded-full"
+            :style="{ width: toastProgress.success + '%', transition: toastActive.success ? 'width 4000ms linear' : 'none' }">
+          </div>
+        </div>
+      </Transition>
+
+      <!-- Error toast (no auto-dismiss — user must close) -->
+      <Transition
+        enter-from-class="translate-x-full opacity-0"
+        enter-active-class="transition-all duration-300 ease-out"
+        enter-to-class="translate-x-0 opacity-100"
+        leave-from-class="translate-x-0 opacity-100"
+        leave-active-class="transition-all duration-200 ease-in"
+        leave-to-class="translate-x-8 opacity-0"
+      >
+        <div v-if="flash.error && !dismissedFlash.error"
+          class="pointer-events-auto relative overflow-hidden bg-white border border-red-200 shadow-lg rounded-xl px-4 py-3.5 flex items-start gap-3">
+          <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 shrink-0">
+            <i class="fa-solid fa-circle-exclamation text-red-500 text-sm"></i>
+          </span>
+          <div class="flex-1 min-w-0 pt-0.5">
+            <p class="text-sm font-semibold text-gray-800">त्रुटि भयो</p>
+            <p class="text-xs text-gray-500 mt-0.5 leading-relaxed">{{ flash.error }}</p>
+          </div>
+          <button @click="dismissFlash('error')"
+            class="text-gray-300 hover:text-gray-500 transition-colors shrink-0 mt-0.5">
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+      </Transition>
+
+    </div>
+  </Teleport>
+
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, h, Transition } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick, h, Transition } from 'vue'
 import { usePage, Link, router } from '@inertiajs/vue3'
 import { useSyncManager } from '@/utils/syncManager'
 
@@ -609,18 +931,50 @@ const flash = computed(() => ({
 }))
 
 const dismissedFlash = ref({ success: false, error: false })
+const toastProgress  = ref({ success: 100, error: 100 })
+const toastActive    = ref({ success: false, error: false })
+const _toastTimers   = { success: null, error: null }
+
+function dismissFlash(type) {
+  dismissedFlash.value[type] = true
+  toastActive.value[type]    = false
+  clearTimeout(_toastTimers[type])
+}
+
+function _startToast(type, autoDismiss = true) {
+  dismissedFlash.value[type] = false
+  toastProgress.value[type]  = 100
+  toastActive.value[type]    = false
+  clearTimeout(_toastTimers[type])
+
+  if (autoDismiss) {
+    // Let the DOM render at 100% first, then kick off the 4s transition to 0%
+    nextTick(() => {
+      toastActive.value[type] = true
+      toastProgress.value[type] = 0
+      _toastTimers[type] = setTimeout(() => dismissFlash(type), 4100)
+    })
+  }
+}
+
+watch(() => flash.value.success, val => { if (val) _startToast('success', true)  })
+watch(() => flash.value.error,   val => { if (val) _startToast('error',   false) })
 
 // Reset dismissed state on each navigation so new flash messages show
 onMounted(() => {
+  // Fire watches for any flash already present on mount
+  if (flash.value.success) _startToast('success', true)
+  if (flash.value.error)   _startToast('error', false)
+
   const stop = router.on('navigate', () => {
     dismissedFlash.value = { success: false, error: false }
   })
   onUnmounted(stop)
 })
 
-function dismissFlash(type) {
-  dismissedFlash.value[type] = true
-}
+// ── Mobile nav + FAB ──────────────────────────────────────────────
+const mobileNavOpen = ref(false)
+const fabOpen       = ref(false)
 
 // ── Sidebar collapse ───────────────────────────────────────────────
 const collapsed = ref(localStorage.getItem('sidebar_collapsed') === 'true')
@@ -635,6 +989,31 @@ const userRole = computed(() => page.props.auth?.user?.role ?? '')
 
 // ── Edit Requests notification count (admin only) ──────────────────
 const editRequestsCount = computed(() => page.props.editRequestsCount ?? 0)
+
+// ── Submission notifications (enumerator / ward_reviewer) ──────────
+const notificationsCount   = computed(() => page.props.notificationsCount ?? 0)
+const recentNotifications  = computed(() => page.props.recentNotifications ?? [])
+const notifOpen            = ref(false)
+const notifContainer       = ref(null)
+
+function notifIconBg(color) {
+  const map = { green: 'bg-green-500', red: 'bg-red-500', orange: 'bg-orange-500', blue: 'bg-blue-500' }
+  return map[color] ?? 'bg-gray-400'
+}
+
+async function openNotification(n) {
+  // Mark as read then navigate
+  if (!n.read_at) {
+    try { await fetch(`/notifications/${n.id}/read`, { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content ?? '' } }) } catch {}
+  }
+  notifOpen.value = false
+  if (n.data.url) router.visit(n.data.url)
+}
+
+async function markAllRead() {
+  try { await fetch('/notifications/read-all', { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content ?? '' } }) } catch {}
+  router.reload({ only: ['notificationsCount', 'recentNotifications'] })
+}
 
 // ── User initials ──────────────────────────────────────────────────
 const userInitials = computed(() => {
@@ -660,6 +1039,9 @@ function handleClickOutside(e) {
   if (gearContainer.value && !gearContainer.value.contains(e.target)) {
     gearOpen.value = false
   }
+  if (notifContainer.value && !notifContainer.value.contains(e.target)) {
+    notifOpen.value = false
+  }
 }
 onMounted(() => document.addEventListener('mousedown', handleClickOutside))
 onUnmounted(() => document.removeEventListener('mousedown', handleClickOutside))
@@ -676,8 +1058,10 @@ onUnmounted(() => {
 })
 
 // ── Logout ─────────────────────────────────────────────────────────
-function logout() {
+async function logout() {
   dropdownOpen.value = false
-  router.post('/logout')
+  const csrf = document.querySelector('meta[name=csrf-token]')?.content ?? ''
+  await fetch('/logout', { method: 'POST', headers: { 'X-CSRF-TOKEN': csrf } }).catch(() => {})
+  window.location.href = '/'
 }
 </script>

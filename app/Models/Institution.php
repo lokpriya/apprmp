@@ -4,6 +4,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Institution extends Model
@@ -16,11 +17,13 @@ class Institution extends Model
         'gps_lat','gps_lng','gps_altitude','gps_accuracy','photo_number','status','survey_date','submitted_at','ward_reviewed_at',
         'ward_reviewer_id','ward_review_comment','published_at','published_by',
         'data_frozen_at','remarks','respondent_name','respondent_contact','survey_data',
+        'sync_source','sync_hash','sync_locked',
     ];
     protected $casts = [
         'established_date'=>'date','survey_date'=>'date',
         'survey_data'=>'array',
         'submitted_at'=>'datetime','ward_reviewed_at'=>'datetime','published_at'=>'datetime','data_frozen_at'=>'datetime',
+        'sync_locked'=>'boolean',
     ];
 
     public function ward(): BelongsTo          { return $this->belongsTo(Ward::class); }
@@ -36,6 +39,7 @@ class Institution extends Model
     public function staff(): HasMany           { return $this->hasMany(InstitutionStaff::class); }
     public function education(): HasMany       { return $this->hasMany(InstitutionEducation::class)->orderBy('grade'); }
     public function submissionLogs(): HasMany  { return $this->hasMany(SubmissionLog::class, 'loggable_id')->where('loggable_type', self::class)->latest(); }
+    public function fieldVerification(): MorphOne { return $this->morphOne(FieldVerification::class, 'verifiable'); }
 
     public function isPublished(): bool { return $this->status === 'published'; }
     public function isDraft(): bool     { return $this->status === 'draft'; }

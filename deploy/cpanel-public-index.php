@@ -36,6 +36,16 @@ use Illuminate\Http\Request;
 
 define('LARAVEL_START', microtime(true));
 
+// Auto-create storage symlink if missing.
+// __DIR__ is public_html/apprmp/ — the correct web-accessible location.
+(function () {
+    $link   = __DIR__ . '/storage';
+    $target = LARAVEL_ROOT . '/storage/app/public';
+    if (!file_exists($link) && is_dir($target)) {
+        @symlink($target, $link);
+    }
+})();
+
 // Maintenance mode check
 if (file_exists($maintenance = LARAVEL_ROOT . '/storage/framework/maintenance.php')) {
     require $maintenance;

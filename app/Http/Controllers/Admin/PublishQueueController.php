@@ -60,7 +60,7 @@ class PublishQueueController extends Controller
 
         $businesses = MemberBusiness::with(['member', 'household', 'ward', 'settlement', 'enumerator', 'wardReviewer'])
             ->whereIn('ward_id', $wardIds)
-            ->where('status', 'ward_approved')
+            ->whereIn('status', ['ward_approved', 'escalated'])
             ->latest('ward_reviewed_at')
             ->paginate(20, ['*'], 'biz_page')
             ->through(fn($b) => [
@@ -132,7 +132,7 @@ class PublishQueueController extends Controller
 
     public function publishBusiness(Request $request, MemberBusiness $business)
     {
-        abort_unless($business->status === 'ward_approved', 422, 'Cannot publish this record.');
+        abort_unless(in_array($business->status, ['ward_approved', 'escalated']), 422, 'Cannot publish this record.');
 
         $this->workflow->publish($business, auth()->user());
         return back()->with('success', "व्यवसाय {$business->unique_code} प्रकाशित गरियो।");
@@ -140,7 +140,7 @@ class PublishQueueController extends Controller
 
     public function rejectBusiness(Request $request, MemberBusiness $business)
     {
-        abort_unless($business->status === 'ward_approved', 422, 'Cannot reject this record.');
+        abort_unless(in_array($business->status, ['ward_approved', 'escalated']), 422, 'Cannot reject this record.');
         $request->validate(['comment' => 'required|string|max:500']);
 
         $this->workflow->reject($business, auth()->user(), $request->comment);

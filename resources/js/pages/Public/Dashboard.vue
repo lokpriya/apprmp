@@ -184,7 +184,7 @@
               <p class="text-[13px] font-semibold text-[#1d273b]">{{ t('dashboard.genderChart') }}</p>
               <p class="text-[11px] text-[#9aa0ac] mt-0.5">{{ t('stats.male') }} · {{ t('stats.female') }}</p>
             </div>
-            <div class="p-4 h-52"><canvas ref="genderChartEl"></canvas></div>
+            <div class="p-4 h-44"><canvas ref="genderChartEl"></canvas></div>
           </div>
           <!-- Age -->
           <div class="bg-white border border-[#e6e7e9] rounded-md overflow-hidden">
@@ -192,7 +192,7 @@
               <p class="text-[13px] font-semibold text-[#1d273b]">{{ t('dashboard.ageChart') }}</p>
               <p class="text-[11px] text-[#9aa0ac] mt-0.5">{{ t('stats.population') }}</p>
             </div>
-            <div class="p-4 h-52"><canvas ref="ageChartEl"></canvas></div>
+            <div class="p-4 h-44"><canvas ref="ageChartEl"></canvas></div>
           </div>
           <!-- Institutions -->
           <div v-if="hasInstitutions" class="bg-white border border-[#e6e7e9] rounded-md overflow-hidden">
@@ -200,128 +200,195 @@
               <p class="text-[13px] font-semibold text-[#1d273b]">{{ t('dashboard.institutionChart') }}</p>
               <p class="text-[11px] text-[#9aa0ac] mt-0.5">{{ t('stats.institutions') }}</p>
             </div>
-            <div class="p-4 h-52"><canvas ref="institutionChartEl"></canvas></div>
+            <div class="p-4 h-44"><canvas ref="institutionChartEl"></canvas></div>
           </div>
         </div>
       </section>
 
-      <!-- ══ WARD SUMMARY ══ -->
-      <section id="wards" class="scroll-mt-[100px] mb-4">
-        <div class="bg-white border border-[#e6e7e9] rounded-md overflow-hidden">
-          <div class="flex items-center justify-between px-4 py-3 border-b border-[#e6e7e9]">
-            <div>
-              <p class="text-[13px] font-semibold text-[#1d273b]">{{ t('dashboard.wardSummaryNp') }}</p>
-              <p class="text-[11px] text-[#9aa0ac] mt-0.5">{{ t('dashboard.wardSummarySubtitle') }}</p>
+      <!-- ══ KEY METRICS ══ -->
+      <section class="mb-4">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="bg-white border border-[#e6e7e9] rounded-md p-4 flex items-center gap-3">
+            <div class="w-9 h-9 rounded bg-emerald-100 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-book-open text-emerald-600 text-sm"></i>
             </div>
-            <span class="text-[11px] text-[#9aa0ac] bg-gray-100 px-2 py-1 rounded">
-              {{ props.wardSummary.length }} {{ t('stats.wards') }}
-            </span>
+            <div>
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-[#9aa0ac]">साक्षरता दर</p>
+              <p class="text-xl font-bold text-emerald-600">{{ props.keyMetrics?.literacy_rate ?? 0 }}%</p>
+            </div>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full">
-              <thead class="border-b border-[#e6e7e9]">
-                <tr>
-                  <th class="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9aa0ac]">{{ t('dashboard.wardCol') }}</th>
-                  <th class="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9aa0ac]">{{ t('stats.households') }}</th>
-                  <th class="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-500">{{ t('stats.male') }}</th>
-                  <th class="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-pink-400">{{ t('stats.female') }}</th>
-                  <th class="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9aa0ac]">{{ t('stats.population') }}</th>
-                  <th class="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#9aa0ac] text-center">{{ t('dashboard.genderRatio') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="ws in props.wardSummary" :key="ws.ward_id"
-                  class="border-b border-[#e6e7e9] hover:bg-gray-50 transition-colors"
-                  :class="props.selectedWardId == ws.ward_id ? 'bg-[#206bc4]/5' : ''">
-                  <td class="px-4 py-2.5">
-                    <a :href="`/public?ward_id=${ws.ward_id}`" class="flex items-center gap-2.5 group">
-                      <span class="w-7 h-7 rounded flex items-center justify-center text-[12px] font-bold shrink-0 transition"
-                        :class="props.selectedWardId == ws.ward_id
-                          ? 'bg-[#206bc4] text-white'
-                          : 'bg-gray-100 text-[#626976] group-hover:bg-[#206bc4]/10 group-hover:text-[#206bc4]'">
-                        {{ ws.ward_number }}
-                      </span>
-                      <span class="text-[13px] text-[#1d273b] group-hover:text-[#206bc4] transition">
-                        {{ t('common.ward') }} {{ ws.ward_number }}
-                      </span>
-                    </a>
-                  </td>
-                  <td class="px-4 py-2.5 text-right text-[13px] text-[#1d273b] tabular-nums">{{ fmt(ws.households) }}</td>
-                  <td class="px-4 py-2.5 text-right text-[13px] text-blue-600 tabular-nums">{{ fmt(ws.male) }}</td>
-                  <td class="px-4 py-2.5 text-right text-[13px] text-pink-500 tabular-nums">{{ fmt(ws.female) }}</td>
-                  <td class="px-4 py-2.5 text-right text-[13px] font-medium text-[#1d273b] tabular-nums">{{ fmt(ws.total) }}</td>
-                  <td class="px-4 py-2.5">
-                    <div class="flex items-center gap-1.5 justify-center">
-                      <span class="text-[11px] text-blue-500 w-6 text-right tabular-nums">{{ malePct(ws) }}%</span>
-                      <div class="w-16 h-1.5 rounded-full overflow-hidden bg-pink-100">
-                        <div class="h-full bg-blue-400 rounded-full" :style="`width:${malePct(ws)}%`"></div>
-                      </div>
-                      <span class="text-[11px] text-pink-400 w-6 tabular-nums">{{ 100 - malePct(ws) }}%</span>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-              <tfoot class="bg-gray-50 border-t border-[#e6e7e9]">
-                <tr>
-                  <td class="px-4 py-2.5 text-[13px] font-semibold text-[#1d273b]">{{ t('dashboard.total') }}</td>
-                  <td class="px-4 py-2.5 text-right text-[13px] font-semibold text-[#1d273b] tabular-nums">{{ fmt(sum('households')) }}</td>
-                  <td class="px-4 py-2.5 text-right text-[13px] font-semibold text-blue-600 tabular-nums">{{ fmt(sum('male')) }}</td>
-                  <td class="px-4 py-2.5 text-right text-[13px] font-semibold text-pink-500 tabular-nums">{{ fmt(sum('female')) }}</td>
-                  <td class="px-4 py-2.5 text-right text-[13px] font-semibold text-[#1d273b] tabular-nums">{{ fmt(sum('total')) }}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
+          <div class="bg-white border border-[#e6e7e9] rounded-md p-4 flex items-center gap-3">
+            <div class="w-9 h-9 rounded bg-amber-100 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-house-user text-amber-600 text-sm"></i>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-[#9aa0ac]">औसत परिवार</p>
+              <p class="text-xl font-bold text-amber-600">{{ props.keyMetrics?.avg_hh_size ?? 0 }}</p>
+            </div>
+          </div>
+          <div class="bg-white border border-[#e6e7e9] rounded-md p-4 flex items-center gap-3">
+            <div class="w-9 h-9 rounded bg-indigo-100 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-venus-mars text-indigo-600 text-sm"></i>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-[#9aa0ac]">लिंग अनुपात</p>
+              <p class="text-xl font-bold text-indigo-600">{{ props.keyMetrics?.sex_ratio ?? 0 }}</p>
+              <p class="text-[10px] text-[#9aa0ac]">प्रति १०० महिला</p>
+            </div>
+          </div>
+          <div class="bg-white border border-[#e6e7e9] rounded-md p-4 flex items-center gap-3">
+            <div class="w-9 h-9 rounded bg-teal-100 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-piggy-bank text-teal-600 text-sm"></i>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-[#9aa0ac]">बैंक खाता</p>
+              <p class="text-xl font-bold text-teal-600">{{ props.keyMetrics?.bank_account_pct ?? 0 }}%</p>
+            </div>
           </div>
         </div>
       </section>
 
-      <!-- ══ ETHNICITY ══ -->
-      <section v-if="hasEthnicity" id="ethnicity" class="scroll-mt-[100px] mb-8">
-        <DemographicSection
-          :title="t('dashboard.ethnicityTitle')"
-          :subtitle="t('dashboard.ethnicitySubtitle')"
-          icon="fa-solid fa-people-group"
-          icon-bg="bg-amber-100"
-          icon-color="text-amber-600"
-          :data="props.ethnicityData"
-          chart-type="bar"
-          :colors="AMBER"
-          accent="text-amber-600"
-          bar-bg="bg-amber-400"
-        />
+      <!-- ══ BASIC SERVICES ══ -->
+      <section v-if="hasServices" class="mb-4">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-[12px] font-semibold text-[#626976] uppercase tracking-wide flex items-center gap-1.5">
+            <i class="fa-solid fa-faucet text-[#9aa0ac] text-[11px]"></i> आधारभूत सेवाहरू
+          </p>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <MiniBarChart v-if="props.waterData?.length"
+            title="पानीको स्रोत" subtitle="Water Source"
+            icon="fa-solid fa-droplet" icon-color="text-blue-600" icon-bg="bg-blue-50"
+            :data="props.waterData" color="#3B82F6" />
+          <MiniBarChart v-if="props.toiletData?.length"
+            title="शौचालयको प्रकार" subtitle="Toilet Type"
+            icon="fa-solid fa-toilet" icon-color="text-green-600" icon-bg="bg-green-50"
+            :data="props.toiletData" color="#10B981" />
+          <MiniBarChart v-if="props.electricityData?.length"
+            title="विद्युत स्रोत" subtitle="Electricity Source"
+            icon="fa-solid fa-bolt" icon-color="text-yellow-600" icon-bg="bg-yellow-50"
+            :data="props.electricityData" color="#F59E0B" />
+          <MiniBarChart v-if="props.cookingData?.length"
+            title="खाना पकाउने इन्धन" subtitle="Cooking Fuel"
+            icon="fa-solid fa-fire-burner" icon-color="text-orange-600" icon-bg="bg-orange-50"
+            :data="props.cookingData" color="#F97316" />
+        </div>
       </section>
 
-      <!-- ══ RELIGION ══ -->
-      <section v-if="hasReligion" id="religion" class="scroll-mt-[100px] mb-8">
-        <DemographicSection
-          :title="t('dashboard.religionTitle')"
-          :subtitle="t('dashboard.religionSubtitle')"
-          icon="fa-solid fa-place-of-worship"
-          icon-bg="bg-purple-100"
-          icon-color="text-purple-600"
-          :data="props.religionData"
-          chart-type="doughnut"
-          :colors="PURPLE"
-          accent="text-purple-600"
-          bar-bg="bg-purple-400"
-        />
+      <!-- ══ ECONOMY & EDUCATION ══ -->
+      <section class="mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <!-- Income source -->
+          <div v-if="props.incomeData?.length" class="bg-white border border-[#e6e7e9] rounded-md overflow-hidden">
+            <div class="px-4 py-3 border-b border-[#e6e7e9] flex items-center gap-2">
+              <div class="w-7 h-7 rounded bg-violet-100 flex items-center justify-center">
+                <i class="fa-solid fa-sack-dollar text-violet-600 text-xs"></i>
+              </div>
+              <div>
+                <p class="text-[13px] font-semibold text-[#1d273b]">आयको मुख्य स्रोत</p>
+                <p class="text-[11px] text-[#9aa0ac]">Primary Income Source</p>
+              </div>
+            </div>
+            <div class="p-3" :style="`height:${Math.min(60 + props.incomeData.length * 28, 280)}px`">
+              <canvas ref="incomeChartEl"></canvas>
+            </div>
+          </div>
+          <!-- Education level -->
+          <div v-if="props.educationData?.length" class="bg-white border border-[#e6e7e9] rounded-md overflow-hidden">
+            <div class="px-4 py-3 border-b border-[#e6e7e9] flex items-center gap-2">
+              <div class="w-7 h-7 rounded bg-sky-100 flex items-center justify-center">
+                <i class="fa-solid fa-graduation-cap text-sky-600 text-xs"></i>
+              </div>
+              <div>
+                <p class="text-[13px] font-semibold text-[#1d273b]">शैक्षिक स्तर</p>
+                <p class="text-[11px] text-[#9aa0ac]">Education Level</p>
+              </div>
+            </div>
+            <div class="p-3" :style="`height:${Math.min(60 + props.educationData.length * 28, 280)}px`">
+              <canvas ref="educationChartEl"></canvas>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <!-- ══ MOTHER TONGUE ══ -->
-      <section v-if="hasMotherTongue" id="mother-tongue" class="scroll-mt-[100px] mb-8">
-        <DemographicSection
-          :title="t('dashboard.motherTongueTitle')"
-          :subtitle="t('dashboard.motherTongueSubtitle')"
-          icon="fa-solid fa-language"
-          icon-bg="bg-teal-100"
-          icon-color="text-teal-600"
-          :data="props.motherTongueData"
-          chart-type="bar"
-          :colors="TEAL"
-          accent="text-teal-600"
-          bar-bg="bg-teal-400"
-        />
+      <!-- ══ OCCUPATION & LITERACY ══ -->
+      <section class="mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <!-- Occupation -->
+          <div v-if="props.occupationData?.length" class="bg-white border border-[#e6e7e9] rounded-md overflow-hidden">
+            <div class="px-4 py-3 border-b border-[#e6e7e9] flex items-center gap-2">
+              <div class="w-7 h-7 rounded bg-rose-100 flex items-center justify-center">
+                <i class="fa-solid fa-briefcase text-rose-600 text-xs"></i>
+              </div>
+              <div>
+                <p class="text-[13px] font-semibold text-[#1d273b]">पेशा / व्यवसाय</p>
+                <p class="text-[11px] text-[#9aa0ac]">Occupation Type</p>
+              </div>
+            </div>
+            <div class="p-3" :style="`height:${Math.min(60 + props.occupationData.length * 28, 280)}px`">
+              <canvas ref="occupationChartEl"></canvas>
+            </div>
+          </div>
+          <!-- Literacy by gender + business -->
+          <div class="flex flex-col gap-3">
+            <!-- Literacy by gender -->
+            <div v-if="props.litByGender?.length" class="bg-white border border-[#e6e7e9] rounded-md overflow-hidden">
+              <div class="px-4 py-3 border-b border-[#e6e7e9] flex items-center gap-2">
+                <div class="w-7 h-7 rounded bg-emerald-100 flex items-center justify-center">
+                  <i class="fa-solid fa-spell-check text-emerald-600 text-xs"></i>
+                </div>
+                <div>
+                  <p class="text-[13px] font-semibold text-[#1d273b]">लिंग अनुसार साक्षरता</p>
+                  <p class="text-[11px] text-[#9aa0ac]">Literacy by Gender</p>
+                </div>
+              </div>
+              <div class="p-3 h-36"><canvas ref="litGenderChartEl"></canvas></div>
+            </div>
+            <!-- Businesses -->
+            <div v-if="props.businessData?.length" class="bg-white border border-[#e6e7e9] rounded-md overflow-hidden">
+              <div class="px-4 py-3 border-b border-[#e6e7e9] flex items-center gap-2">
+                <div class="w-7 h-7 rounded bg-orange-100 flex items-center justify-center">
+                  <i class="fa-solid fa-store text-orange-600 text-xs"></i>
+                </div>
+                <div>
+                  <p class="text-[13px] font-semibold text-[#1d273b]">व्यवसायको प्रकार</p>
+                  <p class="text-[11px] text-[#9aa0ac]">Business Type</p>
+                </div>
+              </div>
+              <div class="p-3" :style="`height:${Math.min(60 + props.businessData.length * 26, 220)}px`">
+                <canvas ref="businessChartEl"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ QUICK LINKS TO DETAIL REPORTS ══ -->
+      <section class="mb-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <a href="/public/reports/population-pyramid"
+            class="bg-white border border-[#e6e7e9] hover:border-[#206bc4]/40 rounded-md p-4 flex items-center gap-3 group transition-colors">
+            <div class="w-10 h-10 rounded bg-indigo-100 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-chart-bar text-indigo-600"></i>
+            </div>
+            <div class="min-w-0">
+              <p class="text-[13px] font-semibold text-[#1d273b] group-hover:text-[#206bc4] transition">जनसंख्या पिरामिड</p>
+              <p class="text-[11px] text-[#9aa0ac]">उमेर समूह × लिंग — विस्तृत तालिका</p>
+            </div>
+            <i class="fa-solid fa-arrow-right text-[#9aa0ac] group-hover:text-[#206bc4] ml-auto shrink-0 transition"></i>
+          </a>
+          <a href="/public/reports/ward-summary"
+            class="bg-white border border-[#e6e7e9] hover:border-[#206bc4]/40 rounded-md p-4 flex items-center gap-3 group transition-colors">
+            <div class="w-10 h-10 rounded bg-emerald-100 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-table text-emerald-600"></i>
+            </div>
+            <div class="min-w-0">
+              <p class="text-[13px] font-semibold text-[#1d273b] group-hover:text-[#206bc4] transition">वडागत सारांश</p>
+              <p class="text-[11px] text-[#9aa0ac]">वडा अनुसार घरधुरी, जनसंख्या र संस्था</p>
+            </div>
+            <i class="fa-solid fa-arrow-right text-[#9aa0ac] group-hover:text-[#206bc4] ml-auto shrink-0 transition"></i>
+          </a>
+        </div>
       </section>
 
       <!-- ══ PROFILE CTA ══ -->
@@ -373,11 +440,18 @@ const props = defineProps({
   stats:                { type: Object,  default: () => ({}) },
   genderData:           { type: Object,  default: () => ({}) },
   ageData:              { type: Object,  default: () => ({}) },
-  ethnicityData:        { type: Object,  default: () => ({}) },
-  religionData:         { type: Object,  default: () => ({}) },
-  motherTongueData:     { type: Object,  default: () => ({}) },
-  institutionData:      { type: Object,  default: () => ({}) },
+  institutionData:      { type: Array,   default: () => [] },
   wardSummary:          { type: Array,   default: () => [] },
+  keyMetrics:           { type: Object,  default: () => ({}) },
+  waterData:            { type: Array,   default: () => [] },
+  toiletData:           { type: Array,   default: () => [] },
+  electricityData:      { type: Array,   default: () => [] },
+  cookingData:          { type: Array,   default: () => [] },
+  incomeData:           { type: Array,   default: () => [] },
+  occupationData:       { type: Array,   default: () => [] },
+  educationData:        { type: Array,   default: () => [] },
+  litByGender:          { type: Array,   default: () => [] },
+  businessData:         { type: Array,   default: () => [] },
   selectedWardId:       { type: [Number, null], default: null },
   selectedSettlementId: { type: [Number, null], default: null },
   profileFilledCount:   { type: Number,  default: 0 },
@@ -395,20 +469,12 @@ const showBanner = computed(() =>
   (props.welcomeConfig?.message || props.welcomeConfig?.chairperson?.name)
 )
 
-// ── Colour palettes ──────────────────────────────────────────────────
-const AMBER  = ['#F59E0B','#FBBF24','#FCD34D','#F97316','#FB923C','#FDE68A','#FDBA74','#FED7AA','#EF4444','#F87171','#FCA5A5','#FEE2E2']
-const PURPLE = ['#7C3AED','#8B5CF6','#A78BFA','#C4B5FD','#6D28D9','#DDD6FE','#4C1D95','#EDE9FE']
-const TEAL   = ['#0D9488','#14B8A6','#2DD4BF','#5EEAD4','#0F766E','#99F6E4','#134E4A','#CCFBF1']
-
 // ── Helpers ──────────────────────────────────────────────────────────
-const fmt      = n => Number(n ?? 0).toLocaleString()
-const malePct  = ws => ws.total > 0 ? Math.round(ws.male / ws.total * 100) : 50
-const sum      = key => props.wardSummary.reduce((s, w) => s + (w[key] ?? 0), 0)
+const fmt = n => Number(n ?? 0).toLocaleString()
+const ucLabel = v => (v ?? '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 
-const hasInstitutions = computed(() => Object.keys(props.institutionData).length > 0)
-const hasEthnicity    = computed(() => Object.keys(props.ethnicityData).length > 0)
-const hasReligion     = computed(() => Object.keys(props.religionData).length > 0)
-const hasMotherTongue = computed(() => Object.keys(props.motherTongueData).length > 0)
+const hasInstitutions = computed(() => props.institutionData.length > 0)
+const hasServices     = computed(() => props.waterData?.length || props.toiletData?.length || props.electricityData?.length || props.cookingData?.length)
 
 onMounted(() => {
   initAllCharts()
@@ -416,9 +482,9 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearSections()
-  genderChart?.destroy()
-  ageChart?.destroy()
-  institutionChart?.destroy()
+  genderChart?.destroy(); ageChart?.destroy(); institutionChart?.destroy()
+  incomeChart?.destroy(); educationChart?.destroy(); occupationChart?.destroy()
+  litGenderChart?.destroy(); businessChart?.destroy()
   leafletMap?.remove()
 })
 
@@ -459,7 +525,7 @@ const statCards = computed(() => [
 const mapEl = ref(null)
 let leafletMap = null
 
-function initMap() {
+async function initMap() {
   if (!mapEl.value || !props.lg) return
   leafletMap?.remove()
   const cfg  = props.lg.map_config ?? {}
@@ -471,6 +537,67 @@ function initMap() {
     maxZoom: 19,
   }).addTo(leafletMap)
 
+  // ── Choropleth layer ─────────────────────────────────────────────────
+  if (cfg.geojson_url && props.wardSummary?.length) {
+    const wardProp = cfg.ward_number_property ?? 'WARD_NO'
+    const wardData = Object.fromEntries(props.wardSummary.map(w => [String(w.ward_number), w]))
+    const maxPop   = Math.max(...props.wardSummary.map(w => w.total), 1)
+
+    const choroplethColor = pop => {
+      const r = pop / maxPop
+      if (r > 0.8) return '#1a4e8a'
+      if (r > 0.6) return '#2169b8'
+      if (r > 0.4) return '#4299e1'
+      if (r > 0.2) return '#90cdf4'
+      if (pop > 0) return '#bee3f8'
+      return '#e8f0fb'
+    }
+
+    try {
+      const res = await fetch(cfg.geojson_url)
+      if (res.ok) {
+        const geojson = await res.json()
+        L.geoJSON(geojson, {
+          style: feature => {
+            const wNum = String(feature.properties?.[wardProp] ?? '')
+            const pop  = wardData[wNum]?.total ?? 0
+            return { fillColor: choroplethColor(pop), weight: 1.5, opacity: 1, color: '#ffffff', fillOpacity: 0.72 }
+          },
+          onEachFeature: (feature, layer) => {
+            const wNum = String(feature.properties?.[wardProp] ?? '')
+            const w    = wardData[wNum]
+            layer.bindPopup(
+              `<b>वडा नं. ${wNum}</b><br>` +
+              `जनसंख्या: ${(w?.total ?? 0).toLocaleString()}<br>` +
+              `घरधुरी: ${(w?.households ?? 0).toLocaleString()}`
+            )
+            layer.on({
+              mouseover: e => { e.target.setStyle({ weight: 2.5, fillOpacity: 0.92 }); e.target.bringToFront() },
+              mouseout:  e => { e.target.setStyle({ weight: 1.5, fillOpacity: 0.72 }) },
+            })
+          },
+        }).addTo(leafletMap)
+
+        // Choropleth legend
+        const legend = L.control({ position: 'bottomright' })
+        legend.onAdd = () => {
+          const div = L.DomUtil.create('div')
+          div.style.cssText = 'background:rgba(255,255,255,0.92);padding:8px 10px;border-radius:6px;font-size:11px;line-height:1.8;box-shadow:0 1px 5px rgba(0,0,0,0.18)'
+          div.innerHTML =
+            '<b style="display:block;margin-bottom:2px">जनसंख्या</b>' +
+            [['#1a4e8a','80–100%'],['#2169b8','60–80%'],['#4299e1','40–60%'],['#90cdf4','20–40%'],['#bee3f8','0–20%']]
+              .map(([c,l]) => `<span style="display:inline-block;width:11px;height:11px;background:${c};margin-right:5px;border-radius:2px;vertical-align:middle"></span>${l}`)
+              .join('<br>')
+          return div
+        }
+        legend.addTo(leafletMap)
+      }
+    } catch {
+      // GeoJSON unavailable — map still works without choropleth
+    }
+  }
+
+  // ── Point markers ────────────────────────────────────────────────────
   const colors = { office: '#1D4ED8', school: '#7C3AED', health: '#059669', ward: '#D97706', tourism: '#DB2777', other: '#6B7280' }
   const makeIcon = type => {
     const c = colors[type] ?? '#6B7280'
@@ -492,16 +619,33 @@ function initMap() {
   leafletMap.on('mouseout', () => leafletMap.scrollWheelZoom.disable())
 }
 
-// ── Charts ───────────────────────────────────────────────────────────
+// ── Chart refs ───────────────────────────────────────────────────────
 const genderChartEl      = ref(null)
 const ageChartEl         = ref(null)
 const institutionChartEl = ref(null)
+const incomeChartEl      = ref(null)
+const educationChartEl   = ref(null)
+const occupationChartEl  = ref(null)
+const litGenderChartEl   = ref(null)
+const businessChartEl    = ref(null)
+
 let genderChart = null, ageChart = null, institutionChart = null
+let incomeChart = null, educationChart = null, occupationChart = null
+let litGenderChart = null, businessChart = null
 
 const chartOpts = (extra = {}) => ({
   responsive: true, maintainAspectRatio: false,
   plugins: { legend: { display: false } },
   ...extra,
+})
+
+const hBarOpts = () => chartOpts({
+  indexAxis: 'y',
+  scales: {
+    x: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { font: { size: 11 } } },
+    y: { grid: { display: false }, ticks: { font: { size: 12 } } },
+  },
+  plugins: { legend: { display: false } },
 })
 
 function initGenderChart() {
@@ -510,8 +654,8 @@ function initGenderChart() {
   genderChart = new Chart(genderChartEl.value, {
     type: 'doughnut',
     data: {
-      labels: Object.keys(props.genderData).map(k => ({ male: 'पुरुष (Male)', female: 'महिला (Female)', other: 'अन्य (Other)' }[k] ?? k)),
-      datasets: [{ data: Object.values(props.genderData), backgroundColor: ['#3B82F6', '#EC4899', '#6B7280'], hoverOffset: 4 }],
+      labels: Object.keys(props.genderData).map(k => ({ male: 'पुरुष', female: 'महिला', other: 'अन्य' }[k] ?? k)),
+      datasets: [{ data: Object.values(props.genderData), backgroundColor: ['#3B82F6','#EC4899','#6B7280'], hoverOffset: 4 }],
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } },
   })
@@ -524,83 +668,124 @@ function initAgeChart() {
     type: 'bar',
     data: {
       labels: Object.keys(props.ageData),
-      datasets: [{ data: Object.values(props.ageData), backgroundColor: '#6366F1', borderRadius: 5, borderSkipped: false }],
+      datasets: [{ data: Object.values(props.ageData), backgroundColor: '#6366F1', borderRadius: 4, borderSkipped: false }],
     },
-    options: chartOpts({ scales: { y: { beginAtZero: true, grid: { color: '#f3f4f6' } } } }),
+    options: chartOpts({ scales: { y: { beginAtZero: true, grid: { color: '#f3f4f6' } }, x: { grid: { display: false } } } }),
   })
 }
 
 function initInstitutionChart() {
-  if (!institutionChartEl.value || !Object.keys(props.institutionData).length) return
+  if (!institutionChartEl.value || !props.institutionData.length) return
   institutionChart?.destroy()
   institutionChart = new Chart(institutionChartEl.value, {
     type: 'bar',
     data: {
-      labels: Object.keys(props.institutionData),
-      datasets: [{ data: Object.values(props.institutionData), backgroundColor: '#10B981', borderRadius: 5, borderSkipped: false }],
+      labels: props.institutionData.map(r => (locale.value === 'ne' && r.label_ne) ? r.label_ne : (r.label_en || '')),
+      datasets: [{ data: props.institutionData.map(r => r.count), backgroundColor: '#10B981', borderRadius: 4, borderSkipped: false }],
     },
-    options: chartOpts({ indexAxis: 'y', scales: { x: { beginAtZero: true, grid: { color: '#f3f4f6' } } } }),
+    options: hBarOpts(),
+  })
+}
+
+function initHBar(elRef, data, color) {
+  if (!elRef.value || !data?.length) return null
+  return new Chart(elRef.value, {
+    type: 'bar',
+    data: {
+      labels: data.map(r => (locale.value === 'ne' && r.label_ne) ? r.label_ne : (r.label_en || ucLabel(r.value))),
+      datasets: [{ data: data.map(r => r.count), backgroundColor: color, borderRadius: 3, borderSkipped: false }],
+    },
+    options: hBarOpts(),
+  })
+}
+
+function initLitGenderChart() {
+  if (!litGenderChartEl.value || !props.litByGender?.length) return
+  litGenderChart?.destroy()
+  const labels = props.litByGender.map(r => ({ male: 'पुरुष', female: 'महिला', other: 'अन्य' }[r.gender] ?? r.gender))
+  litGenderChart = new Chart(litGenderChartEl.value, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'साक्षर',   data: props.litByGender.map(r => r.lit),         backgroundColor: '#10B981', borderRadius: 3 },
+        { label: 'निरक्षर', data: props.litByGender.map(r => r.tot - r.lit),  backgroundColor: '#F87171', borderRadius: 3 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+      scales: { y: { beginAtZero: true, stacked: false, grid: { color: '#f3f4f6' } }, x: { grid: { display: false } } },
+    },
   })
 }
 
 function initAllCharts() {
-  initGenderChart(); initAgeChart(); initInstitutionChart(); initMap()
+  initGenderChart(); initAgeChart(); initInstitutionChart()
+  incomeChart?.destroy();    incomeChart    = initHBar(incomeChartEl,    props.incomeData,    '#7C3AED')
+  educationChart?.destroy(); educationChart = initHBar(educationChartEl, props.educationData, '#0EA5E9')
+  occupationChart?.destroy(); occupationChart = initHBar(occupationChartEl, props.occupationData, '#F43F5E')
+  businessChart?.destroy();  businessChart  = initHBar(businessChartEl,  props.businessData,  '#F97316')
+  initLitGenderChart()
+  initMap()
 }
 
-watch(() => [props.genderData, props.ageData, props.institutionData], initAllCharts, { deep: true })
+watch(
+  () => [props.genderData, props.ageData, props.institutionData, props.incomeData, props.educationData, props.occupationData, props.litByGender, props.businessData, locale.value],
+  initAllCharts, { deep: true }
+)
 </script>
 
 <!-- ─────────────────────────────────────────────────────────────────
-     DemographicSection — render-function sub-component
+     MiniBarChart — compact horizontal-bar card sub-component
 ───────────────────────────────────────────────────────────────────── -->
 <script>
 import { ref, onMounted, onUnmounted, watch, h } from 'vue'
 import Chart from 'chart.js/auto'
+import { useLocale } from '@/i18n/index.js'
 
-export const DemographicSection = {
+export const MiniBarChart = {
   props: {
-    title:     String,
-    subtitle:  String,
-    icon:      String,
-    iconBg:    String,
-    iconColor: String,
-    data:      { type: Object, default: () => ({}) },
-    chartType: { type: String, default: 'bar' },
-    colors:    { type: Array,  default: () => [] },
-    accent:    String,
-    barBg:     String,
+    title:      String,
+    subtitle:   String,
+    icon:       String,
+    iconColor:  String,
+    iconBg:     String,
+    data:       { type: Array, default: () => [] },
+    color:      { type: String, default: '#3B82F6' },
   },
   setup(props) {
     const canvasEl = ref(null)
+    const { locale } = useLocale()
     let chart = null
 
-    function init() {
-      if (!canvasEl.value || !Object.keys(props.data).length) return
-      chart?.destroy()
-      const isDough = props.chartType === 'doughnut'
-      const labels  = Object.keys(props.data).map(l => l.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '))
+    const resolveLabel = r => (locale.value === 'ne' && r.label_ne)
+      ? r.label_ne
+      : (r.label_en || (r.value ?? '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '))
 
+    function init() {
+      if (!canvasEl.value || !props.data?.length) return
+      chart?.destroy()
+      const total = props.data.reduce((s, r) => s + r.count, 0)
       chart = new Chart(canvasEl.value, {
-        type: isDough ? 'doughnut' : 'bar',
+        type: 'bar',
         data: {
-          labels,
-          datasets: [{
-            label: 'Population',
-            data: Object.values(props.data),
-            backgroundColor: props.colors,
-            borderRadius: isDough ? 0 : 4,
-            borderSkipped: false,
-          }],
+          labels: props.data.map(resolveLabel),
+          datasets: [{ data: props.data.map(r => r.count), backgroundColor: props.color, borderRadius: 3, borderSkipped: false }],
         },
         options: {
-          responsive: true, maintainAspectRatio: false,
-          indexAxis: isDough ? undefined : 'y',
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
           plugins: {
-            legend: isDough
-              ? { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } }
-              : { display: false },
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => {
+              const pct = total > 0 ? (ctx.parsed.x / total * 100).toFixed(1) : 0
+              return ` ${ctx.parsed.x.toLocaleString()} (${pct}%)`
+            }}},
           },
-          scales: isDough ? {} : { x: { beginAtZero: true, grid: { color: '#f3f4f6' } } },
+          scales: {
+            x: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { font: { size: 11 } } },
+            y: { grid: { display: false }, ticks: { font: { size: 12 } } },
+          },
         },
       })
     }
@@ -608,72 +793,38 @@ export const DemographicSection = {
     onMounted(init)
     onUnmounted(() => chart?.destroy())
     watch(() => props.data, init, { deep: true })
+    watch(() => locale.value, init)
 
     return () => {
-      const entries  = Object.entries(props.data)
-      const total    = entries.reduce((s, [, v]) => s + v, 0)
-      const isDough  = props.chartType === 'doughnut'
-      const chartH   = isDough ? 'height:300px' : `height:${Math.min(48 + entries.length * 30, 420)}px`
+      const total = (props.data ?? []).reduce((s, r) => s + r.count, 0)
+      const chartH = Math.min(44 + (props.data?.length ?? 0) * 26, 200)
 
-      return h('div', { class: 'bg-white rounded-md border border-[#e6e7e9] overflow-hidden' }, [
-        // Header
-        h('div', { class: 'px-4 py-3 border-b border-[#e6e7e9] flex items-center justify-between' }, [
-          h('div', { class: 'flex items-center gap-2' }, [
-            h('div', { class: `w-8 h-8 rounded flex items-center justify-center ${props.iconBg}` }, [
-              h('i', { class: `${props.icon} ${props.iconColor} text-sm` }),
-            ]),
-            h('div', {}, [
-              h('p', { class: 'text-[13px] font-semibold text-[#1d273b]' }, props.title),
-              h('p', { class: 'text-[11px] text-[#9aa0ac] mt-0.5' }, props.subtitle),
-            ]),
+      return h('div', { class: 'bg-white border border-[#e6e7e9] rounded-md overflow-hidden' }, [
+        h('div', { class: 'px-3 py-2.5 border-b border-[#e6e7e9] flex items-center gap-2' }, [
+          h('div', { class: `w-6 h-6 rounded flex items-center justify-center shrink-0 ${props.iconBg}` }, [
+            h('i', { class: `${props.icon} ${props.iconColor} text-[10px]` }),
           ]),
-          h('span', { class: 'text-[11px] text-[#9aa0ac] bg-gray-100 px-2 py-1 rounded' }, `${entries.length} groups`),
+          h('div', {}, [
+            h('p', { class: 'text-[12px] font-semibold text-[#1d273b] leading-tight' }, props.title),
+            h('p', { class: 'text-[10px] text-[#9aa0ac]' }, props.subtitle),
+          ]),
         ]),
-        // Body: chart + table
-        h('div', { class: 'grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-[#e6e7e9]' }, [
-          // Chart
-          h('div', { class: isDough ? 'p-8 flex items-center justify-center' : 'p-5' }, [
-            h('div', { style: `${chartH}; width:100%${isDough ? '; max-width:320px' : ''}` }, [
-              h('canvas', { ref: canvasEl }),
-            ]),
+        h('div', { class: 'px-3 pb-2' }, [
+          h('div', { style: `height:${chartH}px; padding-top:6px` }, [
+            h('canvas', { ref: canvasEl }),
           ]),
-          // Table
-          h('div', { class: 'overflow-x-auto' }, [
-            h('table', { class: 'w-full' }, [
-              h('thead', { class: 'border-b border-[#e6e7e9]' }, [
-                h('tr', {}, [
-                  h('th', { class: 'px-4 py-2.5 text-left text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-[0.08em] w-7' }, '#'),
-                  h('th', { class: 'px-4 py-2.5 text-left text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-[0.08em]' }, 'नाम'),
-                  h('th', { class: 'px-4 py-2.5 text-right text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-[0.08em]' }, 'जनसंख्या'),
-                  h('th', { class: 'px-4 py-2.5 text-right text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-[0.08em]' }, '%'),
+          // Percentage list
+          h('div', { class: 'mt-1 space-y-0.5' },
+            (props.data ?? []).slice(0, 4).map(r => {
+              const pct = total > 0 ? (r.count / total * 100).toFixed(1) : '0.0'
+              return h('div', { key: r.value, class: 'flex items-center gap-1.5 text-[10px]' }, [
+                h('div', { class: 'h-1 rounded-full flex-1 bg-gray-100 overflow-hidden' }, [
+                  h('div', { style: `width:${pct}%; background:${props.color}`, class: 'h-full rounded-full' }),
                 ]),
-              ]),
-              h('tbody', { class: 'divide-y divide-[#e6e7e9]' },
-                entries.map(([label, count], i) => {
-                  const pct  = total > 0 ? (count / total * 100).toFixed(1) : '0.0'
-                  const disp = label.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
-                  return h('tr', { key: label, class: 'hover:bg-gray-50 transition-colors' }, [
-                    h('td', { class: 'px-4 py-2.5 text-[#9aa0ac] text-[13px] tabular-nums' }, i + 1),
-                    h('td', { class: 'px-4 py-2.5' }, [
-                      h('div', { class: 'text-[13px] font-medium text-[#1d273b]' }, disp),
-                      h('div', { class: 'mt-1.5 h-1.5 rounded-full bg-gray-100 overflow-hidden w-full' }, [
-                        h('div', { class: `h-full rounded-full ${props.barBg}`, style: `width:${pct}%` }),
-                      ]),
-                    ]),
-                    h('td', { class: 'px-4 py-2.5 text-right text-[13px] font-semibold text-[#1d273b] tabular-nums' }, Number(count).toLocaleString()),
-                    h('td', { class: `px-4 py-2.5 text-right text-[13px] font-semibold tabular-nums ${props.accent}` }, `${pct}%`),
-                  ])
-                })
-              ),
-              h('tfoot', { class: 'bg-gray-50 border-t border-[#e6e7e9]' }, [
-                h('tr', {}, [
-                  h('td', { class: 'px-4 py-2.5 text-[13px] font-semibold text-[#1d273b]', colspan: 2 }, 'जम्मा / Total'),
-                  h('td', { class: 'px-4 py-2.5 text-right text-[13px] font-semibold text-[#1d273b] tabular-nums' }, total.toLocaleString()),
-                  h('td', { class: 'px-4 py-2.5 text-right text-[13px] font-semibold text-[#9aa0ac]' }, '100%'),
-                ]),
-              ]),
-            ]),
-          ]),
+                h('span', { class: 'text-[#9aa0ac] shrink-0 w-8 text-right tabular-nums' }, `${pct}%`),
+              ])
+            })
+          ),
         ]),
       ])
     }

@@ -7,37 +7,39 @@ $ProjectRoot = Split-Path $PSScriptRoot -Parent
 $ZipPath     = "$ProjectRoot\apprmp-deploy.zip"
 $TempDir     = "$env:TEMP\apprmp-build-$(Get-Random)"
 
-Write-Host ""
-Write-Host "  LGPAS Deployment ZIP Builder" -ForegroundColor Cyan
-Write-Host "  ============================================" -ForegroundColor Cyan
+Write-Host ''
+Write-Host '  LGPAS Deployment ZIP Builder' -ForegroundColor Cyan
+Write-Host '  ============================================' -ForegroundColor Cyan
 Write-Host "  Source : $ProjectRoot"
 Write-Host "  Output : $ZipPath"
-Write-Host ""
+Write-Host ''
 
 # --- Clean temp dir ---
 if (Test-Path $TempDir) { Remove-Item $TempDir -Recurse -Force }
 New-Item -ItemType Directory -Path $TempDir | Out-Null
 
-# --- Files/folders to EXCLUDE from the deployment package ---
+# --- Files/folders to EXCLUDE ---
 $SkipNames = @(
     '.git', '.github', '.gitattributes', '.gitignore',
-    '.claude',                # Claude AI session data - dev only
-    'memory',                 # Claude memory files - dev only
-    'Reference Files',        # Local reference docs - dev only
+    '.claude', 'memory', 'Reference Files',
     'node_modules',
-    '.env',                   # Installer will create this on the server
+    '.env',
     'tests',
     'phpunit.xml', 'phpunit.xml.dist', '.phpunit.result.cache',
-    'apprmp-deploy.zip',      # Previous build
+    'apprmp-deploy.zip',
     '.install_lock',
     'Makefile',
-    'vite.config.js',
+    'vite.config.js', 'tailwind.config.js', 'postcss.config.js',
     'package.json', 'package-lock.json', 'bun.lockb',
-    '.editorconfig', '.prettierrc', '.styleci.yml'
+    '.editorconfig', '.prettierrc', '.styleci.yml',
+    'README.md', '.env.example',
+    # Stray dev/data files
+    'choices_data.json', 'choices_rows.tsv', 'extracted_data.json',
+    'survey_rows.tsv', 'survey_rows_554_656.json'
 )
 
-# --- Copy top-level items ---
-Write-Host "  Copying files..." -ForegroundColor Yellow
+# --- Copy project files ---
+Write-Host '  Copying project files...' -ForegroundColor Yellow
 
 $items = Get-ChildItem -Path $ProjectRoot -Force |
          Where-Object { $_.Name -notin $SkipNames }
@@ -52,14 +54,17 @@ foreach ($item in $items) {
     Write-Host "    + $($item.Name)" -ForegroundColor DarkGray
 }
 
-# --- Clear storage runtime content (keep folder structure only) ---
-Write-Host "  Clearing storage runtime files..." -ForegroundColor Yellow
+# --- Clear storage runtime content ---
+Write-Host '  Clearing storage runtime files...' -ForegroundColor Yellow
 
 $storageClearDirs = @(
     'storage\logs',
     'storage\framework\cache\data',
+    'storage\framework\cache\laravel-excel',   # Excel temp cache (~4.6 MB)
     'storage\framework\sessions',
-    'storage\framework\views'
+    'storage\framework\views',
+    'storage\app\private\bulk-imports',        # Uploaded import files (~4.5 MB)
+    'storage\app\private\livewire-tmp'         # Livewire temp uploads (~0.4 MB)
 )
 
 foreach ($rel in $storageClearDirs) {
@@ -69,25 +74,44 @@ foreach ($rel in $storageClearDirs) {
     } else {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
     }
-    $keep = Join-Path $dir ".gitkeep"
+    $keep = Join-Path $dir '.gitkeep'
     if (-not (Test-Path $keep)) { New-Item -ItemType File -Path $keep -Force | Out-Null }
 }
 
-# --- Remove any stray .env files ---
+# --- Remove stray .env files ---
 Get-ChildItem -Path $TempDir -Filter '.env' -Recurse -ErrorAction SilentlyContinue |
     Remove-Item -Force -ErrorAction SilentlyContinue
 
-# --- Ensure install.php is present in public/ ---
-$installSrc  = Join-Path $ProjectRoot "public\install.php"
-$installDest = Join-Path $TempDir "public\install.php"
-if ((Test-Path $installSrc) -and -not (Test-Path $installDest)) {
-    Copy-Item $installSrc $installDest -Force
-    Write-Host "    + public/install.php" -ForegroundColor DarkGray
+# --- Verify install.php ---
+$installSrc  = Join-Path $ProjectRoot 'public\install.php'
+$installDest = Join-Path $TempDir 'public\install.php'
+if (Test-Path $installSrc) {
+    if (-not (Test-Path $installDest)) { Copy-Item $installSrc $installDest -Force }
+    Write-Host '    OK public/install.php included' -ForegroundColor Green
+} else {
+    Write-Host '    WARNING: public/install.php not found!' -ForegroundColor Red
+}
+
+# --- Verify Vite build ---
+$buildDir = Join-Path $TempDir 'public\build'
+if (Test-Path $buildDir) {
+    $assetCount = (Get-ChildItem -Path $buildDir -Recurse -File).Count
+    Write-Host "    OK public/build/ included ($assetCount files)" -ForegroundColor Green
+} else {
+    Write-Host '    WARNING: public/build/ missing - run npm run build first!' -ForegroundColor Red
+}
+
+# --- Verify vendor ---
+$vendorDir = Join-Path $TempDir 'vendor'
+if (Test-Path $vendorDir) {
+    Write-Host '    OK vendor/ included' -ForegroundColor Green
+} else {
+    Write-Host '    WARNING: vendor/ missing - run composer install first!' -ForegroundColor Red
 }
 
 # --- Build the ZIP ---
-Write-Host ""
-Write-Host "  Creating ZIP archive (this may take a moment)..." -ForegroundColor Yellow
+Write-Host ''
+Write-Host '  Creating ZIP archive...' -ForegroundColor Yellow
 
 if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
 
@@ -100,20 +124,23 @@ Remove-Item $TempDir -Recurse -Force
 # --- Report ---
 $sizeMB = [math]::Round((Get-Item $ZipPath).Length / 1MB, 1)
 
-Write-Host ""
-Write-Host "  ============================================" -ForegroundColor Green
-Write-Host "  ZIP created successfully!" -ForegroundColor Green
+Write-Host ''
+Write-Host '  ============================================' -ForegroundColor Green
+Write-Host '  ZIP created successfully!' -ForegroundColor Green
 Write-Host "  File : $ZipPath" -ForegroundColor Green
 Write-Host "  Size : $sizeMB MB" -ForegroundColor Green
-Write-Host "  ============================================" -ForegroundColor Green
-Write-Host ""
-Write-Host "  Subdirectory Deployment (public_html/apprmp/):" -ForegroundColor Cyan
-Write-Host "  1. Upload apprmp-deploy.zip to /home/username/"
-Write-Host "  2. Extract it, rename folder to 'apprmp' (private app files)"
-Write-Host "  3. Create folder: public_html/apprmp/"
-Write-Host "  4. Copy apprmp/public/* into public_html/apprmp/"
-Write-Host "  5. Copy deploy/cpanel-public-index.php to public_html/apprmp/index.php"
-Write-Host "  6. Edit that index.php - set LARAVEL_ROOT = /home/username/apprmp"
-Write-Host "  7. Visit https://yourdomain.com/apprmp/install.php"
-Write-Host "  8. Set APP_URL = https://yourdomain.com/apprmp  (in installer step 4)"
-Write-Host ""
+Write-Host '  ============================================' -ForegroundColor Green
+Write-Host ''
+Write-Host '  DEPLOYMENT STEPS (cPanel):' -ForegroundColor Cyan
+Write-Host '  1. cPanel -> MySQL Databases -> create DB + user + ALL PRIVILEGES'
+Write-Host '  2. cPanel -> MultiPHP Manager -> set PHP 8.2 for subdomain'
+Write-Host '  3. Upload apprmp-deploy.zip to /home/username/ via File Manager'
+Write-Host '  4. Extract -> rename folder to: apprmp'
+Write-Host '  5. Create folder: public_html/apprmp/'
+Write-Host '  6. Copy apprmp/public/* into public_html/apprmp/'
+Write-Host '  7. Copy deploy/cpanel-public-index.php to public_html/apprmp/index.php'
+Write-Host '  8. Edit index.php: set LARAVEL_ROOT = /home/username/apprmp'
+Write-Host '  9. Visit: https://yourdomain.com/apprmp/install.php'
+Write-Host ' 10. Follow the 6-step web installer'
+Write-Host ' 11. Delete install.php after completion (installer provides a button)'
+Write-Host ''

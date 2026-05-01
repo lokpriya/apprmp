@@ -35,7 +35,7 @@
         <!-- 1. मूल विवरण -->
         <section class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
           <SectionHead icon="fa-circle-info" color="indigo" title="मूल विवरण" />
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5">
             <DetailRow label="उत्तरदाताको नाम"  :value="household.respondent_name" />
             <DetailRow label="सम्पर्क"           :value="household.respondent_contact" />
             <DetailRow label="वडा नं."            :value="household.ward ? `वडा ${household.ward.ward_number}` : null" />
@@ -55,7 +55,7 @@
         <!-- 2. आवास विवरण -->
         <section v-if="household.housing" class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
           <SectionHead icon="fa-house" color="orange" title="आवास विवरण" />
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5">
             <DetailRow label="घरको प्रकार"       :value="label('house_type', household.housing.house_type)" />
             <DetailRow label="छानाको प्रकार"     :value="label('roof_type', household.housing.roof_type)" />
             <DetailRow label="भित्ताको प्रकार"   :value="label('wall_type', household.housing.wall_type)" />
@@ -70,7 +70,7 @@
             <DetailRow label="जोखिम क्षेत्र"     :value="yesNo(household.housing.is_at_risk)" />
             <DetailRow v-if="household.housing.risk_types?.length"
               label="जोखिमका किसिम"
-              :value="labels('risk_types', household.housing.risk_types)"
+              :value="labels('disaster_type', household.housing.risk_types)"
               class="col-span-2" />
           </div>
         </section>
@@ -78,7 +78,7 @@
         <!-- 3. परिवार तथा सामाजिक -->
         <section v-if="household.survey_data?.social" class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
           <SectionHead icon="fa-people-roof" color="violet" title="परिवार तथा सामाजिक" />
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5">
             <DetailRow label="घरमुलीको नाम"       :value="household.survey_data.social.family_head" />
             <DetailRow label="घरमुलीको सम्पर्क"  :value="household.survey_data.social.contact_no_fam_head" />
             <DetailRow label="पुरुष संख्या"        :value="str(household.survey_data.social.male_num)" />
@@ -108,7 +108,7 @@
         <!-- 4. सरसफाई तथा सुविधा -->
         <section v-if="household.utilities" class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
           <SectionHead icon="fa-faucet" color="blue" title="सरसफाई तथा सुविधा" />
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5">
             <DetailRow label="पिउने पानीको स्रोत"    :value="label('water_source', household.utilities.water_source)" />
             <DetailRow label="पानी दूरी (मिनेट)"     :value="str(household.utilities.water_distance_minutes)" />
             <DetailRow label="शौचालय छ?"              :value="bool(household.utilities.has_toilet)" />
@@ -128,10 +128,10 @@
           </div>
         </section>
 
-        <!-- 5. स्वास्थ्य तथा सुखाकार -->
+        <!-- 5. स्वास्थ्य तथा खुसी-सुखी जीवन -->
         <section v-if="household.survey_data?.health" class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
-          <SectionHead icon="fa-heart-pulse" color="rose" title="स्वास्थ्य तथा सुखाकार" />
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <SectionHead icon="fa-heart-pulse" color="rose" title="स्वास्थ्य तथा खुसी-सुखी जीवन" />
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5">
             <DetailRow label="स्वास्थ्य बिमा"           :value="yesNo(household.survey_data.health.has_health_insurance)" />
             <DetailRow label="बिरामी आवृत्ति"           :value="label('illness_frequency', household.survey_data.health.illness_frequency)" />
             <DetailRow label="उपचार स्थान"              :value="label('treatment_place', household.survey_data.health.treatment_place)" />
@@ -139,12 +139,12 @@
             <DetailRow label="गर्भवती महिला?"           :value="yesNo(household.survey_data.health.has_pregnant_woman)" />
             <DetailRow label="हात धुने जानकारी"         :value="yesNo(household.survey_data.health.aware_handwashing)" />
             <DetailRow label="पोषण जानकारी"             :value="yesNo(household.survey_data.health.aware_nutrition)" />
-            <DetailRow label="फलाम क्याप्सुल जानकारी"  :value="yesNo(household.survey_data.health.aware_iron_capsule)" />
+            <DetailRow label="आइरन चक्की जानकारी"  :value="yesNo(household.survey_data.health.aware_iron_capsule)" />
           </div>
           <template v-if="household.survey_data?.wellbeing">
             <div class="border-t border-gray-100 mt-4 pt-4">
-              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">सुखाकार</p>
-              <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">खुसी-सुखी जीवन</p>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5">
                 <DetailRow label="बसोबासमा खुशी?"       :value="yesNo(household.survey_data.wellbeing.happy_with_location)" />
                 <DetailRow label="बसोबास धारणा"          :value="label('residence_perception', household.survey_data.wellbeing.residence_perception)" />
                 <DetailRow label="छिमेकी मिलन"           :value="label('neighbor_cooperation', household.survey_data.wellbeing.neighbor_cooperation)" />
@@ -157,9 +157,9 @@
         <!-- 6. यातायात तथा संस्था -->
         <section v-if="household.utilities || household.survey_data?.decisions" class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
           <SectionHead icon="fa-car" color="cyan" title="यातायात तथा संस्था" />
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5">
             <template v-if="household.utilities">
-              <DetailRow label="सवारी साधन"            :value="label('vehicle', household.utilities.vehicle)" />
+              <DetailRow label="सवारी साधन"            :value="label('vehicle_type', household.utilities.vehicle)" />
               <DetailRow v-if="household.utilities.vehicles?.length"
                 label="सवारी विवरण" :value="household.utilities.vehicles.length + ' प्रकार'" />
             </template>
@@ -179,7 +179,7 @@
         <!-- 7. व्यवसाय तथा रोजगार -->
         <section v-if="household.survey_data?.occupation" class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
           <SectionHead icon="fa-briefcase" color="amber" title="व्यवसाय तथा रोजगार" />
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5">
             <DetailRow label="भारत विदेश"  :value="str(household.survey_data.occupation.foreign_india)" />
             <DetailRow label="खाडी विदेश"  :value="str(household.survey_data.occupation.foreign_gulf)" />
             <DetailRow label="अन्य विदेश"  :value="str(household.survey_data.occupation.foreign_others)" />
@@ -193,11 +193,11 @@
         <!-- 8. खेतीपाती -->
         <section v-if="household.agriculture" class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
           <SectionHead icon="fa-seedling" color="green" title="खेतीपाती" />
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5">
             <DetailRow label="खेती गर्नुहुन्छ?"     :value="yesNo(household.agriculture.agriculture)" />
             <DetailRow v-if="household.agriculture.agri_categories?.length"
               label="खेती प्रकार"
-              :value="labels('agri_categories', household.agriculture.agri_categories)"
+              :value="labels('agri_category', household.agriculture.agri_categories)"
               class="col-span-2" />
             <DetailRow label="जमिन छ?"              :value="bool(household.agriculture.owns_land)" />
             <DetailRow label="जमिन (रोपनी)"         :value="str(household.agriculture.land_area_ropani)" />
@@ -217,7 +217,7 @@
             <DetailRow label="कीटनाशक लागत"         :value="str(household.agriculture.chem_pesticide_cost)" />
             <DetailRow v-if="household.agriculture.Farm_Challenges?.length"
               label="चुनौतीहरू"
-              :value="labels('Farm_Challenges', household.agriculture.Farm_Challenges)"
+              :value="labels('farm_challenge', household.agriculture.Farm_Challenges)"
               class="col-span-2" />
           </div>
         </section>
@@ -225,7 +225,7 @@
         <!-- 9. कृषि उत्पादन -->
         <section v-if="hasCropData" class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
           <SectionHead icon="fa-wheat-awn" color="yellow" title="कृषि उत्पादन" />
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5">
             <DetailRow label="खाद्यान्न बाली" :value="cropCount('food_crops')" />
             <DetailRow label="दलहन बाली"       :value="cropCount('pulses')" />
             <DetailRow label="तेलहन बाली"      :value="cropCount('oil_seeds')" />
@@ -245,24 +245,49 @@
               <DetailRow label="AI सेवा"               :value="yesNo(household.survey_data.livestockDetail.Ai_in_livestock)" />
             </div>
           </template>
-          <div v-if="household.livestock?.length" class="overflow-x-auto">
+          <!-- Livestock rows table -->
+          <div v-if="household.survey_data?.livestockDetail?.livestock_rows?.length" class="overflow-x-auto mb-3">
+            <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">पशु/पक्षी विवरण</p>
             <table class="w-full text-xs">
               <thead class="bg-gray-50">
                 <tr>
                   <th class="text-left px-3 py-2 text-gray-500 font-semibold">पशु/पक्षी</th>
-                  <th class="text-right px-3 py-2 text-gray-500 font-semibold">जम्मा</th>
-                  <th class="text-right px-3 py-2 text-gray-500 font-semibold">नर</th>
-                  <th class="text-right px-3 py-2 text-gray-500 font-semibold">मादा</th>
-                  <th class="text-left px-3 py-2 text-gray-500 font-semibold">उत्पादन</th>
+                  <th class="text-right px-3 py-2 text-gray-500 font-semibold">परिमाण</th>
+                  <th class="text-left px-3 py-2 text-gray-500 font-semibold">जात</th>
+                  <th class="text-left px-3 py-2 text-gray-500 font-semibold">पालनको तरिका</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-[#e6e7e9]">
-                <tr v-for="(lv, i) in household.livestock" :key="i" class="hover:bg-gray-50 transition-colors">
-                  <td class="px-3 py-2 font-medium text-gray-800">{{ label('livestock_type', lv.livestock_type) || lv.livestock_type }}</td>
-                  <td class="px-3 py-2 text-right text-gray-600">{{ lv.total_count ?? '—' }}</td>
-                  <td class="px-3 py-2 text-right text-gray-600">{{ lv.male_count ?? '—' }}</td>
-                  <td class="px-3 py-2 text-right text-gray-600">{{ lv.female_count ?? '—' }}</td>
-                  <td class="px-3 py-2 text-gray-600">{{ lv.production_amount ? lv.production_amount + (lv.production_unit ? ' ' + lv.production_unit : '') : '—' }}</td>
+                <tr v-for="(row, i) in household.survey_data.livestockDetail.livestock_rows" :key="i" class="hover:bg-gray-50">
+                  <td class="px-3 py-2 font-medium text-gray-800">{{ label('livestock_kind', row.kind) || row.kind || '—' }}</td>
+                  <td class="px-3 py-2 text-right text-gray-600">{{ row.qty || '—' }}</td>
+                  <td class="px-3 py-2 text-gray-600">{{ label('livestock_breed', row.breed) || row.breed || '—' }}</td>
+                  <td class="px-3 py-2 text-gray-600">{{ label('livestock_rearing_method', row.rearing_method) || row.rearing_method || '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Production rows table -->
+          <div v-if="household.survey_data?.livestockDetail?.product_rows?.length" class="overflow-x-auto">
+            <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">पशु उत्पादन</p>
+            <table class="w-full text-xs">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="text-left px-3 py-2 text-gray-500 font-semibold">उत्पादनको किसिम</th>
+                  <th class="text-left px-3 py-2 text-gray-500 font-semibold">एकाइ</th>
+                  <th class="text-right px-3 py-2 text-gray-500 font-semibold">उत्पादन</th>
+                  <th class="text-right px-3 py-2 text-gray-500 font-semibold">बिक्री</th>
+                  <th class="text-right px-3 py-2 text-gray-500 font-semibold">प्रति इकाई मूल्य</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-[#e6e7e9]">
+                <tr v-for="(row, i) in household.survey_data.livestockDetail.product_rows" :key="i" class="hover:bg-gray-50">
+                  <td class="px-3 py-2 font-medium text-gray-800">{{ label('livestock_product', row.product) || row.product || '—' }}</td>
+                  <td class="px-3 py-2 text-gray-600">{{ label('livestock_product_unit', row.unit) || row.unit || '—' }}</td>
+                  <td class="px-3 py-2 text-right text-gray-600">{{ row.qty || '—' }}</td>
+                  <td class="px-3 py-2 text-right text-gray-600">{{ row.sale_qty || '—' }}</td>
+                  <td class="px-3 py-2 text-right text-gray-600">{{ row.price_per_unit || '—' }}</td>
                 </tr>
               </tbody>
             </table>
@@ -272,9 +297,9 @@
         <!-- 11. मौरी/माछा/रेशम -->
         <section v-if="household.survey_data?.beeFishSilk?.has_bee_fish_silk === 'yes'" class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
           <SectionHead icon="fa-egg" color="amber" title="मौरी / माछा / रेशम" />
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5">
             <DetailRow v-if="household.survey_data.beeFishSilk.bee_fish_silk_select?.length"
-              label="प्रकार" :value="household.survey_data.beeFishSilk.bee_fish_silk_select.join(', ')" />
+              label="प्रकार" :value="labels('bee_fish_silk', household.survey_data.beeFishSilk.bee_fish_silk_select)" />
             <DetailRow label="मुढे घार"                :value="str(household.survey_data.beeFishSilk.Mudhe_Hive)" />
             <DetailRow label="आधुनिक घार"              :value="str(household.survey_data.beeFishSilk.Modern_Hive)" />
             <DetailRow label="मह उत्पादन (मुढे)"       :value="str(household.survey_data.beeFishSilk.Honey_Production_Mudhe_Hive)" />
@@ -292,12 +317,12 @@
         <!-- 12. आम्दानी तथा खर्च -->
         <section v-if="household.economic" class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
           <SectionHead icon="fa-coins" color="green" title="आम्दानी तथा खर्च" />
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5">
             <DetailRow label="मुख्य आयस्रोत"       :value="label('income_source', household.economic.primary_income_source)" />
             <DetailRow label="वार्षिक आम्दानी"      :value="household.economic.annual_income_range" />
             <DetailRow label="वार्षिक खर्च"         :value="household.economic.annual_expenditure_range" />
             <DetailRow label="रेमिट्यान्स"          :value="str(household.economic.remittance_amount)" />
-            <DetailRow label="ऋणको स्रोत"           :value="labels('loan_sources', household.economic.loan_sources)" />
+            <DetailRow label="ऋणको स्रोत"           :value="labels('loan_source', household.economic.loan_sources)" />
             <DetailRow label="जम्मा ऋण"             :value="str(household.economic.total_loan_amount)" />
             <DetailRow label="बैंक खाता"            :value="bool(household.economic.has_bank_account)" />
             <DetailRow label="बिमा"                  :value="bool(household.economic.has_insurance)" />
@@ -316,10 +341,10 @@
         <!-- 13. प्राकृतिक प्रकोप -->
         <section v-if="household.disaster" class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
           <SectionHead icon="fa-triangle-exclamation" color="red" title="प्राकृतिक प्रकोप" />
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5">
             <DetailRow v-if="household.disaster.risk_types?.length"
               label="जोखिमका किसिम"
-              :value="labels('disaster_risk_type', household.disaster.risk_types)"
+              :value="labels('disaster_type', household.disaster.risk_types)"
               class="col-span-2" />
             <DetailRow label="जोखिम न्यूनीकरण योजना"    :value="label('risk_reduction_plan', household.disaster.risk_reduction_plan)" />
             <DetailRow label="पछिल्लो ३ वर्षमा प्रभावित?" :value="yesNo(household.disaster.affected_last_3years)" />
@@ -353,7 +378,7 @@
               v-for="(m, idx) in household.members"
               :key="m.id ?? idx"
               class="rounded-md border overflow-hidden shadow-sm"
-              :class="m.is_household_head ? 'border-indigo-300' : 'border-[#e6e7e9]'"
+              :class="m.is_deceased ? 'border-gray-300 opacity-75' : m.is_household_head ? 'border-indigo-300' : 'border-[#e6e7e9]'"
             >
               <!-- Collapsed header -->
               <div class="flex items-center gap-3 px-4 py-3 bg-white cursor-pointer select-none" @click="toggleMember(idx)">
@@ -367,6 +392,7 @@
                       {{ m.full_name || ('सदस्य ' + (idx + 1)) }}
                     </a>
                     <span v-if="m.is_household_head" class="ml-1.5 text-[10px] bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded">घरमुली</span>
+                    <span v-if="m.is_deceased" class="ml-1.5 text-[10px] bg-gray-200 text-gray-600 font-bold px-1.5 py-0.5 rounded line-through">मृत्यु भयो</span>
                   </p>
                   <p class="text-[11px] text-gray-400 mt-0.5 truncate">
                     <template v-if="m.age">{{ m.age }} वर्ष</template>
@@ -381,6 +407,18 @@
                   </span>
                   <span v-if="m.blood_group" class="text-[10px] bg-rose-100 text-rose-700 font-semibold px-1.5 py-0.5 rounded">{{ m.blood_group }}</span>
                   <span v-if="m.has_citizenship" class="text-[10px] bg-green-100 text-green-700 font-semibold px-1.5 py-0.5 rounded">नागरिकता</span>
+                  <template v-if="canMarkDeceased">
+                    <button v-if="!m.is_deceased" type="button"
+                      @click.stop="openDeceasedModal(m)"
+                      class="text-[10px] bg-gray-100 hover:bg-red-50 text-gray-500 hover:text-red-600 border border-gray-200 hover:border-red-200 font-medium px-1.5 py-0.5 rounded transition">
+                      <i class="fa-solid fa-skull text-[9px]"></i> मृत्यु भए दर्शाउनुहोस्
+                    </button>
+                    <button v-else type="button"
+                      @click.stop="openDeceasedModal(m)"
+                      class="text-[10px] bg-gray-200 hover:bg-gray-300 text-gray-600 font-medium px-1.5 py-0.5 rounded transition">
+                      <i class="fa-solid fa-pencil text-[9px]"></i> मृत्यु सम्पादन
+                    </button>
+                  </template>
                 </div>
                 <span class="shrink-0 w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
                   <i :class="expandedMembers.has(idx) ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down'" class="text-[10px]"></i>
@@ -389,7 +427,7 @@
 
               <!-- Expanded detail -->
               <div v-show="expandedMembers.has(idx)" class="member-body border-t border-[#e6e7e9] bg-slate-50/40 px-4 py-3">
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1.5 text-[12px]">
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 text-[13px]">
                   <div v-if="m.father_name" class="flex gap-1.5"><span class="text-gray-500 shrink-0">बुवाको नाम:</span><span class="font-semibold text-gray-700">{{ m.father_name }}</span></div>
                   <div class="flex gap-1.5"><span class="text-gray-500 shrink-0">जन्म मिति:</span><span class="font-semibold text-gray-700">{{ m.date_of_birth ? formatDate(m.date_of_birth) : '—' }}</span></div>
                   <div class="flex gap-1.5"><span class="text-gray-500 shrink-0">जातजाति:</span><span class="font-semibold text-gray-700">{{ label('ethnicity', m.ethnicity) || m.ethnicity || '—' }}</span></div>
@@ -407,6 +445,17 @@
                   <div v-if="m.disability_status" class="flex gap-1.5"><span class="text-gray-500 shrink-0">अपाङ्गता:</span><span class="font-semibold text-orange-600">{{ label('disability_type', m.disability_type) || 'छ' }}</span></div>
                   <div v-if="m.disability_card === 'yes'" class="flex gap-1.5"><span class="text-gray-500 shrink-0">परिचयपत्र रंग:</span><span class="font-semibold text-gray-700">{{ label('disability_card_color', m.disability_card_color) || '—' }}</span></div>
                   <div v-if="m.chronic_illness" class="flex gap-1.5"><span class="text-gray-500 shrink-0">दीर्घरोग:</span><span class="font-semibold text-red-600">{{ m.chronic_illness_types?.length ? labels('chronic_illness_type', m.chronic_illness_types) : 'छ' }}</span></div>
+                  <!-- Deceased info row -->
+                  <div v-if="m.is_deceased" class="col-span-2 md:col-span-3 flex flex-wrap items-center gap-3 mt-1 pt-1.5 border-t border-red-200 bg-red-50 -mx-4 px-4 py-2 rounded-b">
+                    <i class="fa-solid fa-skull text-red-400 text-[11px]"></i>
+                    <span class="text-[11px] font-semibold text-red-700">मृत्यु भयो</span>
+                    <span v-if="m.death_date" class="text-[11px] text-red-600">मिति: {{ m.death_date }}</span>
+                    <span v-if="m.death_cause" class="text-[11px] text-red-600">कारण: {{ m.death_cause }}</span>
+                    <span v-if="m.death_remarks" class="text-[11px] text-gray-500 italic">{{ m.death_remarks }}</span>
+                    <button v-if="canMarkDeceased" type="button" @click.stop="unmarkDeceased(m)"
+                      class="ml-auto text-[10px] text-gray-400 hover:text-red-500 underline">हटाउनुहोस्</button>
+                  </div>
+
                   <!-- Documents row -->
                   <div class="col-span-2 md:col-span-3 flex flex-wrap gap-2 mt-1 pt-1.5 border-t border-slate-200">
                     <span class="text-gray-500 text-[11px]">कागजात:</span>
@@ -464,11 +513,16 @@
               class="flex items-center gap-2 w-full rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700">
               <i class="fa-solid fa-clock text-amber-400"></i> अनुरोध पेस गरिएको — समीक्षा बाँकी
             </div>
-            <!-- Print / PDF button -->
+            <!-- Print button -->
             <button @click="printPage"
               class="flex items-center justify-center gap-2 w-full rounded-md border border-violet-200 bg-violet-50 hover:bg-violet-100 px-4 py-2 text-sm font-medium text-violet-700 transition-colors">
-              <i class="fa-solid fa-print text-violet-400"></i> प्रिन्ट / PDF
+              <i class="fa-solid fa-print text-violet-400"></i> प्रिन्ट
             </button>
+            <!-- Download PDF button -->
+            <a :href="`/households/${household.id}/pdf`" target="_blank"
+              class="flex items-center justify-center gap-2 w-full rounded-md border border-rose-200 bg-rose-50 hover:bg-rose-100 px-4 py-2 text-sm font-medium text-rose-700 transition-colors">
+              <i class="fa-solid fa-file-pdf text-rose-400"></i> PDF डाउनलोड
+            </a>
           </div>
           <div class="mt-4 pt-4 border-t border-gray-50">
             <a href="/households" class="flex items-center gap-2 text-xs text-gray-400 hover:text-gray-600 transition-colors">
@@ -537,6 +591,13 @@
           </div>
         </div>
 
+        <!-- Field Verification -->
+        <FieldVerificationCard
+          :verification="fieldVerification"
+          :can-verify="canVerify"
+          :save-url="`/households/${household.id}/field-verify`"
+        />
+
         <!-- Submission Log -->
         <div v-if="household.submissionLogs?.length" class="no-print bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
           <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
@@ -603,11 +664,66 @@
       </div>
     </div>
   </Teleport>
+
+  <!-- ── Deceased Modal ─────────────────────────────────────────────── -->
+  <Teleport to="body">
+    <div v-if="deceasedModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
+        <div class="flex items-center gap-3 px-5 py-4 border-b border-[#e6e7e9]">
+          <i class="fa-solid fa-skull text-red-500"></i>
+          <h3 class="text-[15px] font-semibold text-[#1d273b]">मृत्यु विवरण</h3>
+          <span class="text-[13px] text-gray-400 ml-1">— {{ deceasedMember?.full_name }}</span>
+          <button type="button" @click="deceasedModal = false" class="ml-auto text-gray-400 hover:text-gray-600">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="px-5 py-4 space-y-4">
+          <div>
+            <label class="block text-[12px] font-medium text-gray-600 mb-1">मृत्यु मिति</label>
+            <NepaliDatePicker v-model="deceasedForm.death_date" placeholder="मृत्यु मिति (बि.सं.)" />
+          </div>
+          <div>
+            <label class="block text-[12px] font-medium text-gray-600 mb-1">मृत्युको कारण</label>
+            <select v-model="deceasedForm.death_cause"
+              class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-[13px] focus:ring-2 focus:ring-red-500/20 focus:border-red-400 outline-none bg-white">
+              <option value="">— छान्नुहोस् —</option>
+              <option v-for="c in (props.surveyOptions?.death_cause ?? [])" :key="c.value" :value="c.value">{{ c.label }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[12px] font-medium text-gray-600 mb-1">थप टिप्पणी</label>
+            <textarea v-model="deceasedForm.death_remarks" rows="2"
+              class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-[13px] focus:ring-2 focus:ring-red-500/20 focus:border-red-400 outline-none resize-none"
+              placeholder="वैकल्पिक टिप्पणी…"></textarea>
+          </div>
+        </div>
+        <div class="flex items-center justify-between px-5 py-4 border-t border-[#e6e7e9] gap-3">
+          <button v-if="deceasedMember?.is_deceased" type="button" @click="unmarkDeceased(deceasedMember); deceasedModal = false"
+            class="text-[12px] text-gray-400 hover:text-red-500 underline">
+            मृत्यु स्थिति हटाउनुहोस्
+          </button>
+          <div class="flex gap-2 ml-auto">
+            <button type="button" @click="deceasedModal = false"
+              class="px-4 py-2 text-[13px] border border-[#e6e7e9] rounded-md text-gray-600 hover:bg-gray-50 transition">
+              रद्द गर्नुहोस्
+            </button>
+            <button type="button" @click="saveDeceased" :disabled="deceasedSaving"
+              class="px-4 py-2 text-[13px] bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-semibold rounded-md transition flex items-center gap-2">
+              <i v-if="deceasedSaving" class="fa-solid fa-spinner fa-spin text-xs"></i>
+              सुरक्षित गर्नुहोस्
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
 import { ref, computed, h } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
+import FieldVerificationCard from '@/components/FieldVerificationCard.vue'
+import NepaliDatePicker      from '@/components/NepaliDatePicker.vue'
 
 const page = usePage()
 function printPage() { window.print() }
@@ -619,6 +735,9 @@ const props = defineProps({
   canPublish:             { type: Boolean, default: false },
   canRequestEdit:         { type: Boolean, default: false },
   hasPendingEditRequest:  { type: Boolean, default: false },
+  canVerify:              { type: Boolean, default: false },
+  canMarkDeceased:        { type: Boolean, default: false },
+  fieldVerification:      { type: Object,  default: null },
   surveyOptions:          { type: Object,  default: () => ({}) },
 })
 
@@ -667,6 +786,43 @@ function cropCount(key) {
   return arr?.length ? arr.length + ' किसिम' : null
 }
 
+// ── Deceased modal ────────────────────────────────────────────────────────────
+const deceasedModal   = ref(false)
+const deceasedMember  = ref(null)
+const deceasedForm    = ref({ death_date: '', death_cause: '', death_remarks: '' })
+const deceasedSaving  = ref(false)
+
+function openDeceasedModal(member) {
+  deceasedMember.value = member
+  deceasedForm.value   = {
+    death_date:    member.death_date ?? '',
+    death_cause:   member.death_cause ?? '',
+    death_remarks: member.death_remarks ?? '',
+  }
+  deceasedModal.value = true
+}
+
+function saveDeceased() {
+  if (deceasedSaving.value) return
+  deceasedSaving.value = true
+  router.patch(
+    `/households/${props.household.id}/members/${deceasedMember.value.id}/deceased`,
+    deceasedForm.value,
+    {
+      preserveScroll: true,
+      onFinish: () => { deceasedSaving.value = false; deceasedModal.value = false },
+    }
+  )
+}
+
+function unmarkDeceased(member) {
+  if (!confirm(`${member.full_name} को मृत्यु स्थिति हटाउने?`)) return
+  router.delete(
+    `/households/${props.household.id}/members/${member.id}/deceased`,
+    { preserveScroll: true }
+  )
+}
+
 // ── Member accordion ──────────────────────────────────────────────────────────
 const expandedMembers = ref(new Set(
   (props.household.members ?? []).map((m, i) => m.is_household_head ? i : null).filter(i => i !== null)
@@ -684,8 +840,8 @@ const DetailRow = {
   props: ['label', 'value'],
   render() {
     return h('div', [
-      h('p', { class: 'text-[11px] text-gray-400 mb-0.5' }, this.label),
-      h('p', { class: 'text-[13px] font-medium text-gray-800' }, this.value ?? '—'),
+      h('p', { class: 'text-[12px] text-gray-500 mb-1 leading-snug' }, this.label),
+      h('p', { class: 'text-[15px] font-medium text-gray-800 leading-snug' }, this.value ?? '—'),
     ])
   },
 }
@@ -704,12 +860,12 @@ const SectionHead = {
   render() {
     const bg = colorMap[this.color] ?? 'bg-gray-500'
     return h('div', {
-      class: `section-head-bar -mx-5 -mt-5 px-5 py-2.5 mb-4 rounded-t-md ${bg} flex items-center gap-2.5`,
+      class: `section-head-bar -mx-5 -mt-5 px-5 py-3 mb-5 rounded-t-md ${bg} flex items-center gap-3`,
     }, [
-      h('span', { class: 'w-6 h-6 rounded bg-white/20 flex items-center justify-center flex-shrink-0' }, [
-        h('i', { class: `fa-solid ${this.icon} text-white text-[11px]` }),
+      h('span', { class: 'w-7 h-7 rounded bg-white/20 flex items-center justify-center flex-shrink-0' }, [
+        h('i', { class: `fa-solid ${this.icon} text-white text-xs` }),
       ]),
-      h('span', { class: 'text-[13px] font-semibold text-white tracking-wide' }, this.title),
+      h('span', { class: 'text-[15px] font-semibold text-white tracking-wide' }, this.title),
     ])
   },
 }

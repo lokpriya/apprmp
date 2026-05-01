@@ -35,7 +35,12 @@ class NepalMasterDataSeeder extends Seeder
 
     public function run(): void
     {
-        $path = base_path('Reference Files/data_localgov.xlsx');
+        // Primary location (deployment): database/data/nepal_geo.xlsx
+        // Fallback (local dev): Reference Files/data_localgov.xlsx
+        $path = base_path('database/data/nepal_geo.xlsx');
+        if (! file_exists($path)) {
+            $path = base_path('Reference Files/data_localgov.xlsx');
+        }
 
         if (! file_exists($path)) {
             $this->command->error("File not found: {$path}");
@@ -109,15 +114,18 @@ class NepalMasterDataSeeder extends Seeder
                 continue;
             }
 
-            LocalGovernment::create([
-                'code'        => 'NLP' . str_pad($lgSequence, 4, '0', STR_PAD_LEFT),
-                'district_id' => $currentDistrict->id,
-                'name_en'     => $lgEn,
-                'name_np'     => $lgNp,
-                'type'        => $this->inferType($lgNp),
-                'ward_count'  => 0,
-                'is_active'   => false,
-            ]);
+            $code = 'NLP' . str_pad($lgSequence, 4, '0', STR_PAD_LEFT);
+            LocalGovernment::updateOrCreate(
+                ['code' => $code],
+                [
+                    'district_id' => $currentDistrict->id,
+                    'name_en'     => $lgEn,
+                    'name_np'     => $lgNp,
+                    'type'        => $this->inferType($lgNp),
+                    'ward_count'  => 0,
+                    'is_active'   => false,
+                ]
+            );
 
             $lgSequence++;
             $lgCount++;

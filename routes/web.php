@@ -11,7 +11,14 @@ use App\Http\Controllers\Admin\PublishQueueController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\SurveyOptionsController;
 use App\Http\Controllers\Admin\RolePermissionsController;
+use App\Http\Controllers\Admin\ProgressController;
+use App\Http\Controllers\Admin\DataExportController;
+use App\Http\Controllers\Admin\GoogleSyncController;
+use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\EditRequestController;
+use App\Http\Controllers\FieldVerificationController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PdfController;
 use App\Http\Controllers\Public\AnalyticsController;
 use App\Http\Controllers\Public\BusinessReportController;
 use App\Http\Controllers\Public\InstitutionReportController;
@@ -19,8 +26,32 @@ use App\Http\Controllers\Public\ReportController;
 use App\Http\Controllers\Public\ReportExportController;
 use Illuminate\Support\Facades\Route;
 
+// ── Public access captcha gate ───────────────────────────────────────────────
+Route::middleware('maintenance')->group(function () {
+    Route::get('/verify', function () {
+        $a = rand(1, 12);
+        $b = rand(1, 12);
+        $op = ['+', '-', '×'][array_rand(['+', '-', '×'])];
+        if ($op === '-' && $a < $b) [$a, $b] = [$b, $a];
+        $answer = match($op) { '+' => $a + $b, '-' => $a - $b, '×' => $a * $b };
+        session(['captcha_answer' => $answer]);
+        $lg = \App\Models\LocalGovernment::first();
+        return view('public.verify', ['problem' => "$a $op $b", 'lg' => $lg]);
+    })->name('public.verify');
+
+    Route::post('/verify', function (\Illuminate\Http\Request $request) {
+        $request->validate(['answer' => 'required|integer']);
+        if ((int) $request->answer === (int) session('captcha_answer')) {
+            session(['public_verified' => true]);
+            session()->forget('captcha_answer');
+            return redirect(session()->pull('public_intended', '/public'));
+        }
+        return back()->withErrors(['answer' => 'उत्तर गलत छ। पुनः प्रयास गर्नुहोस्।']);
+    })->name('public.verify.post');
+});
+
 // Public analytics portal (no auth required)
-Route::prefix('public')->name('public.')->middleware('maintenance')->group(function () {
+Route::prefix('public')->name('public.')->middleware(['maintenance', 'public.access'])->group(function () {
     Route::get('/', [AnalyticsController::class, 'index'])->name('dashboard');
     Route::get('/profile',         [AnalyticsController::class, 'profile'])->name('profile');
     Route::get('/representatives', [AnalyticsController::class, 'representatives'])->name('representatives');
@@ -36,16 +67,18 @@ Route::prefix('public')->name('public.')->middleware('maintenance')->group(funct
 
     // ── Public Cross-Tab Reports ─────────────────────────────────────────
     Route::prefix('reports')->name('reports.')->group(function () {
-        Route::get('/',              [ReportController::class, 'index'])       ->name('index');
-        Route::get('/demographics',  [ReportController::class, 'demographics'])->name('demographics');
-        Route::get('/age-groups',    [ReportController::class, 'ageGroups'])   ->name('age-groups');
-        Route::get('/education',     [ReportController::class, 'education'])   ->name('education');
-        Route::get('/health',        [ReportController::class, 'health'])      ->name('health');
-        Route::get('/employment',    [ReportController::class, 'employment'])  ->name('employment');
-        Route::get('/housing',       [ReportController::class, 'housing'])     ->name('housing');
-        Route::get('/utilities',     [ReportController::class, 'utilities'])   ->name('utilities');
-        Route::get('/economics',     [ReportController::class, 'economics'])   ->name('economics');
-        Route::get('/export/{category}', [ReportExportController::class, 'download'])->name('export');
+        Route::get('/',                    [ReportController::class,    'index'])          ->name('index');
+        Route::get('/demographics',        [ReportController::class,    'demographics'])   ->name('demographics');
+        Route::get('/age-groups',          [ReportController::class,    'ageGroups'])      ->name('age-groups');
+        Route::get('/education',           [ReportController::class,    'education'])      ->name('education');
+        Route::get('/health',              [ReportController::class,    'health'])         ->name('health');
+        Route::get('/employment',          [ReportController::class,    'employment'])     ->name('employment');
+        Route::get('/housing',             [ReportController::class,    'housing'])        ->name('housing');
+        Route::get('/utilities',           [ReportController::class,    'utilities'])      ->name('utilities');
+        Route::get('/economics',           [ReportController::class,    'economics'])      ->name('economics');
+        Route::get('/export/{category}',   [ReportExportController::class, 'download'])   ->name('export');
+        Route::get('/population-pyramid',  [AnalyticsController::class, 'populationPyramid'])->name('population-pyramid');
+        Route::get('/ward-summary',        [AnalyticsController::class, 'wardSummaryPage'])  ->name('ward-summary');
     });
 
     // ── Public Business Reports ──────────────────────────────────────────────
@@ -92,10 +125,15 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    // ─── Enumerator Routes ───────────────────────────────────────────────────
-    Route::middleware(['role:enumerator,municipal_admin,super_admin', 'ward.scope'])->group(function () {
+    // ─── Enumerator + Reviewer Routes ───────────────────────────────────────
+    // ward_reviewer included so they can access show/index pages for records they review.
+    // Controller-level policies enforce write restrictions per role.
+    Route::middleware(['role:enumerator,ward_reviewer,municipal_admin,super_admin', 'ward.scope', 'survey.period'])->group(function () {
         Route::get('households/{household}/preview', [HouseholdController::class, 'preview'])->name('households.preview');
         Route::get('households/{household}/members/{member}', [HouseholdController::class, 'showMember'])->name('households.members.show');
+        Route::post('households/bulk-submit',  [HouseholdController::class, 'bulkSubmit']) ->name('households.bulk-submit');
+        Route::post('households/bulk-approve', [HouseholdController::class, 'bulkApprove'])->name('households.bulk-approve');
+        Route::post('households/bulk-reject',  [HouseholdController::class, 'bulkReject']) ->name('households.bulk-reject');
         Route::resource('households', HouseholdController::class);
         Route::post('households/{household}/submit', [HouseholdController::class, 'submit'])->name('households.submit');
         Route::resource('institutions', InstitutionController::class);
@@ -109,10 +147,35 @@ Route::middleware(['auth'])->group(function () {
         Route::get('api/businesses/ward-settlements',   [BusinessController::class, 'settlementsForWard'])  ->name('businesses.api.ward-settlements');
     });
 
+    // ─── PDF Export ─────────────────────────────────────────────────────────
+    Route::middleware(['role:enumerator,ward_reviewer,municipal_admin,super_admin'])->group(function () {
+        Route::get('households/{household}/pdf',   [PdfController::class, 'household'])  ->name('households.pdf');
+        Route::get('institutions/{institution}/pdf',[PdfController::class, 'institution'])->name('institutions.pdf');
+        Route::get('businesses/{business}/pdf',    [PdfController::class, 'business'])   ->name('businesses.pdf');
+    });
+
+    // ─── Notifications ──────────────────────────────────────────────────────
+    Route::post('notifications/{id}/read',  [NotificationController::class, 'markRead'])   ->name('notifications.read');
+    Route::post('notifications/read-all',   [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+
     // ─── Edit Requests (Ward Reviewer can submit) ────────────────────────────
     Route::middleware(['role:ward_reviewer,municipal_admin,super_admin'])
         ->post('edit-requests', [EditRequestController::class, 'store'])
         ->name('edit-requests.store');
+
+    // ─── Field Verification ──────────────────────────────────────────────────
+    Route::middleware(['role:ward_reviewer,municipal_admin,super_admin'])->group(function () {
+        Route::post('households/{household}/field-verify',   [FieldVerificationController::class, 'saveHousehold'])  ->name('households.field-verify');
+        Route::post('institutions/{institution}/field-verify',[FieldVerificationController::class, 'saveInstitution'])->name('institutions.field-verify');
+        Route::post('businesses/{business}/field-verify',    [FieldVerificationController::class, 'saveBusiness'])   ->name('businesses.field-verify');
+    });
+
+    // ─── Deceased status (ward_reviewer+, bypasses workflow) ────────────────────
+    Route::middleware(['role:ward_reviewer,municipal_admin,super_admin', 'ward.scope'])
+        ->group(function () {
+            Route::patch('households/{household}/members/{member}/deceased', [HouseholdController::class, 'markDeceased'])->name('households.members.deceased');
+            Route::delete('households/{household}/members/{member}/deceased', [HouseholdController::class, 'unmarkDeceased'])->name('households.members.undeceased');
+        });
 
     // ─── Ward Reviewer Routes ────────────────────────────────────────────────
     Route::middleware(['role:ward_reviewer,municipal_admin,super_admin', 'ward.scope'])
@@ -124,10 +187,12 @@ Route::middleware(['auth'])->group(function () {
             Route::patch('/households/{household}/approve', [ReviewController::class, 'approveHousehold'])->name('households.approve');
             Route::patch('/households/{household}/reject', [ReviewController::class, 'rejectHousehold'])->name('households.reject');
             Route::patch('/households/{household}/escalate', [ReviewController::class, 'escalateHousehold'])->name('households.escalate');
-            Route::patch('/institutions/{institution}/approve', [ReviewController::class, 'approveInstitution'])->name('institutions.approve');
-            Route::patch('/institutions/{institution}/reject', [ReviewController::class, 'rejectInstitution'])->name('institutions.reject');
-            Route::patch('/businesses/{business}/approve',     [ReviewController::class, 'approveBusiness'])   ->name('businesses.approve');
-            Route::patch('/businesses/{business}/reject',      [ReviewController::class, 'rejectBusiness'])    ->name('businesses.reject');
+            Route::patch('/institutions/{institution}/approve',  [ReviewController::class, 'approveInstitution']) ->name('institutions.approve');
+            Route::patch('/institutions/{institution}/reject',  [ReviewController::class, 'rejectInstitution']) ->name('institutions.reject');
+            Route::patch('/institutions/{institution}/escalate',[ReviewController::class, 'escalateInstitution'])->name('institutions.escalate');
+            Route::patch('/businesses/{business}/approve',      [ReviewController::class, 'approveBusiness'])   ->name('businesses.approve');
+            Route::patch('/businesses/{business}/reject',       [ReviewController::class, 'rejectBusiness'])    ->name('businesses.reject');
+            Route::patch('/businesses/{business}/escalate',     [ReviewController::class, 'escalateBusiness'])  ->name('businesses.escalate');
         });
 
     // ─── Admin Routes ────────────────────────────────────────────────────────
@@ -137,6 +202,12 @@ Route::middleware(['auth'])->group(function () {
             Route::resource('users', UserController::class);
             Route::patch('/users/{user}/toggle-active',  [UserController::class, 'toggleActive'])->name('users.toggle-active');
             Route::patch('/users/{user}/reset-password', [UserController::class, 'resetPassword'])->name('users.reset-password');
+            Route::get('/ward-assignments',              [UserController::class, 'assignments'])  ->name('ward-assignments');
+            Route::get('/progress',                      [ProgressController::class, 'index'])    ->name('progress');
+            Route::get('/data-export',                   [DataExportController::class, 'index'])  ->name('data-export');
+            Route::post('/data-export/download',         [DataExportController::class, 'download'])->name('data-export.download');
+            Route::get('/audit-logs',                    [AuditLogController::class, 'index'])     ->name('audit-logs');
+            Route::patch('/users/{user}/assign-wards',  [UserController::class, 'assignWards'])  ->name('users.assign-wards');
             Route::get('/role-permissions',              [RolePermissionsController::class, 'index'])->name('role-permissions');
             Route::patch('/role-permissions',            [RolePermissionsController::class, 'update'])->name('role-permissions.update');
             Route::patch('/households/{household}/publish', [HouseholdController::class, 'publish'])->name('households.publish');
@@ -166,6 +237,11 @@ Route::middleware(['auth'])->group(function () {
             Route::patch('/survey-options/{surveyOption}/toggle',[SurveyOptionsController::class, 'toggle'])          ->name('survey-options.toggle');
             Route::delete('/survey-options/{surveyOption}',      [SurveyOptionsController::class, 'destroy'])         ->name('survey-options.destroy');
 
+            // Google Sheets Sync
+            Route::get('/google-sync',         [GoogleSyncController::class, 'index'])  ->name('google-sync');
+            Route::post('/google-sync/preview', [GoogleSyncController::class, 'preview'])->name('google-sync.preview');
+            Route::post('/google-sync/apply',   [GoogleSyncController::class, 'apply'])  ->name('google-sync.apply');
+
             // Bulk Import
             Route::get('/bulk-import', function () {
                 return view('admin.bulk-import');
@@ -181,6 +257,9 @@ Route::middleware(['auth'])->group(function () {
             Route::patch('/settings/maintenance',        [SettingsController::class, 'updateMaintenance'])   ->name('settings.maintenance');
             Route::post('/settings/maintenance/bg',      [SettingsController::class, 'uploadMaintenanceBg']) ->name('settings.maintenance.bg');
             Route::delete('/settings/maintenance/bg',    [SettingsController::class, 'deleteMaintenanceBg']) ->name('settings.maintenance.bg.delete');
+            Route::get('/maintenance-preview', fn () => view('maintenance', [
+                'lg' => \App\Models\LocalGovernment::first(),
+            ]))->name('maintenance.preview');
 
             // Municipal Settings
             Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
@@ -222,6 +301,11 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/settings/download-links',                    [SettingsController::class, 'storeDownloadLink'])  ->name('settings.download-links.store');
             Route::post('/settings/download-links/{downloadLink}',     [SettingsController::class, 'updateDownloadLink']) ->name('settings.download-links.update');
             Route::delete('/settings/download-links/{downloadLink}',   [SettingsController::class, 'destroyDownloadLink'])->name('settings.download-links.destroy');
+            Route::patch('/settings/survey-period', [SettingsController::class, 'saveSurveyPeriod'])->name('settings.survey-period.save');
+            Route::get('/settings/export',  [SettingsController::class, 'exportSettings']) ->name('settings.export');
+            Route::post('/settings/import', [SettingsController::class, 'importSettings']) ->name('settings.import');
+            Route::patch('/settings/google-sheets',      [SettingsController::class, 'saveGoogleSheets'])  ->name('settings.google-sheets.save');
+            Route::post('/settings/test-google-sheet',   [SettingsController::class, 'testGoogleSheet'])   ->name('settings.google-sheets.test');
         });
 });
 

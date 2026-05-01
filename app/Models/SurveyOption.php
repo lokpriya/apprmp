@@ -67,12 +67,15 @@ class SurveyOption extends Model
         });
     }
 
-    /** Clear all cache entries for a category. */
+    /** Clear all cache entries for a category (including the import validator cache). */
     public static function clearCache(string $category, ?int $lgId = null): void
     {
         Cache::forget("survey_options.{$category}." . ($lgId ?? 'global'));
         Cache::forget("survey_options.all." . ($lgId ?? 'global'));
         Cache::forget("survey_options.all.global");
+        // Also clear the SurveyValueValidator cache so imports see the new option immediately
+        Cache::forget("survey_validator." . ($lgId ?? 'global'));
+        Cache::forget("survey_validator.global");
     }
 
     // ── Category registry ─────────────────────────────────────────────────────

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{{ $lg?->name_np ?? $lg?->name_en ?? 'स्थानीय सरकार' }} — मर्मत अवस्था</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  @vite(['resources/css/app.css'])
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -25,9 +25,10 @@
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
-      @if(!empty($config['bg_image']))
+      @php $bgType = $config['bg_type'] ?? 'gradient'; @endphp
+      @if($bgType === 'upload' && !empty($config['bg_image']))
         background-image: url('{{ Storage::url($config['bg_image']) }}');
-      @elseif(!empty($config['bg_url']))
+      @elseif($bgType === 'url' && !empty($config['bg_url']))
         background-image: url('{{ $config['bg_url'] }}');
       @else
         background: linear-gradient(135deg, #0f1923 0%, #1a3a4a 40%, #0d3d3a 100%);

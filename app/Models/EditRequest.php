@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Facades\Cache;
 
 class EditRequest extends Model
 {
@@ -17,6 +18,16 @@ class EditRequest extends Model
         'reason',
         'admin_note',
     ];
+
+    /* ── Cache invalidation ────────────────────────────────── */
+
+    protected static function booted(): void
+    {
+        $bust = fn () => Cache::forget('edit_requests_pending');
+        static::created($bust);
+        static::updated($bust);
+        static::deleted($bust);
+    }
 
     /* ── Relationships ─────────────────────────────────────── */
 

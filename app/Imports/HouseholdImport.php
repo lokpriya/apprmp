@@ -9,6 +9,7 @@ use App\Imports\Sheets\UtilitiesSheet;
 use App\Imports\Sheets\EconomicSheet;
 use App\Imports\Sheets\AgricultureSheet;
 use App\Imports\Sheets\LivestockSheet;
+use App\Services\SurveyValueValidator;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
 class HouseholdImport implements WithMultipleSheets
@@ -19,14 +20,15 @@ class HouseholdImport implements WithMultipleSheets
     public function __construct(
         private readonly int  $enumeratorId,
         private readonly ?int $wardId = null,
+        private readonly ?SurveyValueValidator $validator = null,
     ) {
         $this->householdsSheet = new HouseholdsSheet($enumeratorId, $wardId);
 
         $this->dependentSheets = [
-            'Members'     => new MembersSheet($this->householdsSheet),
-            'Housing'     => new HousingSheet($this->householdsSheet),
-            'Utilities'   => new UtilitiesSheet($this->householdsSheet),
-            'Economic'    => new EconomicSheet($this->householdsSheet),
+            'Members'     => new MembersSheet($this->householdsSheet,    $this->validator),
+            'Housing'     => new HousingSheet($this->householdsSheet,    $this->validator),
+            'Utilities'   => new UtilitiesSheet($this->householdsSheet,  $this->validator),
+            'Economic'    => new EconomicSheet($this->householdsSheet,   $this->validator),
             'Agriculture' => new AgricultureSheet($this->householdsSheet),
             'Livestock'   => new LivestockSheet($this->householdsSheet),
         ];
@@ -46,7 +48,12 @@ class HouseholdImport implements WithMultipleSheets
         $allSheets = array_merge(['Households' => $this->householdsSheet], $this->dependentSheets);
         foreach ($allSheets as $name => $sheet) {
             foreach ($sheet->getErrors() as $err) {
-                $all[] = "[{$name}] {$err}";
+                if (is_array($err)) {
+                    $err['sheet'] = $name;
+                    $all[] = $err;
+                } else {
+                    $all[] = "[{$name}] {$err}";
+                }
             }
         }
         return $all;

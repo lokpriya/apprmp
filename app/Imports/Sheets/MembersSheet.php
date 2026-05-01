@@ -3,6 +3,7 @@
 namespace App\Imports\Sheets;
 
 use App\Models\HouseholdMember;
+use App\Services\SurveyValueValidator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\ToCollection;
@@ -17,7 +18,10 @@ class MembersSheet implements ToCollection, WithHeadingRow, WithStartRow, SkipsE
     private array $errors   = [];
     private int   $imported = 0;
 
-    public function __construct(private readonly HouseholdsSheet $householdsSheet) {}
+    public function __construct(
+        private readonly HouseholdsSheet $householdsSheet,
+        private readonly ?SurveyValueValidator $validator = null,
+    ) {}
 
     public function collection(Collection $rows): void
     {
@@ -35,6 +39,27 @@ class MembersSheet implements ToCollection, WithHeadingRow, WithStartRow, SkipsE
                     }
                     $householdId = $codeMap[$code];
                     $sortCounters[$householdId] = ($sortCounters[$householdId] ?? 0) + 1;
+
+                    // ── Survey option validation ──────────────────────────────
+                    if ($this->validator) {
+                        $errs = $this->validator->checkFields([
+                            'relation_to_head'  => trim($row['relation_to_head']  ?? ''),
+                            'ethnicity'         => trim($row['ethnicity']         ?? ''),
+                            'religion'          => trim($row['religion']          ?? ''),
+                            'mother_tongue'     => trim($row['mother_tongue']     ?? ''),
+                            'marital_status'    => trim($row['marital_status']    ?? ''),
+                            'education_level'   => trim($row['education_level']   ?? ''),
+                            'occupation_type'   => trim($row['occupation_type']   ?? ''),
+                            'employment_status' => trim($row['employment_status'] ?? ''),
+                            'disability_type'   => trim($row['disability_type']   ?? ''),
+                            'blood_group'       => trim($row['blood_group']       ?? ''),
+                            'residence_status'  => trim($row['residence_status']  ?? ''),
+                        ], $rowNum);
+                        if ($errs) {
+                            foreach ($errs as $e) $this->errors[] = $e;
+                            continue;
+                        }
+                    }
 
                     HouseholdMember::create([
                         'household_id'        => $householdId,

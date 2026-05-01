@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('member_businesses', function (Blueprint $table) {
-            $table->string('pan_vat_number', 50)->nullable()->after('has_pan_vat');
-        });
+        if (!Schema::hasColumn('member_businesses', 'pan_vat_number')) {
+            Schema::table('member_businesses', function (Blueprint $table) {
+                $table->string('pan_vat_number', 50)->nullable()->after('has_pan_vat');
+            });
+        }
     }
 
     public function down(): void

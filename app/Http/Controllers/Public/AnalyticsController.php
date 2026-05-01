@@ -6,12 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Models\Household;
 use App\Models\HouseholdHousing;
 use App\Models\HouseholdMember;
+use App\Models\MemberBusiness;
 use App\Models\Institution;
 use App\Models\InstitutionType;
 use App\Models\LocalGovernment;
 use App\Models\Settlement;
+use App\Models\SurveyOption;
 use App\Models\Ward;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -20,7 +23,10 @@ class AnalyticsController extends Controller
 {
     private function defaultLg(): ?LocalGovernment
     {
-        return LocalGovernment::with(['district.province'])->first();
+        // 10-minute cache — busted by SettingsController on general/map save
+        return Cache::remember('active_lg_full', 600, fn () =>
+            LocalGovernment::with(['district.province'])->first()
+        );
     }
 
     private function lgProps(LocalGovernment $lg): array
@@ -51,6 +57,7 @@ class AnalyticsController extends Controller
                 'stats'              => ['total_households' => 0, 'total_members' => 0, 'total_institutions' => 0, 'total_wards' => 0],
                 'genderData'         => [],
                 'ageData'            => [],
+                'pyramidData'        => [],
                 'ethnicityData'      => [],
                 'religionData'       => [],
                 'motherTongueData'   => [],
@@ -86,7 +93,7 @@ class AnalyticsController extends Controller
                 ->where('status', 'published')
                 ->when($selectedSettlementId, fn($q) => $q->where('settlement_id', $selectedSettlementId))
                 ->count(),
-            'total_members'      => HouseholdMember::whereHas('household', $hhBase)->count(),
+            'total_members'      => HouseholdMember::alive()->whereHas('household', $hhBase)->count(),
             'total_institutions' => Institution::whereIn('ward_id', $activeWardIds)
                 ->where('status', 'published')
                 ->when($selectedSettlementId, fn($q) => $q->where('settlement_id', $selectedSettlementId))
@@ -94,14 +101,14 @@ class AnalyticsController extends Controller
             'total_wards'        => count($allWardIds),
         ];
 
-        $genderData = HouseholdMember::whereHas('household', $hhBase)
+        $genderData = HouseholdMember::alive()->whereHas('household', $hhBase)
             ->whereNotNull('gender')
             ->select('gender', DB::raw('count(*) as count'))
             ->groupBy('gender')
             ->pluck('count', 'gender')
             ->toArray();
 
-        $ageData = HouseholdMember::whereHas('household', $hhBase)
+        $ageData = HouseholdMember::alive()->whereHas('household', $hhBase)
             ->whereNotNull('age')
             ->select(DB::raw("
                 CASE
@@ -117,7 +124,43 @@ class AnalyticsController extends Controller
             ->pluck('count', 'age_group')
             ->toArray();
 
-        $ethnicityData = HouseholdMember::whereHas('household', $hhBase)
+        // Population pyramid — 5-year age bands × gender (oldest first for top-to-bottom chart display)
+        $pyramidBands = ['80+','75-79','70-74','65-69','60-64','55-59','50-54','45-49','40-44','35-39','30-34','25-29','20-24','15-19','10-14','5-9','0-4'];
+        $rawPyramid = HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->whereNotNull('age')->whereNotNull('gender')
+            ->select(DB::raw("
+                CASE
+                    WHEN age BETWEEN 0  AND 4  THEN '0-4'
+                    WHEN age BETWEEN 5  AND 9  THEN '5-9'
+                    WHEN age BETWEEN 10 AND 14 THEN '10-14'
+                    WHEN age BETWEEN 15 AND 19 THEN '15-19'
+                    WHEN age BETWEEN 20 AND 24 THEN '20-24'
+                    WHEN age BETWEEN 25 AND 29 THEN '25-29'
+                    WHEN age BETWEEN 30 AND 34 THEN '30-34'
+                    WHEN age BETWEEN 35 AND 39 THEN '35-39'
+                    WHEN age BETWEEN 40 AND 44 THEN '40-44'
+                    WHEN age BETWEEN 45 AND 49 THEN '45-49'
+                    WHEN age BETWEEN 50 AND 54 THEN '50-54'
+                    WHEN age BETWEEN 55 AND 59 THEN '55-59'
+                    WHEN age BETWEEN 60 AND 64 THEN '60-64'
+                    WHEN age BETWEEN 65 AND 69 THEN '65-69'
+                    WHEN age BETWEEN 70 AND 74 THEN '70-74'
+                    WHEN age BETWEEN 75 AND 79 THEN '75-79'
+                    ELSE '80+'
+                END as age_group
+            "), 'gender', DB::raw('count(*) as count'))
+            ->groupBy('age_group', 'gender')
+            ->get()
+            ->groupBy('age_group');
+
+        $pyramidData = collect($pyramidBands)->map(fn($g) => [
+            'age_group' => $g,
+            'male'      => $rawPyramid->get($g, collect())->firstWhere('gender', 'male')?->count  ?? 0,
+            'female'    => $rawPyramid->get($g, collect())->firstWhere('gender', 'female')?->count ?? 0,
+            'other'     => $rawPyramid->get($g, collect())->firstWhere('gender', 'other')?->count  ?? 0,
+        ])->values()->toArray();
+
+        $ethnicityData = HouseholdMember::alive()->whereHas('household', $hhBase)
             ->whereNotNull('ethnicity')->where('ethnicity', '!=', '')
             ->select('ethnicity', DB::raw('count(*) as count'))
             ->groupBy('ethnicity')
@@ -125,7 +168,7 @@ class AnalyticsController extends Controller
             ->pluck('count', 'ethnicity')
             ->toArray();
 
-        $religionData = HouseholdMember::whereHas('household', $hhBase)
+        $religionData = HouseholdMember::alive()->whereHas('household', $hhBase)
             ->whereNotNull('religion')->where('religion', '!=', '')
             ->select('religion', DB::raw('count(*) as count'))
             ->groupBy('religion')
@@ -133,7 +176,7 @@ class AnalyticsController extends Controller
             ->pluck('count', 'religion')
             ->toArray();
 
-        $motherTongueData = HouseholdMember::whereHas('household', $hhBase)
+        $motherTongueData = HouseholdMember::alive()->whereHas('household', $hhBase)
             ->whereNotNull('mother_tongue')->where('mother_tongue', '!=', '')
             ->select('mother_tongue', DB::raw('count(*) as count'))
             ->groupBy('mother_tongue')
@@ -145,10 +188,12 @@ class AnalyticsController extends Controller
             ->where('status', 'published')
             ->when($selectedSettlementId, fn($q) => $q->where('settlement_id', $selectedSettlementId))
             ->join('institution_types', 'institutions.institution_type_id', '=', 'institution_types.id')
-            ->select('institution_types.name_en', DB::raw('count(*) as count'))
-            ->groupBy('institution_types.name_en')
-            ->pluck('count', 'name_en')
-            ->toArray();
+            ->select('institution_types.name_np as label_ne', 'institution_types.name_en as label_en', DB::raw('count(*) as count'))
+            ->groupBy('institution_types.name_np', 'institution_types.name_en')
+            ->orderByDesc('count')
+            ->get()
+            ->map(fn($r) => ['label_ne' => $r->label_ne, 'label_en' => $r->label_en, 'count' => (int)$r->count])
+            ->values()->toArray();
 
         $wards = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
 
@@ -158,20 +203,16 @@ class AnalyticsController extends Controller
                 ->values()
             : collect();
 
+        // Ward summary (kept lightweight — used by choropleth map)
         $wardHouseholds = DB::table('households')
-            ->whereIn('ward_id', $allWardIds)
-            ->where('status', 'published')
-            ->select('ward_id', DB::raw('count(*) as hh'))
-            ->groupBy('ward_id')->pluck('hh', 'ward_id');
-
+            ->whereIn('ward_id', $allWardIds)->where('status', 'published')
+            ->select('ward_id', DB::raw('count(*) as hh'))->groupBy('ward_id')->pluck('hh', 'ward_id');
         $wardGender = DB::table('household_members')
             ->join('households', 'household_members.household_id', '=', 'households.id')
-            ->whereIn('households.ward_id', $allWardIds)
-            ->where('households.status', 'published')
+            ->whereIn('households.ward_id', $allWardIds)->where('households.status', 'published')
+            ->where('household_members.is_deceased', false)
             ->select('households.ward_id', 'household_members.gender', DB::raw('count(*) as cnt'))
-            ->groupBy('households.ward_id', 'household_members.gender')
-            ->get()->groupBy('ward_id');
-
+            ->groupBy('households.ward_id', 'household_members.gender')->get()->groupBy('ward_id');
         $wardSummary = $wards->map(fn($ward) => [
             'ward_id'     => $ward->id,
             'ward_number' => $ward->ward_number,
@@ -180,6 +221,93 @@ class AnalyticsController extends Controller
             'female'      => $wardGender->get($ward->id, collect())->firstWhere('gender', 'female')?->cnt ?? 0,
             'total'       => $wardGender->get($ward->id, collect())->sum('cnt'),
         ])->values();
+
+        // ── Key metrics ────────────────────────────────────────────────
+        $litRow = HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->whereNotNull('is_literate')
+            ->select(DB::raw('SUM(CASE WHEN is_literate=1 THEN 1 ELSE 0 END) as lit'), DB::raw('count(*) as tot'))
+            ->first();
+        $litRate = ($litRow && $litRow->tot > 0) ? round($litRow->lit / $litRow->tot * 100, 1) : 0;
+
+        $bankRow = DB::table('household_economic')
+            ->join('households', 'household_economic.household_id', '=', 'households.id')
+            ->whereIn('households.ward_id', $activeWardIds)->where('households.status', 'published')
+            ->when($selectedSettlementId, fn($q) => $q->where('households.settlement_id', $selectedSettlementId))
+            ->select(DB::raw('SUM(CASE WHEN has_bank_account=1 THEN 1 ELSE 0 END) as has_bank'), DB::raw('count(*) as tot'))
+            ->first();
+        $bankPct = ($bankRow && $bankRow->tot > 0) ? round($bankRow->has_bank / $bankRow->tot * 100, 1) : 0;
+
+        $maleCount   = $genderData['male']   ?? 0;
+        $femaleCount = $genderData['female'] ?? 0;
+        $keyMetrics  = [
+            'literacy_rate'    => $litRate,
+            'avg_hh_size'      => $stats['total_households'] > 0 ? round($stats['total_members'] / $stats['total_households'], 1) : 0,
+            'sex_ratio'        => $femaleCount > 0 ? round($maleCount / $femaleCount * 100) : 0,
+            'bank_account_pct' => $bankPct,
+        ];
+
+        // ── Survey option labels (Nepali + English) for all chart datasets ─
+        $surveyLabels = SurveyOption::whereIn('category', [
+            'water_source', 'toilet_type', 'electricity_source', 'cooking_fuel',
+            'income_source', 'occupation_type', 'education_level', 'business_type',
+        ])->select('category', 'value', 'label_ne', 'label_en')
+            ->get()->groupBy('category')->map(fn($g) => $g->keyBy('value'));
+
+        $attachLabels = function (array $rows, string $cat) use ($surveyLabels): array {
+            $map = $surveyLabels->get($cat, collect());
+            return array_map(function ($row) use ($map) {
+                $opt = $map->get($row['value'] ?? '');
+                $row['label_ne'] = $opt?->label_ne ?? null;
+                $row['label_en'] = $opt?->label_en ?? null;
+                return $row;
+            }, $rows);
+        };
+
+        // ── Basic services ─────────────────────────────────────────────
+        $waterData       = $attachLabels($this->utilityBreakdown($activeWardIds, $selectedSettlementId, 'water_source'), 'water_source');
+        $toiletData      = $attachLabels($this->utilityBreakdown($activeWardIds, $selectedSettlementId, 'toilet_type'), 'toilet_type');
+        $electricityData = $attachLabels($this->utilityBreakdown($activeWardIds, $selectedSettlementId, 'electricity_source'), 'electricity_source');
+        $cookingData     = $attachLabels($this->utilityBreakdown($activeWardIds, $selectedSettlementId, 'cooking_fuel'), 'cooking_fuel');
+
+        // ── Economy ────────────────────────────────────────────────────
+        $incomeData = $attachLabels(DB::table('household_economic')
+            ->join('households', 'household_economic.household_id', '=', 'households.id')
+            ->whereIn('households.ward_id', $activeWardIds)->where('households.status', 'published')
+            ->when($selectedSettlementId, fn($q) => $q->where('households.settlement_id', $selectedSettlementId))
+            ->whereNotNull('household_economic.primary_income_source')
+            ->where('household_economic.primary_income_source', '!=', '')
+            ->select('household_economic.primary_income_source as value', DB::raw('count(*) as count'))
+            ->groupBy('value')->orderByDesc('count')->get()
+            ->map(fn($r) => ['value' => $r->value, 'count' => (int)$r->count])->toArray(), 'income_source');
+
+        $occupationData = $attachLabels(HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->whereNotNull('occupation_type')->where('occupation_type', '!=', '')
+            ->select('occupation_type as value', DB::raw('count(*) as count'))
+            ->groupBy('value')->orderByDesc('count')->get()
+            ->map(fn($r) => ['value' => $r->value, 'count' => (int)$r->count])->toArray(), 'occupation_type');
+
+        // ── Education ──────────────────────────────────────────────────
+        $educationData = $attachLabels(HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->whereNotNull('education_level')->where('education_level', '!=', '')
+            ->select('education_level as value', DB::raw('count(*) as count'))
+            ->groupBy('value')->orderByDesc('count')->get()
+            ->map(fn($r) => ['value' => $r->value, 'count' => (int)$r->count])->toArray(), 'education_level');
+
+        $litByGender = HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->whereNotNull('gender')->whereNotNull('is_literate')
+            ->select('gender', DB::raw('SUM(CASE WHEN is_literate=1 THEN 1 ELSE 0 END) as lit'), DB::raw('count(*) as tot'))
+            ->groupBy('gender')->get()
+            ->map(fn($r) => ['gender' => $r->gender, 'lit' => (int)$r->lit, 'tot' => (int)$r->tot])->toArray();
+
+        // ── Businesses ─────────────────────────────────────────────────
+        $businessData = $attachLabels(DB::table('member_businesses')
+            ->join('households', 'member_businesses.household_id', '=', 'households.id')
+            ->whereIn('households.ward_id', $activeWardIds)->where('households.status', 'published')
+            ->when($selectedSettlementId, fn($q) => $q->where('households.settlement_id', $selectedSettlementId))
+            ->whereNotNull('member_businesses.business_type')->where('member_businesses.business_type', '!=', '')
+            ->select('member_businesses.business_type as value', DB::raw('count(*) as count'))
+            ->groupBy('value')->orderByDesc('count')->limit(8)->get()
+            ->map(fn($r) => ['value' => $r->value, 'count' => (int)$r->count])->toArray(), 'business_type');
 
         $profileContent  = $lg->profile_content ?? [];
         $profileSections = LocalGovernment::profileSections();
@@ -192,15 +320,140 @@ class AnalyticsController extends Controller
             'stats'               => $stats,
             'genderData'          => $genderData,
             'ageData'             => $ageData,
-            'ethnicityData'       => $ethnicityData,
-            'religionData'        => $religionData,
-            'motherTongueData'    => $motherTongueData,
             'institutionData'     => $institutionData,
             'wardSummary'         => $wardSummary,
+            'keyMetrics'          => $keyMetrics,
+            'waterData'           => $waterData,
+            'toiletData'          => $toiletData,
+            'electricityData'     => $electricityData,
+            'cookingData'         => $cookingData,
+            'incomeData'          => $incomeData,
+            'occupationData'      => $occupationData,
+            'educationData'       => $educationData,
+            'litByGender'         => $litByGender,
+            'businessData'        => $businessData,
             'selectedWardId'      => $selectedWardId,
             'selectedSettlementId' => $selectedSettlementId,
             'profileFilledCount'  => $profileFilledCount,
             'welcomeConfig'       => $lg->welcome_config ?? [],
+        ]);
+    }
+
+    // ── Utility breakdown helper ──────────────────────────────────────────
+    private function utilityBreakdown(array $wardIds, ?int $settlementId, string $column): array
+    {
+        return DB::table('household_utilities')
+            ->join('households', 'household_utilities.household_id', '=', 'households.id')
+            ->whereIn('households.ward_id', $wardIds)
+            ->where('households.status', 'published')
+            ->when($settlementId, fn($q) => $q->where('households.settlement_id', $settlementId))
+            ->whereNotNull("household_utilities.{$column}")
+            ->where("household_utilities.{$column}", '!=', '')
+            ->select("household_utilities.{$column} as value", DB::raw('count(*) as count'))
+            ->groupBy('value')->orderByDesc('count')->get()
+            ->map(fn($r) => ['value' => $r->value, 'count' => (int)$r->count])->toArray();
+    }
+
+    // ── Population Pyramid page ───────────────────────────────────────────
+    public function populationPyramid(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) return redirect()->route('public.dashboard');
+
+        $allWardIds     = Ward::where('local_government_id', $lg->id)->pluck('id')->toArray();
+        $selectedWardId = $request->integer('ward_id') ?: null;
+        if ($selectedWardId && !in_array($selectedWardId, $allWardIds)) $selectedWardId = null;
+        $activeWardIds  = $selectedWardId ? [$selectedWardId] : $allWardIds;
+        $wards          = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
+
+        $hhBase = fn($q) => $q->whereIn('ward_id', $activeWardIds)->where('status', 'published');
+
+        $bands = ['80+','75-79','70-74','65-69','60-64','55-59','50-54','45-49','40-44','35-39','30-34','25-29','20-24','15-19','10-14','5-9','0-4'];
+        $raw   = HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->whereNotNull('age')->whereNotNull('gender')
+            ->select(DB::raw("
+                CASE
+                    WHEN age BETWEEN 0  AND 4  THEN '0-4'
+                    WHEN age BETWEEN 5  AND 9  THEN '5-9'
+                    WHEN age BETWEEN 10 AND 14 THEN '10-14'
+                    WHEN age BETWEEN 15 AND 19 THEN '15-19'
+                    WHEN age BETWEEN 20 AND 24 THEN '20-24'
+                    WHEN age BETWEEN 25 AND 29 THEN '25-29'
+                    WHEN age BETWEEN 30 AND 34 THEN '30-34'
+                    WHEN age BETWEEN 35 AND 39 THEN '35-39'
+                    WHEN age BETWEEN 40 AND 44 THEN '40-44'
+                    WHEN age BETWEEN 45 AND 49 THEN '45-49'
+                    WHEN age BETWEEN 50 AND 54 THEN '50-54'
+                    WHEN age BETWEEN 55 AND 59 THEN '55-59'
+                    WHEN age BETWEEN 60 AND 64 THEN '60-64'
+                    WHEN age BETWEEN 65 AND 69 THEN '65-69'
+                    WHEN age BETWEEN 70 AND 74 THEN '70-74'
+                    WHEN age BETWEEN 75 AND 79 THEN '75-79'
+                    ELSE '80+'
+                END as age_group
+            "), 'gender', DB::raw('count(*) as count'))
+            ->groupBy('age_group', 'gender')->get()->groupBy('age_group');
+
+        $pyramidData = collect($bands)->map(fn($g) => [
+            'age_group' => $g,
+            'male'      => $raw->get($g, collect())->firstWhere('gender', 'male')?->count  ?? 0,
+            'female'    => $raw->get($g, collect())->firstWhere('gender', 'female')?->count ?? 0,
+            'other'     => $raw->get($g, collect())->firstWhere('gender', 'other')?->count  ?? 0,
+        ])->values()->toArray();
+
+        $totalMembers = HouseholdMember::alive()->whereHas('household', $hhBase)->count();
+        $genderData   = HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->whereNotNull('gender')->select('gender', DB::raw('count(*) as count'))
+            ->groupBy('gender')->pluck('count', 'gender')->toArray();
+
+        return Inertia::render('Public/Reports/PopulationPyramid', [
+            'lg'             => $this->lgProps($lg),
+            'wards'          => $wards->map(fn($w) => ['id' => $w->id, 'ward_number' => $w->ward_number])->values(),
+            'selectedWardId' => $selectedWardId,
+            'pyramidData'    => $pyramidData,
+            'totalMembers'   => $totalMembers,
+            'genderData'     => $genderData,
+        ]);
+    }
+
+    // ── Ward Summary page ─────────────────────────────────────────────────
+    public function wardSummaryPage(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) return redirect()->route('public.dashboard');
+
+        $allWardIds = Ward::where('local_government_id', $lg->id)->pluck('id')->toArray();
+        $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
+
+        $wardHouseholds = DB::table('households')
+            ->whereIn('ward_id', $allWardIds)->where('status', 'published')
+            ->select('ward_id', DB::raw('count(*) as hh'))->groupBy('ward_id')->pluck('hh', 'ward_id');
+
+        $wardGender = DB::table('household_members')
+            ->join('households', 'household_members.household_id', '=', 'households.id')
+            ->whereIn('households.ward_id', $allWardIds)->where('households.status', 'published')
+            ->where('household_members.is_deceased', false)
+            ->select('households.ward_id', 'household_members.gender', DB::raw('count(*) as cnt'))
+            ->groupBy('households.ward_id', 'household_members.gender')->get()->groupBy('ward_id');
+
+        $wardInstitutions = DB::table('institutions')
+            ->whereIn('ward_id', $allWardIds)->where('status', 'published')
+            ->select('ward_id', DB::raw('count(*) as cnt'))->groupBy('ward_id')->pluck('cnt', 'ward_id');
+
+        $wardSummary = $wards->map(fn($ward) => [
+            'ward_id'      => $ward->id,
+            'ward_number'  => $ward->ward_number,
+            'households'   => $wardHouseholds->get($ward->id, 0),
+            'male'         => $wardGender->get($ward->id, collect())->firstWhere('gender', 'male')?->cnt  ?? 0,
+            'female'       => $wardGender->get($ward->id, collect())->firstWhere('gender', 'female')?->cnt ?? 0,
+            'other'        => $wardGender->get($ward->id, collect())->firstWhere('gender', 'other')?->cnt  ?? 0,
+            'total'        => $wardGender->get($ward->id, collect())->sum('cnt'),
+            'institutions' => $wardInstitutions->get($ward->id, 0),
+        ])->values();
+
+        return Inertia::render('Public/Reports/WardSummary', [
+            'lg'          => $this->lgProps($lg),
+            'wardSummary' => $wardSummary,
         ]);
     }
 
@@ -317,11 +570,11 @@ class AnalyticsController extends Controller
     {
         $stats = [
             'households'   => Household::where('ward_id', $ward->id)->where('status', 'published')->count(),
-            'members'      => HouseholdMember::whereHas('household', fn($q) => $q->where('ward_id', $ward->id)->where('status', 'published'))->count(),
+            'members'      => HouseholdMember::alive()->whereHas('household', fn($q) => $q->where('ward_id', $ward->id)->where('status', 'published'))->count(),
             'institutions' => Institution::where('ward_id', $ward->id)->where('status', 'published')->count(),
         ];
 
-        $genderData = HouseholdMember::whereHas('household', fn($q) => $q->where('ward_id', $ward->id)->where('status', 'published'))
+        $genderData = HouseholdMember::alive()->whereHas('household', fn($q) => $q->where('ward_id', $ward->id)->where('status', 'published'))
             ->whereNotNull('gender')
             ->select('gender', DB::raw('count(*) as count'))
             ->groupBy('gender')
@@ -354,7 +607,7 @@ class AnalyticsController extends Controller
         $lg      = $this->defaultLg();
         $wardIds = Ward::where('local_government_id', $lg->id)->pluck('id')->toArray();
 
-        $data = HouseholdMember::whereHas('household', fn($q) => $q->whereIn('ward_id', $wardIds)->where('status', 'published'))
+        $data = HouseholdMember::alive()->whereHas('household', fn($q) => $q->whereIn('ward_id', $wardIds)->where('status', 'published'))
             ->whereNotNull('gender')
             ->select('gender', DB::raw('count(*) as count'))
             ->groupBy('gender')

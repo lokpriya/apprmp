@@ -5,8 +5,10 @@ namespace App\Services;
 use App\Enums\RecordStatus;
 use App\Models\Household;
 use App\Models\Institution;
+use App\Models\MemberBusiness;
 use App\Models\SubmissionLog;
 use App\Models\User;
+use App\Notifications\SubmissionStatusNotification;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
@@ -23,13 +25,19 @@ class WorkflowService
         DB::transaction(function () use ($record, $newStatus, $actor, $comment, $currentStatus) {
             $updates = ['status' => $newStatus->value];
 
-            match ($newStatus) {
-                RecordStatus::Submitted    => $updates['submitted_at'] = now(),
-                RecordStatus::WardApproved => array_merge($updates, ['ward_reviewed_at' => now(), 'ward_reviewer_id' => $actor->id]),
-                RecordStatus::Rejected     => array_merge($updates, ['ward_reviewed_at' => now(), 'ward_reviewer_id' => $actor->id, 'ward_review_comment' => $comment]),
-                RecordStatus::Published    => array_merge($updates, ['published_at' => now(), 'published_by' => $actor->id]),
-                default => null,
-            };
+            if ($newStatus === RecordStatus::Submitted) {
+                $updates['submitted_at'] = now();
+            } elseif ($newStatus === RecordStatus::WardApproved) {
+                $updates['ward_reviewed_at'] = now();
+                $updates['ward_reviewer_id'] = $actor->id;
+            } elseif ($newStatus === RecordStatus::Rejected) {
+                $updates['ward_reviewed_at']    = now();
+                $updates['ward_reviewer_id']    = $actor->id;
+                $updates['ward_review_comment'] = $comment;
+            } elseif ($newStatus === RecordStatus::Published) {
+                $updates['published_at'] = now();
+                $updates['published_by'] = $actor->id;
+            }
 
             $record->update($updates);
 
@@ -42,6 +50,27 @@ class WorkflowService
                 'comment'       => $comment,
             ]);
         });
+
+        // Notify the enumerator (skip submitted status and when actor is the enumerator)
+        $notifyStatuses = [
+            RecordStatus::WardApproved->value,
+            RecordStatus::Rejected->value,
+            RecordStatus::Escalated->value,
+            RecordStatus::Published->value,
+        ];
+        if (in_array($newStatus->value, $notifyStatuses) && isset($record->enumerator_id)) {
+            $enumerator = User::find($record->enumerator_id);
+            if ($enumerator && $enumerator->id !== $actor->id) {
+                $recordType = match(true) {
+                    $record instanceof Institution    => 'institution',
+                    $record instanceof MemberBusiness => 'business',
+                    default                           => 'household',
+                };
+                $enumerator->notify(new SubmissionStatusNotification(
+                    $recordType, $record->id, $record->unique_code, $newStatus->value, $comment
+                ));
+            }
+        }
     }
 
     public function submit(Model $record, User $actor): void

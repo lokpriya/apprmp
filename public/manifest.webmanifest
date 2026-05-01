@@ -1,0 +1,26 @@
+{
+  "name": "स्थानीय तह वस्तुगत विवरण प्रणाली",
+  "short_name": "LGPAS",
+  "description": "स्थानीय तह वस्तुगत विवरण तथा विश्लेषण प्रणाली",
+  "start_url": "/public",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#182433",
+  "background_color": "#f4f6fb",
+  "lang": "ne",
+  "icons": [
+    {
+      "src": "/pwa-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

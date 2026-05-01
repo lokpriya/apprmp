@@ -33,6 +33,10 @@ class EditRequestController extends Controller
 
         abort_unless($record->status === 'published', 422, 'केवल प्रकाशित रेकर्डको लागि अनुरोध गर्न सकिन्छ।');
 
+        // Reviewer may only request edits for records in their assigned wards
+        $assignedWardIds = auth()->user()->assignedWards()->pluck('wards.id')->toArray();
+        abort_unless(in_array($record->ward_id, $assignedWardIds), 403, 'यस वडाको रेकर्डमा पहुँच छैन।');
+
         // Prevent duplicate pending requests
         $existing = EditRequest::where('requestable_type', $modelClass)
             ->where('requestable_id', $record->id)

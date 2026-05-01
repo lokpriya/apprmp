@@ -68,11 +68,15 @@ class HouseholdMember extends Model
         'involveinbusiness','business_name',
         // Residence
         'residence_status','remarks','sort_order',
+        // Deceased
+        'is_deceased','death_date','death_cause','death_remarks',
     ];
 
     protected $casts = [
         'date_of_birth'              => 'date',
+        'death_date'                 => 'date',
         'is_household_head'          => 'boolean',
+        'is_deceased'                => 'boolean',
         'is_literate'                => 'boolean',
         // Age 0-3
         'colostrum'                  => 'boolean',
@@ -125,6 +129,8 @@ class HouseholdMember extends Model
         // Business
         'involveinbusiness'          => 'boolean',
     ];
+
+    public function scopeAlive($query) { return $query->where('is_deceased', false); }
 
     public function household(): BelongsTo { return $this->belongsTo(Household::class); }
     public function migration(): HasOne     { return $this->hasOne(MemberMigration::class, 'member_id'); }

@@ -10,6 +10,7 @@ use App\Models\MemberBusiness;
 use App\Models\SurveyOption;
 use App\Models\Ward;
 use App\Services\BusinessService;
+use App\Services\CompletenessScoreService;
 use App\Services\WorkflowService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -103,6 +104,7 @@ class BusinessController extends Controller
             'settlement'      => $b->settlement ? ['name_np' => $b->settlement->name_np] : null,
             'enumerator'      => $b->enumerator ? ['name' => $b->enumerator->name] : null,
             'created_at'      => $b->created_at?->diffForHumans(),
+            'completeness'    => CompletenessScoreService::business($b),
         ]);
 
         $wards = Ward::whereIn('id', $wardIds)->orderBy('ward_number')->pluck('ward_number');
@@ -192,7 +194,7 @@ class BusinessController extends Controller
     {
         $this->authorizeWard($business->ward_id);
 
-        $business->load(['member.household', 'ward', 'settlement', 'enumerator', 'wardReviewer', 'publisher']);
+        $business->load(['member.household', 'ward', 'settlement', 'enumerator', 'wardReviewer', 'publisher', 'fieldVerification.verifier']);
 
         return Inertia::render('Business/Show', [
             'business'      => $business,
@@ -208,7 +210,7 @@ class BusinessController extends Controller
             ] : null,
             'canEdit'        => auth()->user()->isAdmin()
                                  || in_array($business->status, ['draft', 'rejected']),
-            'canSubmit'      => $business->status === 'draft',
+            'canSubmit'      => in_array($business->status, ['draft', 'rejected']),
             'canPublish'     => auth()->user()->isAdmin() && in_array($business->status, ['ward_approved', 'escalated']),
             'canRequestEdit' => auth()->user()->isReviewer() && $business->status === 'published'
                                  && !EditRequest::where('requestable_type', MemberBusiness::class)
@@ -219,6 +221,14 @@ class BusinessController extends Controller
                                                 ->where('requestable_id', $business->id)
                                                 ->where('status', 'pending')
                                                 ->exists(),
+            'canVerify'      => (auth()->user()->isReviewer() || auth()->user()->isAdmin()) && $business->status !== 'draft',
+            'fieldVerification' => ($fv = $business->fieldVerification) ? [
+                'visited_at'  => $fv->visited_at?->format('Y-m-d'),
+                'is_verified' => $fv->is_verified,
+                'notes'       => $fv->notes,
+                'verifier'    => $fv->verifier ? ['name' => $fv->verifier->name] : null,
+                'created_at'  => $fv->created_at?->format('Y-m-d'),
+            ] : null,
             'surveyOptions' => $this->surveyOptions(),
         ]);
     }
@@ -296,7 +306,7 @@ class BusinessController extends Controller
     public function submit(Request $request, MemberBusiness $business)
     {
         $this->authorizeWard($business->ward_id);
-        abort_unless($business->status === 'draft', 422, 'केवल मस्यौदा पेस गर्न सकिन्छ।');
+        abort_unless(in_array($business->status, ['draft', 'rejected']), 422, 'केवल मस्यौदा वा अस्वीकृत रेकर्ड पेस गर्न सकिन्छ।');
 
         $this->workflow->submit($business, auth()->user());
 

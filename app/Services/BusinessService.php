@@ -83,6 +83,7 @@ class BusinessService
     {
         DB::transaction(function () use ($business, $data) {
             $business->update([
+                'sync_locked'               => true,
                 // Step 1
                 'business_name'             => $data['business_name'] ?? $business->business_name,
                 'owner_father_name'         => $data['owner_father_name'] ?? null,

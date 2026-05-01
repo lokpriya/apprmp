@@ -1,6 +1,63 @@
 <template>
   <div class="space-y-5">
 
+    <!-- ── Duplicate Warning Modal ── -->
+    <Teleport to="body">
+      <div v-if="duplicateMatches" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden">
+          <div class="bg-amber-500 px-5 py-4 flex items-center gap-3">
+            <i class="fa-solid fa-triangle-exclamation text-white text-lg"></i>
+            <h2 class="text-[16px] font-bold text-white">सम्भावित डुप्लिकेट पाइयो!</h2>
+          </div>
+          <div class="px-5 py-4 space-y-3 max-h-72 overflow-y-auto">
+            <p class="text-[13px] text-[#626976]">
+              तलका अभिलेखहरूसँग मिल्दो घरधुरी पहिलेनै दर्ता भएको देखिन्छ। जाँच गर्नुहोस्:
+            </p>
+            <div v-for="m in duplicateMatches" :key="m.id"
+              class="border border-amber-200 bg-amber-50 rounded-lg px-4 py-3 space-y-1">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-[13px] font-semibold text-[#1d273b]">{{ m.unique_code }}</span>
+                <span class="text-[11px] px-2 py-0.5 rounded-full font-medium"
+                  :class="{
+                    'bg-green-100 text-green-700': m.status === 'published',
+                    'bg-yellow-100 text-yellow-700': m.status === 'submitted' || m.status === 'ward_approved',
+                    'bg-gray-100 text-gray-600': m.status === 'draft',
+                  }">
+                  {{ m.status }}
+                </span>
+              </div>
+              <div class="text-[12px] text-[#626976]">
+                उत्तरदाता: {{ m.respondent_name || '—' }}
+                <span v-if="m.ward_number"> · वडा {{ m.ward_number }}</span>
+              </div>
+              <div class="flex flex-wrap gap-1 mt-1">
+                <span v-for="r in m.reasons" :key="r"
+                  class="text-[11px] bg-amber-100 text-amber-800 border border-amber-200 rounded px-1.5 py-0.5">
+                  {{ r }}
+                </span>
+              </div>
+              <a :href="m.edit_url" target="_blank"
+                class="inline-flex items-center gap-1 text-[12px] text-blue-600 hover:underline mt-1">
+                <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                हेर्नुहोस्
+              </a>
+            </div>
+          </div>
+          <div class="px-5 py-4 border-t border-[#e6e7e9] flex justify-end gap-3 bg-gray-50">
+            <button @click="dismissDuplicate"
+              class="px-4 py-2 rounded border border-[#e6e7e9] text-[13px] text-[#626976] hover:bg-gray-100 transition">
+              फर्कनुहोस् (जाँच गर्नुहोस्)
+            </button>
+            <button @click="confirmDuplicate"
+              class="px-4 py-2 rounded bg-amber-500 hover:bg-amber-600 text-white text-[13px] font-semibold transition">
+              <i class="fa-solid fa-circle-check mr-1"></i>
+              डुप्लिकेट होइन — सुरक्षित गर्नुहोस्
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- Page heading — 2 columns: left=title, right=progress -->
     <div class="bg-white rounded-md border border-[#e6e7e9] shadow-sm px-5 py-4 flex items-center gap-6">
 
@@ -203,6 +260,27 @@
             <label class="text-[11px] font-medium text-[#9aa0ac]">Altitude (m)</label>
             <input v-model="form.gps_altitude" type="number" step="any" placeholder="masl" class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-[13px] bg-white focus:ring-2 focus:ring-[#206bc4]/20 focus:border-[#206bc4]" />
           </div>
+        </div>
+        <!-- GPS boundary alert -->
+        <div v-if="gpsBoundaryResult && gpsBoundaryResult.status !== 'inside'"
+          class="mx-4 mb-3 flex items-start gap-2 rounded px-3 py-2 text-[12px]"
+          :class="{
+            'bg-amber-50 border border-amber-200 text-amber-800':  gpsBoundaryResult.status === 'near',
+            'bg-orange-50 border border-orange-200 text-orange-800': gpsBoundaryResult.status === 'warn',
+            'bg-red-50 border border-red-200 text-red-800':        gpsBoundaryResult.status === 'far',
+          }">
+          <i class="fa-solid fa-triangle-exclamation mt-0.5 shrink-0 text-[11px]"></i>
+          <span>
+            <template v-if="gpsBoundaryResult.status === 'near'">
+              GPS वडा सीमाबाट लगभग <b>{{ gpsBoundaryResult.distanceM }}m</b> बाहिर छ — GPS accuracy को कारण हुन सक्छ। सुरक्षित गर्न मिल्छ।
+            </template>
+            <template v-else-if="gpsBoundaryResult.status === 'warn'">
+              GPS वडा सीमाबाट <b>{{ gpsBoundaryResult.distanceM }}m</b> बाहिर छ — कृपया स्थान जाँच गर्नुहोस्। सुरक्षित गर्न मिल्छ।
+            </template>
+            <template v-else>
+              GPS वडा सीमाबाट <b>{{ gpsBoundaryResult.distanceM }}m</b> टाढा छ — वडा गलत भएको हुन सक्छ। कृपया जाँच गर्नुहोस्।
+            </template>
+          </span>
         </div>
         <p v-if="gpsError" class="text-[11px] text-red-500 px-5 pb-3">{{ gpsError }}</p>
       </div>
@@ -4468,6 +4546,7 @@ const props = defineProps({
   settlements:   { type: Array,  default: () => [] },
   initialWardId: { type: Number, default: null },
   surveyOptions: { type: Object, default: () => ({}) },
+  mapConfig:     { type: Object, default: () => ({}) },
 })
 
 // ── Page meta ──────────────────────────────────────────────────────
@@ -4707,8 +4786,25 @@ const facilityOptions = computed(() => props.surveyOptions.facilities ?? [])
 // ── Vehicle type options (from surveyOptions) ──────────────────────
 
 // ── GPS ────────────────────────────────────────────────────────────
-const gpsLoading = ref(false)
-const gpsError   = ref('')
+const gpsLoading       = ref(false)
+const gpsError         = ref('')
+const gpsBoundaryResult = ref(null)
+
+import { useGpsBoundary } from '@/composables/useGpsBoundary.js'
+const { checkBoundary } = useGpsBoundary()
+
+watch([() => form.gps_lat, () => form.gps_lng, () => form.ward_id], async ([lat, lng, wardId]) => {
+  gpsBoundaryResult.value = null
+  if (!lat || !lng || !wardId || !props.mapConfig?.geojson_url) return
+  const wardNumber = props.wards.find(w => String(w.id) === String(wardId))?.ward_number
+  if (!wardNumber) return
+  gpsBoundaryResult.value = await checkBoundary(
+    parseFloat(lat), parseFloat(lng),
+    wardNumber,
+    props.mapConfig.geojson_url,
+    props.mapConfig.ward_number_property ?? 'WARD_NO'
+  )
+})
 
 function getGPS() {
   if (!navigator.geolocation) {
@@ -4827,7 +4923,8 @@ const form = useForm({
   gps_accuracy:       hh?.gps_accuracy        ?? '',
   gps_altitude:       hh?.gps_altitude        ?? '',
   photo_number:       hh?.photo_number        ?? '',
-  save_draft:         false,
+  save_draft:           false,
+  duplicate_confirmed:  false,
 
   location: {
     province:           hh?.survey_data?.location?.province           ?? '',
@@ -5643,6 +5740,22 @@ function showOfflineToast(msg) {
   offlineToast.value = msg
   clearTimeout(_toastTimer)
   _toastTimer = setTimeout(() => { offlineToast.value = '' }, 4000)
+}
+
+// ── Duplicate detection ────────────────────────────────────────────
+const duplicateMatches = computed(() => {
+  const raw = form.errors.duplicate_warning
+  if (!raw) return null
+  try { return JSON.parse(raw) } catch { return null }
+})
+function confirmDuplicate() {
+  form.clearErrors('duplicate_warning')
+  form.duplicate_confirmed = true
+  submitForm()
+}
+function dismissDuplicate() {
+  form.clearErrors('duplicate_warning')
+  form.duplicate_confirmed = false
 }
 
 // ── Submit ─────────────────────────────────────────────────────────

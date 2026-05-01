@@ -7,6 +7,7 @@ use App\Imports\HouseholdImport;
 use App\Imports\InstitutionImport;
 use App\Models\BulkImportBatch;
 use App\Models\User;
+use App\Services\SurveyValueValidator;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
@@ -59,7 +60,8 @@ class BulkImportService
         ]);
 
         try {
-            $import = new HouseholdImport($uploader->id, $wardId);
+            $validator = new SurveyValueValidator($uploader->local_government_id);
+            $import = new HouseholdImport($uploader->id, $wardId, $validator);
 
             Excel::import($import, Storage::disk('local')->path($path));
 
@@ -155,7 +157,8 @@ class BulkImportService
         ]);
 
         try {
-            $import = new BusinessImport($uploader->id, $wardId);
+            $validator = new SurveyValueValidator($uploader->local_government_id);
+            $import = new BusinessImport($uploader->id, $wardId, $validator);
 
             Excel::import($import, Storage::disk('local')->path($path));
 

@@ -51,16 +51,63 @@
       </div>
     </div>
 
-    <!-- Tab bar -->
-    <div class="flex items-center gap-1 bg-white rounded-md border border-[#e6e7e9] shadow-sm p-1 overflow-x-auto">
-      <button v-for="t in tabs" :key="t.key" @click="activeTab = t.key"
-        class="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium whitespace-nowrap transition-colors"
-        :class="activeTab === t.key
-          ? 'bg-[#206bc4] text-white shadow-sm'
-          : 'text-gray-500 hover:bg-gray-100'">
-        <i :class="[t.icon, 'text-xs']"></i>
-        {{ t.label }}
-      </button>
+    <!-- Tab bar (auto-collapses to 9-dot when tabs overflow) -->
+    <div class="relative">
+
+      <!-- Full pill bar — always in DOM so overflow can be measured; visually hidden behind compact bar when overflowing -->
+      <div ref="fullTabBarRef"
+           class="flex items-center gap-1 bg-white rounded-md border border-gray-200 shadow-sm p-1 overflow-hidden">
+        <button v-for="t in tabs" :key="t.key" @click="!tabsOverflow && selectTab(t.key)"
+          class="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium whitespace-nowrap transition-colors"
+          :class="activeTab === t.key ? 'bg-[#206bc4] text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100'">
+          <i :class="[t.icon, 'text-xs']"></i>
+          {{ t.label }}
+        </button>
+      </div>
+
+      <!-- Compact overlay — shown only when overflow detected -->
+      <div v-if="tabsOverflow"
+           class="absolute inset-0 flex items-center gap-2 bg-white rounded-md border border-gray-200 shadow-sm px-3">
+        <!-- Active tab label -->
+        <div class="flex-1 flex items-center gap-2 min-w-0">
+          <span class="flex items-center justify-center w-7 h-7 rounded-md bg-[#206bc4]/10 shrink-0">
+            <i :class="[activeTabObj?.icon ?? 'fa-solid fa-gear', 'text-[#206bc4] text-xs']"></i>
+          </span>
+          <span class="text-sm font-semibold text-gray-800 truncate">{{ activeTabObj?.label }}</span>
+        </div>
+        <!-- 9-dot toggle -->
+        <button @click="tabMenuOpen = !tabMenuOpen"
+          :class="tabMenuOpen ? 'bg-[#206bc4] text-white' : 'text-gray-500 hover:bg-gray-100'"
+          class="flex items-center justify-center w-8 h-8 rounded-md transition-colors shrink-0"
+          title="सबै ट्याबहरू">
+          <svg width="16" height="16" viewBox="0 0 18 18" fill="currentColor">
+            <circle cx="3"  cy="3"  r="1.8"/>
+            <circle cx="9"  cy="3"  r="1.8"/>
+            <circle cx="15" cy="3"  r="1.8"/>
+            <circle cx="3"  cy="9"  r="1.8"/>
+            <circle cx="9"  cy="9"  r="1.8"/>
+            <circle cx="15" cy="9"  r="1.8"/>
+            <circle cx="3"  cy="15" r="1.8"/>
+            <circle cx="9"  cy="15" r="1.8"/>
+            <circle cx="15" cy="15" r="1.8"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Backdrop -->
+      <div v-if="tabMenuOpen" class="fixed inset-0 z-40" @click="tabMenuOpen = false"></div>
+
+      <!-- Dropdown grid -->
+      <div v-if="tabMenuOpen"
+           class="absolute top-full left-0 right-0 z-50 mt-1 bg-white rounded-lg border border-gray-200 shadow-xl p-3 grid grid-cols-3 gap-1.5">
+        <button v-for="t in tabs" :key="t.key" @click="selectTab(t.key)"
+          class="flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-colors"
+          :class="activeTab === t.key ? 'bg-[#206bc4] text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'">
+          <i :class="[t.icon, 'text-xl shrink-0']"></i>
+          <span class="text-[13px] font-medium leading-tight">{{ t.label }}</span>
+        </button>
+      </div>
+
     </div>
 
     <!-- Lock overlay for non-super-admin -->
@@ -75,46 +122,52 @@
     <div v-if="activeTab === 'general'" class="space-y-5" :class="locked ? 'pointer-events-none opacity-60' : ''">
 
       <!-- Logo upload -->
-      <div class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
-        <h2 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-          <i class="fa-solid fa-image text-[#206bc4] text-xs"></i>
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <h2 class="section-heading">
+          <span class="section-heading-icon"><i class="fa-solid fa-image text-[#206bc4] text-sm"></i></span>
           लोगो
         </h2>
-        <div class="flex items-center gap-5">
-          <div class="w-20 h-20 rounded-md border-2 border-dashed border-[#e6e7e9] flex items-center justify-center bg-gray-50 overflow-hidden shrink-0">
+        <form @submit.prevent="uploadLogo" class="flex items-start gap-5">
+          <!-- Preview -->
+          <div class="w-20 h-20 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50 overflow-hidden shrink-0">
             <img v-if="props.lg.logo" :src="`/storage/${props.lg.logo}`" class="w-full h-full object-contain" />
             <i v-else class="fa-solid fa-image text-gray-300 text-2xl"></i>
           </div>
-          <div>
-            <form @submit.prevent="uploadLogo">
-              <input ref="logoInputRef" type="file" accept="image/*" class="hidden" @change="onLogoSelect" />
-              <button type="button" @click="logoInputRef.click()"
-                class="px-4 py-2 bg-[#206bc4]/8 hover:bg-[#206bc4]/15 text-[#206bc4] text-sm font-medium rounded-md transition-colors">
-                <i class="fa-solid fa-upload mr-1.5 text-xs"></i>
-                लोगो अपलोड गर्नुहोस्
+          <!-- Drop zone -->
+          <div class="flex-1">
+            <input ref="logoInputRef" type="file" accept="image/*" class="hidden" @change="onLogoSelect" />
+            <div
+              @dragover.prevent
+              @drop.prevent="onLogoDrop"
+              @click="logoInputRef?.click()"
+              class="flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-gray-200 hover:border-[#206bc4]/50 bg-gray-50 hover:bg-blue-50/30 transition-colors cursor-pointer py-4 px-4">
+              <i class="fa-solid fa-cloud-arrow-up text-gray-300 text-xl"></i>
+              <p class="text-xs text-gray-500 text-center">क्लिक गर्नुहोस् वा यहाँ छोड्नुहोस्</p>
+              <p class="text-[11px] text-gray-400">PNG, JPG, SVG — <strong>max 2MB</strong></p>
+            </div>
+            <div v-if="logoFile" class="mt-2 flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+              <span class="text-xs text-gray-700 truncate">{{ logoFile.name }}</span>
+              <span class="text-[10px] text-gray-400 shrink-0 mx-2">{{ (logoFile.size / 1024).toFixed(0) }} KB</span>
+              <button type="submit" :disabled="logoForm.processing || locked"
+                class="btn-primary text-xs px-3 py-1 shrink-0">
+                <i v-if="logoForm.processing" class="fa-solid fa-spinner fa-spin mr-1 text-xs"></i>
+                <i v-else class="fa-solid fa-upload text-xs mr-1"></i>
+                अपलोड
               </button>
-              <p class="text-xs text-gray-400 mt-1.5">PNG, JPG, SVG — अधिकतम 2MB</p>
-              <div v-if="logoFile" class="mt-2 flex items-center gap-2">
-                <span class="text-xs text-gray-600">{{ logoFile.name }}</span>
-                <button type="submit" :disabled="logoForm.processing || locked"
-                  class="px-3 py-1 bg-[#206bc4] text-white text-xs rounded">
-                  <i v-if="logoForm.processing" class="fa-solid fa-spinner fa-spin mr-1"></i>
-                  अपलोड
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
-        </div>
+        </form>
       </div>
 
       <!-- General info form -->
       <form @submit.prevent="saveGeneral">
-        <div class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5 space-y-4">
-          <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
-            <i class="fa-solid fa-building-columns text-[#206bc4] text-xs"></i>
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+          <h2 class="section-heading">
+            <span class="section-heading-icon"><i class="fa-solid fa-building-columns text-[#206bc4] text-sm"></i></span>
             आधारभूत विवरण
           </h2>
 
+          <!-- ── पहिचान ── -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="field-label">
@@ -198,23 +251,32 @@
               <label class="field-label">स्थापना मिति</label>
               <NepaliDatePicker v-model="genForm.established_date" placeholder="स्थापना मिति (बि.सं.)" />
             </div>
-            <div>
-              <label class="field-label">सम्पर्क इमेल</label>
-              <input v-model="genForm.contact_email" type="email" class="field-input" />
-            </div>
-            <div>
-              <label class="field-label">सम्पर्क फोन</label>
-              <input v-model="genForm.contact_phone" type="text" class="field-input" />
-            </div>
-            <div class="sm:col-span-2">
-              <label class="field-label">वेबसाइट</label>
-              <input v-model="genForm.website" type="url" placeholder="https://" class="field-input" />
+          </div>
+
+          <!-- ── सम्पर्क ── -->
+          <div class="border-t border-gray-100 pt-4">
+            <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+              <i class="fa-solid fa-address-book text-gray-300 text-xs"></i> सम्पर्क विवरण
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="field-label">सम्पर्क इमेल</label>
+                <input v-model="genForm.contact_email" type="email" class="field-input" />
+              </div>
+              <div>
+                <label class="field-label">सम्पर्क फोन</label>
+                <input v-model="genForm.contact_phone" type="text" class="field-input" />
+              </div>
+              <div class="sm:col-span-2">
+                <label class="field-label">वेबसाइट</label>
+                <input v-model="genForm.website" type="url" placeholder="https://" class="field-input" />
+              </div>
             </div>
           </div>
 
           <div class="flex justify-end">
             <button type="submit" :disabled="genForm.processing || locked"
-              class="px-6 py-2.5 bg-[#206bc4] hover:bg-[#1a5ba8] disabled:opacity-60 text-white text-sm font-semibold rounded-md transition-colors flex items-center gap-2">
+              class="btn-primary">
               <i v-if="genForm.processing" class="fa-solid fa-spinner fa-spin text-xs"></i>
               <i v-else class="fa-solid fa-floppy-disk text-xs"></i>
               सुरक्षित गर्नुहोस्
@@ -228,12 +290,12 @@
     <div v-if="activeTab === 'wards'" class="space-y-4" :class="locked ? 'pointer-events-none opacity-60' : ''">
 
       <!-- Add ward form -->
-      <div class="bg-white rounded-md border shadow-sm p-5"
-        :class="wardLimitReached ? 'border-red-200' : 'border-[#e6e7e9]'">
+      <div class="bg-white rounded-xl border shadow-sm p-6"
+        :class="wardLimitReached ? 'border-red-200' : 'border-gray-200'">
 
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
-            <i class="fa-solid fa-plus text-[#206bc4] text-xs"></i>
+          <h2 class="section-heading">
+            <span class="section-heading-icon"><i class="fa-solid fa-plus text-[#206bc4] text-sm"></i></span>
             नयाँ वडा थप्नुहोस्
           </h2>
           <div class="flex items-center gap-2">
@@ -245,7 +307,7 @@
               {{ props.wards.length }} / {{ props.lg.ward_count }} वडा
             </span>
             <a href="/admin/settings/wards-settlements/template"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-[#e6e7e9] text-[#626976] text-[12px] font-medium rounded hover:bg-gray-100 transition-colors">
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 text-[#626976] text-[12px] font-medium rounded hover:bg-gray-100 transition-colors">
               <i class="fa-solid fa-file-arrow-down text-[#206bc4] text-[11px]"></i>
               Template
             </a>
@@ -258,7 +320,7 @@
         </div>
 
         <!-- Combined Ward+Settlement import result banner -->
-        <div v-if="combinedImportResult" class="mb-4 rounded-md border px-4 py-3 space-y-3 bg-white border-[#e6e7e9]">
+        <div v-if="combinedImportResult" class="mb-4 rounded-md border px-4 py-3 space-y-3 bg-white border-gray-200">
           <p class="text-[13px] font-semibold text-[#1d273b] flex items-center gap-2">
             <i class="fa-solid fa-circle-check text-green-500"></i> आयात सम्पन्न भयो
           </p>
@@ -288,10 +350,17 @@
               </span>
             </div>
           </div>
-          <ul v-if="combinedImportResult.errors?.length" class="mt-1 space-y-0.5 max-h-28 overflow-y-auto">
-            <li v-for="(e,i) in combinedImportResult.errors" :key="i"
-              class="text-[11px] text-red-600 font-mono bg-red-50 px-2 py-0.5 rounded">{{ e }}</li>
-          </ul>
+          <div v-if="combinedImportResult.errors?.length" class="mt-2">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-[11px] font-semibold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded-full">
+                <i class="fa-solid fa-circle-xmark mr-1 text-[10px]"></i>{{ combinedImportResult.errors.length }} त्रुटि
+              </span>
+            </div>
+            <ul class="space-y-0.5 max-h-48 overflow-y-auto">
+              <li v-for="(e,i) in combinedImportResult.errors" :key="i"
+                class="text-[11px] text-red-600 font-mono bg-red-50 px-2 py-0.5 rounded">{{ e }}</li>
+            </ul>
+          </div>
         </div>
 
         <!-- Limit reached notice -->
@@ -326,7 +395,7 @@
                 class="field-input" />
             </div>
             <button type="submit" :disabled="wardForm.processing || locked"
-              class="px-5 py-2.5 bg-[#206bc4] hover:bg-[#1a5ba8] disabled:opacity-60 text-white text-sm font-semibold rounded-md transition-colors shrink-0">
+              class="btn-primary shrink-0">
               <i v-if="wardForm.processing" class="fa-solid fa-spinner fa-spin mr-1 text-xs"></i>
               थप्नुहोस्
             </button>
@@ -336,7 +405,7 @@
       </div>
 
       <!-- Wards list -->
-      <div class="bg-white rounded-md border border-[#e6e7e9] shadow-sm overflow-hidden">
+      <div class="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
 
         <!-- Bulk action bar -->
         <div v-if="selectedWards.length" class="flex items-center justify-between px-4 py-2.5 bg-red-50 border-b border-red-200">
@@ -406,31 +475,6 @@
                   </div>
                 </td>
               </tr>
-              <!-- Inline edit row -->
-              <tr v-if="editingWardId === ward.id" class="bg-[#206bc4]/5">
-                <td colspan="5" class="px-4 py-3">
-                  <form @submit.prevent="saveWard(ward)" class="flex flex-wrap items-end gap-3">
-                    <div class="flex-1 min-w-[180px]">
-                      <label class="field-label">वडाध्यक्ष</label>
-                      <input v-model="editWardForm.ward_chairperson" type="text" class="field-input" />
-                    </div>
-                    <div class="flex-1 min-w-[140px]">
-                      <label class="field-label">फोन</label>
-                      <input v-model="editWardForm.contact_phone" type="text" class="field-input" />
-                    </div>
-                    <div class="flex gap-2">
-                      <button type="submit" :disabled="editWardForm.processing || locked"
-                        class="px-4 py-2 bg-[#206bc4] text-white text-sm font-medium rounded-md">
-                        सुरक्षित
-                      </button>
-                      <button type="button" @click="editingWardId = null"
-                        class="px-4 py-2 border border-[#e6e7e9] text-gray-600 text-sm rounded-md">
-                        रद्द
-                      </button>
-                    </div>
-                  </form>
-                </td>
-              </tr>
             </template>
           </tbody>
         </table>
@@ -441,7 +485,7 @@
     <div v-if="activeTab === 'toles'" class="space-y-4" :class="locked ? 'pointer-events-none opacity-60' : ''">
 
       <!-- Toolbar: ward selector + import buttons -->
-      <div class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-4 flex flex-wrap items-end gap-3">
+      <div class="bg-white rounded-md border border-gray-200 shadow-sm p-4 flex flex-wrap items-end gap-3">
         <div class="flex-1 min-w-[200px]">
           <label class="field-label">वडा छान्नुहोस्</label>
           <select v-model="selectedWardId" class="field-input max-w-xs">
@@ -451,7 +495,7 @@
         </div>
         <div class="flex items-center gap-2">
           <a href="/admin/settings/wards-settlements/template"
-            class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-50 border border-[#e6e7e9] text-[#626976] text-[12px] font-medium rounded-md hover:bg-gray-100 transition-colors">
+            class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-50 border border-gray-200 text-[#626976] text-[12px] font-medium rounded-md hover:bg-gray-100 transition-colors">
             <i class="fa-solid fa-file-arrow-down text-[#206bc4] text-[11px]"></i>
             Template
           </a>
@@ -468,9 +512,9 @@
       <template v-if="selectedWard">
         <!-- Add settlement form -->
         <form @submit.prevent="addSettlement">
-          <div class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
-            <h2 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-              <i class="fa-solid fa-plus text-[#206bc4] text-xs"></i>
+          <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+            <h2 class="section-heading">
+              <span class="section-heading-icon"><i class="fa-solid fa-plus text-[#206bc4] text-sm"></i></span>
               नयाँ टोल/बस्ती थप्नुहोस् — वडा {{ selectedWard.ward_number }}
             </h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
@@ -492,7 +536,7 @@
                 </select>
               </div>
               <button type="submit" :disabled="settlForm.processing || locked"
-                class="px-5 py-2.5 bg-[#206bc4] hover:bg-[#1a5ba8] text-white text-sm font-semibold rounded-md transition-colors self-end">
+                class="px-5 py-2.5 btn-primary self-end">
                 <i v-if="settlForm.processing" class="fa-solid fa-spinner fa-spin mr-1 text-xs"></i>
                 थप्नुहोस्
               </button>
@@ -501,7 +545,7 @@
         </form>
 
         <!-- Settlements list -->
-        <div class="bg-white rounded-md border border-[#e6e7e9] shadow-sm overflow-hidden">
+        <div class="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
 
           <!-- Bulk action bar -->
           <div v-if="selectedSettlements.length" class="flex items-center justify-between px-4 py-2.5 bg-red-50 border-b border-red-200">
@@ -588,9 +632,9 @@
                       </div>
                       <div class="sm:col-span-3 flex gap-2 justify-end">
                         <button type="submit" :disabled="editSettlForm.processing || locked"
-                          class="px-4 py-2 bg-[#206bc4] text-white text-sm font-medium rounded-md">सुरक्षित</button>
+                          class="px-4 py-2 btn-primary">सुरक्षित</button>
                         <button type="button" @click="editingSettlId = null"
-                          class="px-4 py-2 border border-[#e6e7e9] text-gray-600 text-sm rounded-md">रद्द</button>
+                          class="px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-md">रद्द</button>
                       </div>
                     </form>
                   </td>
@@ -601,31 +645,41 @@
         </div>
       </template>
 
-      <p v-else class="text-sm text-gray-400 text-center py-8">
-        टोलहरू हेर्न वडा छान्नुहोस्
-      </p>
+      <div v-else class="bg-white rounded-xl border border-dashed border-gray-200 py-12 flex flex-col items-center gap-3">
+        <div class="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center">
+          <i class="fa-solid fa-map-pin text-2xl text-gray-300"></i>
+        </div>
+        <div class="text-center">
+          <p class="text-sm font-medium text-gray-600">टोलहरू हेर्न वडा छान्नुहोस्</p>
+          <p class="text-xs text-gray-400 mt-0.5">माथिको ड्रपडाउनबाट वडा नम्बर छान्नुहोस्</p>
+        </div>
+      </div>
     </div>
 
     <!-- ── Profile Tab ─────────────────────────────────────────────── -->
     <div v-if="activeTab === 'profile'" :class="locked ? 'pointer-events-none opacity-60' : ''">
       <form @submit.prevent="saveProfile">
-        <div class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5 space-y-4">
-          <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-2">
-            <i class="fa-solid fa-file-lines text-[#206bc4] text-xs"></i>
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+          <h2 class="section-heading">
+            <span class="section-heading-icon"><i class="fa-solid fa-file-lines text-[#206bc4] text-sm"></i></span>
             प्रोफाइल सामग्री — Profile Narrative Content
           </h2>
           <p class="text-xs text-gray-400 -mt-2">यी सामग्री सार्वजनिक प्रोफाइल पेजमा देखाइन्छन्।</p>
 
-          <div v-for="(label, key) in props.profileSections" :key="key">
+          <div v-for="(label, key) in props.profileSections" :key="key" class="space-y-1">
             <label class="field-label">{{ label }}</label>
             <textarea v-model="profileForm.profile[key]" rows="4"
-              class="w-full px-3 py-2.5 rounded-md border border-[#e6e7e9] text-sm focus:ring-2 focus:ring-[#206bc4]/30 focus:border-[#206bc4] resize-none"
+              class="w-full px-3 py-2.5 rounded-md border border-gray-200 text-sm focus:ring-2 focus:ring-[#206bc4]/30 focus:border-[#206bc4] resize-none"
               :placeholder="`${label} बारे जानकारी लेख्नुहोस्...`"></textarea>
+            <p v-if="profileHints[key]" class="text-[11px] text-gray-400 flex items-center gap-1">
+              <i class="fa-solid fa-circle-info text-[9px]"></i>
+              {{ profileHints[key] }}
+            </p>
           </div>
 
           <div class="flex justify-end">
             <button type="submit" :disabled="profileForm.processing || locked"
-              class="px-6 py-2.5 bg-[#206bc4] hover:bg-[#1a5ba8] disabled:opacity-60 text-white text-sm font-semibold rounded-md transition-colors flex items-center gap-2">
+              class="btn-primary">
               <i v-if="profileForm.processing" class="fa-solid fa-spinner fa-spin text-xs"></i>
               <i v-else class="fa-solid fa-floppy-disk text-xs"></i>
               सुरक्षित गर्नुहोस्
@@ -638,9 +692,9 @@
     <!-- ── Map Tab ─────────────────────────────────────────────────── -->
     <div v-if="activeTab === 'map'" :class="locked ? 'pointer-events-none opacity-60' : ''">
       <form @submit.prevent="saveMap">
-        <div class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5 space-y-4">
-          <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-2">
-            <i class="fa-solid fa-map text-[#206bc4] text-xs"></i>
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+          <h2 class="section-heading">
+            <span class="section-heading-icon"><i class="fa-solid fa-map text-[#206bc4] text-sm"></i></span>
             नक्सा कन्फिगरेसन
           </h2>
 
@@ -656,6 +710,37 @@
             <div>
               <label class="field-label">Zoom Level <span class="text-red-400">*</span></label>
               <input v-model="mapForm.zoom" type="number" min="5" max="18" required class="field-input" />
+            </div>
+          </div>
+          <div v-if="mapForm.center_lat && mapForm.center_lng" class="flex items-center gap-1.5">
+            <a :href="`https://www.google.com/maps?q=${mapForm.center_lat},${mapForm.center_lng}`"
+               target="_blank" rel="noopener"
+               class="inline-flex items-center gap-1.5 text-[12px] text-[#206bc4] hover:underline">
+              <i class="fa-solid fa-location-dot text-[10px]"></i>
+              Google Maps मा हेर्नुहोस्
+              <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+            </a>
+          </div>
+
+          <!-- GeoJSON Choropleth -->
+          <div class="border-t border-gray-100 pt-4">
+            <h3 class="text-xs font-semibold text-gray-600 mb-3 flex items-center gap-1.5">
+              <i class="fa-solid fa-draw-polygon text-[#206bc4] text-xs"></i>
+              वडा सीमा Choropleth (GeoJSON)
+            </h3>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div class="sm:col-span-2">
+                <label class="field-label">GeoJSON File URL</label>
+                <input v-model="mapForm.geojson_url" type="text" class="field-input"
+                  placeholder="https://example.com/ward-boundaries.geojson" />
+                <p class="text-[11px] text-gray-400 mt-1">वडा सीमा GeoJSON फाइलको URL (GitHub Raw, CDN, आदि)</p>
+              </div>
+              <div>
+                <label class="field-label">Ward Number Property</label>
+                <input v-model="mapForm.ward_number_property" type="text" class="field-input"
+                  placeholder="WARD_NO" />
+                <p class="text-[11px] text-gray-400 mt-1">GeoJSON feature मा वडा नम्बर राखिएको property नाम</p>
+              </div>
             </div>
           </div>
 
@@ -705,7 +790,7 @@
 
           <div class="flex justify-end">
             <button type="submit" :disabled="mapForm.processing || locked"
-              class="px-6 py-2.5 bg-[#206bc4] hover:bg-[#1a5ba8] disabled:opacity-60 text-white text-sm font-semibold rounded-md transition-colors flex items-center gap-2">
+              class="btn-primary">
               <i v-if="mapForm.processing" class="fa-solid fa-spinner fa-spin text-xs"></i>
               <i v-else class="fa-solid fa-floppy-disk text-xs"></i>
               सुरक्षित गर्नुहोस्
@@ -718,7 +803,7 @@
     <!-- ── Photo Directory tab ──────────────────────────────────────────── -->
     <div v-if="activeTab === 'photo'" :class="locked ? 'pointer-events-none opacity-60' : ''">
       <form @submit.prevent="savePhotoDir">
-        <div class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-6 space-y-5">
+        <div class="bg-white rounded-md border border-gray-200 shadow-sm p-6 space-y-5">
           <div>
             <h3 class="text-sm font-semibold text-gray-800 flex items-center gap-2 mb-1">
               <i class="fa-solid fa-camera text-[#206bc4] text-xs"></i>
@@ -739,7 +824,7 @@
             </label>
             <input v-model="photoForm.household_base_url" type="url"
               placeholder="https://photos.example.com/households"
-              class="w-full rounded-md border border-[#e6e7e9] px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4] font-mono" />
+              class="w-full rounded-md border border-gray-200 px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4] font-mono" />
             <p v-if="photoForm.errors.household_base_url" class="text-xs text-red-500">{{ photoForm.errors.household_base_url }}</p>
             <p v-if="photoForm.household_base_url" class="text-xs text-gray-400 font-mono">
               → {{ photoForm.household_base_url }}/00247.png
@@ -754,7 +839,7 @@
             </label>
             <input v-model="photoForm.institution_base_url" type="url"
               placeholder="https://photos.example.com/institutions"
-              class="w-full rounded-md border border-[#e6e7e9] px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4] font-mono" />
+              class="w-full rounded-md border border-gray-200 px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4] font-mono" />
             <p v-if="photoForm.errors.institution_base_url" class="text-xs text-red-500">{{ photoForm.errors.institution_base_url }}</p>
             <p v-if="photoForm.institution_base_url" class="text-xs text-gray-400 font-mono">
               → {{ photoForm.institution_base_url }}/00131.png
@@ -769,7 +854,7 @@
             </label>
             <input v-model="photoForm.gallery_url" type="url"
               placeholder="https://photos.example.com/gallery"
-              class="w-full rounded-md border border-[#e6e7e9] px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4] font-mono" />
+              class="w-full rounded-md border border-gray-200 px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4] font-mono" />
             <p v-if="photoForm.errors.gallery_url" class="text-xs text-red-500">{{ photoForm.errors.gallery_url }}</p>
             <p v-if="photoForm.gallery_url" class="text-xs text-gray-400 font-mono mt-1">
               → {{ photoForm.gallery_url }}/001.jpg
@@ -779,7 +864,7 @@
 
           <div class="pt-2">
             <button type="submit" :disabled="photoForm.processing || locked"
-              class="px-6 py-2.5 bg-[#206bc4] hover:bg-[#1a5ba8] disabled:opacity-60 text-white text-sm font-semibold rounded-md transition-colors flex items-center gap-2">
+              class="btn-primary">
               <i v-if="photoForm.processing" class="fa-solid fa-spinner fa-spin text-xs"></i>
               <i v-else class="fa-solid fa-floppy-disk text-xs"></i>
               सुरक्षित गर्नुहोस्
@@ -795,7 +880,7 @@
         <div class="space-y-5">
 
           <!-- Banner toggle + headline -->
-          <div class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-6 space-y-5">
+          <div class="bg-white rounded-md border border-gray-200 shadow-sm p-6 space-y-5">
             <h3 class="text-sm font-semibold text-gray-800 flex items-center gap-2">
               <i class="fa-solid fa-bullhorn text-[#206bc4] text-xs"></i>
               स्वागत ब्यानर
@@ -815,7 +900,7 @@
               <label class="block text-sm font-medium text-gray-700">स्वागत शीर्षक <span class="text-gray-400 font-normal">(heading)</span></label>
               <input v-model="welcomeForm.message" type="text" maxlength="200"
                 placeholder="हार्दिक स्वागत छ"
-                class="w-full rounded-md border border-[#e6e7e9] px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4]" />
+                class="w-full rounded-md border border-gray-200 px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4]" />
             </div>
 
             <!-- Body text -->
@@ -823,13 +908,13 @@
               <label class="block text-sm font-medium text-gray-700">स्वागत सन्देश <span class="text-gray-400 font-normal">(body text)</span></label>
               <textarea v-model="welcomeForm.message_body" rows="4" maxlength="2000"
                 placeholder="नगरपालिकाको परिचय, लक्ष्य, उद्देश्य..."
-                class="w-full rounded-md border border-[#e6e7e9] px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4] resize-none"></textarea>
+                class="w-full rounded-md border border-gray-200 px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4] resize-none"></textarea>
               <p class="text-xs text-gray-400 text-right">{{ (welcomeForm.message_body || '').length }} / 2000</p>
             </div>
           </div>
 
           <!-- Map image upload -->
-          <div class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-6">
+          <div class="bg-white rounded-md border border-gray-200 shadow-sm p-6">
             <h3 class="text-sm font-semibold text-gray-800 flex items-center gap-2 mb-4">
               <i class="fa-solid fa-map text-[#206bc4] text-xs"></i>
               स्थान नक्सा चित्र
@@ -837,7 +922,7 @@
             </h3>
             <div class="flex items-start gap-6">
               <!-- Preview -->
-              <div class="w-40 h-32 rounded-md border-2 border-dashed border-[#e6e7e9] bg-gray-50 overflow-hidden shrink-0 flex items-center justify-center">
+              <div class="w-40 h-32 rounded-md border-2 border-dashed border-gray-200 bg-gray-50 overflow-hidden shrink-0 flex items-center justify-center">
                 <img v-if="props.welcomeConfig?.map_image"
                   :src="`/storage/${props.welcomeConfig.map_image}`"
                   class="w-full h-full object-contain p-1" />
@@ -853,7 +938,7 @@
                   class="hidden" @change="onMapImageChange" />
                 <div class="flex items-center gap-2">
                   <button type="button" @click="mapImageInputRef?.click()" :disabled="locked"
-                    class="flex items-center gap-2 px-4 py-2 bg-[#206bc4]/8 hover:bg-[#206bc4]/15 text-[#206bc4] text-sm font-medium rounded-md transition-colors disabled:opacity-50">
+                    class="flex items-center gap-2 btn-ghost disabled:opacity-50">
                     <i class="fa-solid fa-upload text-xs"></i>
                     {{ props.welcomeConfig?.map_image ? 'बदल्नुहोस्' : 'अपलोड गर्नुहोस्' }}
                   </button>
@@ -873,16 +958,16 @@
           </div>
 
           <!-- Leadership cards -->
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <template v-for="(role, roleKey) in {
               chairperson:      { label: 'अध्यक्ष', icon: 'fa-solid fa-user-tie', color: 'blue' },
               vice_chairperson: { label: 'उपाध्यक्ष', icon: 'fa-solid fa-user-tie', color: 'indigo' },
               cao:              { label: 'प्रमुख प्रशासकीय अधिकृत', icon: 'fa-solid fa-briefcase', color: 'green' },
             }" :key="roleKey">
-              <div class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5 space-y-4">
+              <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
                 <!-- Photo + title -->
                 <div class="flex items-center gap-3">
-                  <div class="w-14 h-14 rounded-full border-2 border-dashed border-[#e6e7e9] bg-gray-50 overflow-hidden shrink-0 flex items-center justify-center">
+                  <div class="w-14 h-14 rounded-full border-2 border-dashed border-gray-200 bg-gray-50 overflow-hidden shrink-0 flex items-center justify-center">
                     <img v-if="leaderPhotoUrl(roleKey)" :src="leaderPhotoUrl(roleKey)"
                       class="w-full h-full object-cover" />
                     <i v-else class="fa-solid fa-user text-gray-300 text-xl"></i>
@@ -903,14 +988,14 @@
                   <label class="block text-xs font-medium text-gray-600">पूरा नाम</label>
                   <input v-model="welcomeForm[roleKey].name" type="text" maxlength="100"
                     placeholder="श्री/श्रीमती..."
-                    class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4]" />
+                    class="w-full rounded border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4]" />
                 </div>
 
                 <!-- Designation -->
                 <div class="space-y-1">
                   <label class="block text-xs font-medium text-gray-600">पद / ओहदा</label>
                   <input v-model="welcomeForm[roleKey].designation" type="text" maxlength="100"
-                    class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4]" />
+                    class="w-full rounded border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4]" />
                 </div>
 
                 <!-- Contact -->
@@ -918,7 +1003,7 @@
                   <label class="block text-xs font-medium text-gray-600">सम्पर्क नम्बर</label>
                   <input v-model="welcomeForm[roleKey].contact" type="text" maxlength="30"
                     placeholder="०१-XXXXXXX"
-                    class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4]" />
+                    class="w-full rounded border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4]" />
                 </div>
 
                 <!-- Email -->
@@ -926,7 +1011,7 @@
                   <label class="block text-xs font-medium text-gray-600">इमेल</label>
                   <input v-model="welcomeForm[roleKey].email" type="email" maxlength="100"
                     placeholder="name@mun.gov.np"
-                    class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4]" />
+                    class="w-full rounded border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4]" />
                 </div>
               </div>
             </template>
@@ -935,7 +1020,7 @@
           <!-- Save button -->
           <div class="flex justify-end">
             <button type="submit" :disabled="welcomeForm.processing || locked"
-              class="px-6 py-2.5 bg-[#206bc4] hover:bg-[#1a5ba8] disabled:opacity-60 text-white text-sm font-semibold rounded-md transition-colors flex items-center gap-2">
+              class="btn-primary">
               <i v-if="welcomeForm.processing" class="fa-solid fa-spinner fa-spin text-xs"></i>
               <i v-else class="fa-solid fa-floppy-disk text-xs"></i>
               सुरक्षित गर्नुहोस्
@@ -952,18 +1037,18 @@
       <!-- Header row -->
       <div class="flex items-center justify-between">
         <div>
-          <h2 class="text-[15px] font-semibold text-[#1d273b]">जनप्रतिनिधि प्रोफायल</h2>
+          <h2 class="text-base font-bold text-gray-900">जनप्रतिनिधि प्रोफायल</h2>
           <p class="text-xs text-gray-400 mt-0.5">स्थानीय सरकारका निर्वाचित जनप्रतिनिधिहरूको विवरण</p>
         </div>
         <button @click="openRepForm(null)"
-          class="flex items-center gap-2 px-4 py-2 bg-[#206bc4] hover:bg-[#1a5ba8] text-white text-sm font-semibold rounded-md transition-colors">
+          class="flex items-center gap-2 px-4 py-2 btn-primary">
           <i class="fa-solid fa-plus text-xs"></i> नयाँ थप्नुहोस्
         </button>
       </div>
 
       <!-- Empty state -->
       <div v-if="!props.representatives.length"
-        class="bg-white border border-dashed border-[#e6e7e9] rounded-md py-12 flex flex-col items-center gap-3 text-gray-400">
+        class="bg-white border border-dashed border-gray-200 rounded-md py-12 flex flex-col items-center gap-3 text-gray-400">
         <i class="fa-solid fa-people-group text-3xl"></i>
         <p class="text-sm">कुनै जनप्रतिनिधि विवरण छैन</p>
         <button @click="openRepForm(null)"
@@ -973,15 +1058,15 @@
       <!-- Accordion list -->
       <div v-else class="space-y-2">
         <div v-for="rep in props.representatives" :key="rep.id"
-          class="bg-white border border-[#e6e7e9] rounded-md shadow-sm overflow-hidden">
+          class="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
 
           <!-- Accordion header -->
           <button type="button" @click="toggleRep(rep.id)"
-            class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors">
+            class="group w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors">
             <!-- Photo thumb -->
-            <div class="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden shrink-0 border border-indigo-200">
+            <div class="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden shrink-0 border border-indigo-200">
               <img v-if="rep.photo" :src="`/storage/${rep.photo}`" class="w-full h-full object-cover" />
-              <i v-else class="fa-solid fa-user text-indigo-400 text-sm"></i>
+              <i v-else class="fa-solid fa-user text-indigo-400 text-base"></i>
             </div>
             <div class="flex-1 min-w-0">
               <p class="text-sm font-semibold text-[#1d273b] truncate">{{ rep.name }}</p>
@@ -1001,7 +1086,7 @@
                 </span>
               </div>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
+            <div class="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
               <button type="button" @click.stop="openRepForm(rep)"
                 class="text-xs text-[#206bc4] hover:underline px-2 py-1 rounded hover:bg-blue-50">
                 <i class="fa-solid fa-pen text-[10px] mr-1"></i>सम्पादन
@@ -1010,12 +1095,12 @@
                 class="text-xs text-red-500 hover:underline px-2 py-1 rounded hover:bg-red-50">
                 <i class="fa-solid fa-trash text-[10px] mr-1"></i>हटाउनुहोस्
               </button>
-              <i :class="['fa-solid text-gray-400 text-xs transition-transform', openReps[rep.id] ? 'fa-chevron-up' : 'fa-chevron-down']"></i>
             </div>
+            <i :class="['fa-solid text-gray-400 text-xs transition-transform shrink-0', openReps[rep.id] ? 'fa-chevron-up' : 'fa-chevron-down']"></i>
           </button>
 
           <!-- Accordion body — view mode -->
-          <div v-if="openReps[rep.id]" class="border-t border-[#e6e7e9] px-5 py-4">
+          <div v-if="openReps[rep.id]" class="border-t border-gray-200 px-5 py-4">
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 text-xs">
               <div v-if="rep.contact"><p class="text-gray-400 mb-0.5">सम्पर्क</p><p class="font-medium text-gray-700">{{ rep.contact }}</p></div>
               <div v-if="rep.email"><p class="text-gray-400 mb-0.5">इमेल</p><p class="font-medium text-gray-700">{{ rep.email }}</p></div>
@@ -1031,7 +1116,7 @@
               <div v-if="rep.address_ward"><p class="text-gray-400 mb-0.5">ठेगाना (वडा)</p><p class="font-medium text-gray-700">वडा {{ rep.address_ward.ward_number }}</p></div>
               <div v-if="rep.address_tole"><p class="text-gray-400 mb-0.5">टोल/बस्ती</p><p class="font-medium text-gray-700">{{ rep.address_tole.name_np }}</p></div>
             </div>
-            <div v-if="rep.work_experience" class="mt-3 pt-3 border-t border-[#e6e7e9]">
+            <div v-if="rep.work_experience" class="mt-3 pt-3 border-t border-gray-200">
               <p class="text-xs text-gray-400 mb-1">कार्य अनुभव</p>
               <p class="text-xs text-gray-700 whitespace-pre-wrap">{{ rep.work_experience }}</p>
             </div>
@@ -1046,7 +1131,7 @@
       <!-- Header row -->
       <div class="flex items-center justify-between">
         <div>
-          <h2 class="text-[15px] font-semibold text-[#1d273b]">कर्मचारी विवरण</h2>
+          <h2 class="text-base font-bold text-gray-900">कर्मचारी विवरण</h2>
           <p class="text-xs text-[#9aa0ac] mt-0.5">पालिकाका कर्मचारीहरूको विवरण</p>
         </div>
         <button @click="openEmpForm(null)"
@@ -1057,7 +1142,7 @@
 
       <!-- Empty state -->
       <div v-if="!props.employees.length"
-        class="bg-white border border-dashed border-[#e6e7e9] rounded-md py-12 flex flex-col items-center gap-3 text-gray-400">
+        class="bg-white border border-dashed border-gray-200 rounded-md py-12 flex flex-col items-center gap-3 text-gray-400">
         <i class="fa-solid fa-id-badge text-3xl"></i>
         <p class="text-sm">अहिलेसम्म कुनै कर्मचारी थपिएको छैन</p>
         <button @click="openEmpForm(null)"
@@ -1067,14 +1152,14 @@
       <!-- Accordion list -->
       <div v-else class="space-y-2">
         <div v-for="emp in props.employees" :key="emp.id"
-          class="bg-white border border-[#e6e7e9] rounded-md shadow-sm overflow-hidden">
+          class="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
 
           <!-- Accordion header -->
           <button type="button" @click="toggleEmp(emp.id)"
-            class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors">
-            <div class="w-9 h-9 rounded-full bg-cyan-100 flex items-center justify-center overflow-hidden shrink-0 border border-cyan-200">
+            class="group w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors">
+            <div class="w-12 h-12 rounded-full bg-cyan-100 flex items-center justify-center overflow-hidden shrink-0 border border-cyan-200">
               <img v-if="emp.photo" :src="`/storage/${emp.photo}`" class="w-full h-full object-cover" />
-              <i v-else class="fa-solid fa-user text-cyan-400 text-sm"></i>
+              <i v-else class="fa-solid fa-user text-cyan-400 text-base"></i>
             </div>
             <div class="flex-1 min-w-0">
               <p class="text-sm font-semibold text-[#1d273b] truncate">{{ emp.name }}</p>
@@ -1084,7 +1169,7 @@
                 <span v-if="emp.contact"    class="text-xs text-gray-500"><i class="fa-solid fa-phone text-[9px] mr-0.5"></i>{{ emp.contact }}</span>
               </div>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
+            <div class="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
               <button @click.stop="openEmpForm(emp)"
                 class="text-xs text-cyan-600 hover:text-cyan-800 border border-cyan-200 hover:border-cyan-400 rounded px-2 py-1 transition-colors">
                 <i class="fa-solid fa-pen text-[10px] mr-1"></i>सम्पादन
@@ -1093,12 +1178,12 @@
                 class="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 rounded px-2 py-1 transition-colors">
                 <i class="fa-solid fa-trash text-[10px] mr-1"></i>हटाउनुहोस्
               </button>
-              <i :class="['fa-solid text-gray-400 text-xs transition-transform', openEmps[emp.id] ? 'fa-chevron-up' : 'fa-chevron-down']"></i>
             </div>
+            <i :class="['fa-solid text-gray-400 text-xs transition-transform shrink-0', openEmps[emp.id] ? 'fa-chevron-up' : 'fa-chevron-down']"></i>
           </button>
 
           <!-- Accordion body -->
-          <div v-if="openEmps[emp.id]" class="border-t border-[#e6e7e9] px-5 py-4">
+          <div v-if="openEmps[emp.id]" class="border-t border-gray-200 px-5 py-4">
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 text-xs">
               <div v-if="emp.position">       <p class="text-gray-400 mb-0.5">पद</p>                   <p class="font-medium text-gray-700">{{ emp.position }}</p></div>
               <div v-if="emp.department">     <p class="text-gray-400 mb-0.5">शाखा</p>                 <p class="font-medium text-gray-700">{{ emp.department }}</p></div>
@@ -1118,13 +1203,13 @@
             </div>
             <!-- Social IDs -->
             <div v-if="emp.facebook || emp.instagram || emp.tiktok || emp.twitter_x"
-              class="mt-3 pt-3 border-t border-[#e6e7e9] flex flex-wrap gap-x-5 gap-y-1 text-xs">
+              class="mt-3 pt-3 border-t border-gray-200 flex flex-wrap gap-x-5 gap-y-1 text-xs">
               <span v-if="emp.facebook">  <i class="fa-brands fa-facebook text-blue-500 mr-1"></i>{{ emp.facebook }}</span>
               <span v-if="emp.instagram"> <i class="fa-brands fa-instagram text-pink-500 mr-1"></i>{{ emp.instagram }}</span>
               <span v-if="emp.tiktok">    <i class="fa-brands fa-tiktok text-gray-700 mr-1"></i>{{ emp.tiktok }}</span>
               <span v-if="emp.twitter_x"> <i class="fa-brands fa-x-twitter text-gray-700 mr-1"></i>{{ emp.twitter_x }}</span>
             </div>
-            <div v-if="emp.work_experience" class="mt-3 pt-3 border-t border-[#e6e7e9]">
+            <div v-if="emp.work_experience" class="mt-3 pt-3 border-t border-gray-200">
               <p class="text-xs text-gray-400 mb-1">कार्य अनुभव</p>
               <p class="text-xs text-gray-700 whitespace-pre-wrap">{{ emp.work_experience }}</p>
             </div>
@@ -1140,7 +1225,7 @@
       <!-- Header -->
       <div class="flex items-center justify-between">
         <div>
-          <h2 class="text-[15px] font-semibold text-[#1d273b]">फोटो ग्यालरी</h2>
+          <h2 class="text-base font-bold text-gray-900">फोटो ग्यालरी</h2>
           <p class="text-xs text-[#9aa0ac] mt-0.5">पालिकाको फोटो संग्रह</p>
         </div>
         <button @click="openGalleryForm(null)"
@@ -1151,7 +1236,7 @@
 
       <!-- Empty state -->
       <div v-if="!props.photos.length"
-        class="bg-white border border-dashed border-[#e6e7e9] rounded-md py-12 flex flex-col items-center gap-3 text-gray-400">
+        class="bg-white border border-dashed border-gray-200 rounded-md py-12 flex flex-col items-center gap-3 text-gray-400">
         <i class="fa-solid fa-images text-3xl"></i>
         <p class="text-sm">अहिलेसम्म कुनै फोटो थपिएको छैन</p>
         <button @click="openGalleryForm(null)" class="text-xs text-purple-600 hover:underline font-medium">+ फोटो थप्नुहोस्</button>
@@ -1160,20 +1245,21 @@
       <!-- Accordion list -->
       <div v-else class="space-y-2">
         <div v-for="ph in props.photos" :key="ph.id"
-          class="bg-white border border-[#e6e7e9] rounded-md shadow-sm overflow-hidden">
+          class="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
 
           <!-- Accordion header -->
           <button type="button" @click="togglePhoto(ph.id)"
             class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors">
 
             <!-- Thumbnail -->
-            <div class="w-14 h-10 rounded overflow-hidden bg-gray-100 border border-gray-200 shrink-0 relative">
+            <div class="w-14 h-14 rounded-lg overflow-hidden shrink-0 relative border border-gray-200"
+              :style="ph.category ? `background:${categoryThumbBg(ph.category)}` : 'background:#f3f4f6'">
               <img v-if="ph.photo_no && props.lg.photo_dir?.gallery_url"
                 :src="`${props.lg.photo_dir.gallery_url}/${ph.photo_no}`"
                 class="w-full h-full object-cover"
                 @error="e => e.target.style.display='none'" />
-              <div class="absolute inset-0 flex items-center justify-center text-gray-300">
-                <i class="fa-solid fa-image text-sm"></i>
+              <div class="absolute inset-0 flex items-center justify-center">
+                <i class="fa-solid fa-image text-sm text-white/70"></i>
               </div>
             </div>
 
@@ -1213,7 +1299,7 @@
           </button>
 
           <!-- Accordion body -->
-          <div v-if="openPhotos[ph.id]" class="border-t border-[#e6e7e9] px-5 py-4">
+          <div v-if="openPhotos[ph.id]" class="border-t border-gray-200 px-5 py-4">
             <div class="flex gap-5">
               <!-- Larger preview -->
               <div v-if="ph.photo_no && props.lg.photo_dir?.gallery_url"
@@ -1259,7 +1345,7 @@
       </div>
 
       <!-- Toggle card -->
-      <div class="bg-white rounded-xl border border-[#e6e7e9] shadow-sm p-5">
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
         <div class="flex items-center justify-between gap-4">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
@@ -1285,7 +1371,7 @@
       </div>
 
       <!-- Message + Countdown -->
-      <div class="bg-white rounded-xl border border-[#e6e7e9] shadow-sm p-5 space-y-4">
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
         <h3 class="text-sm font-bold text-gray-700 flex items-center gap-2">
           <i class="fa-solid fa-message text-orange-400 text-xs"></i>
           सूचना सन्देश
@@ -1295,7 +1381,7 @@
           <label class="block text-xs font-semibold text-gray-600 mb-1">मुख्य सन्देश</label>
           <textarea v-model="maintForm.message" rows="3" maxlength="500"
             placeholder="जस्तै: हामी हाम्रो वेबसाइटमा सुधार गरिरहेका छौं। छिट्टै फर्किनेछौं।"
-            class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-orange-300 focus:border-orange-400 outline-none resize-none"></textarea>
+            class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-300 focus:border-orange-400 outline-none resize-none"></textarea>
           <p class="text-[11px] text-gray-400 mt-1 text-right">{{ (maintForm.message||'').length }}/500</p>
         </div>
 
@@ -1303,7 +1389,7 @@
           <label class="block text-xs font-semibold text-gray-600 mb-1">उप-सन्देश <span class="font-normal text-gray-400">(वैकल्पिक)</span></label>
           <input v-model="maintForm.message_sub" type="text" maxlength="300"
             placeholder="जस्तै: हामी ०७ मई, २०२६ सम्म तयार हुनेछौं।"
-            class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-orange-300 focus:border-orange-400 outline-none" />
+            class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-300 focus:border-orange-400 outline-none" />
         </div>
 
         <!-- Countdown date + time -->
@@ -1314,9 +1400,9 @@
           </label>
           <div class="grid grid-cols-2 gap-3">
             <input v-model="maintCountdownDate" type="date"
-              class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-orange-300 focus:border-orange-400 outline-none" />
+              class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-300 focus:border-orange-400 outline-none" />
             <input v-model="maintCountdownTime" type="time"
-              class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-orange-300 focus:border-orange-400 outline-none" />
+              class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-300 focus:border-orange-400 outline-none" />
           </div>
           <p v-if="maintCountdownDate" class="text-[11px] text-orange-600 mt-1">
             <i class="fa-solid fa-circle-info mr-1"></i>
@@ -1326,7 +1412,7 @@
       </div>
 
       <!-- Background -->
-      <div class="bg-white rounded-xl border border-[#e6e7e9] shadow-sm p-5 space-y-4">
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
         <h3 class="text-sm font-bold text-gray-700 flex items-center gap-2">
           <i class="fa-solid fa-image text-purple-400 text-xs"></i>
           पृष्ठभूमि
@@ -1339,7 +1425,7 @@
             class="flex-1 py-2 rounded-md text-xs font-semibold border transition-colors"
             :class="maintForm.bg_type === opt.value
               ? 'bg-purple-600 border-purple-600 text-white'
-              : 'bg-white border-[#e6e7e9] text-gray-500 hover:bg-gray-50'">
+              : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'">
             <i :class="[opt.icon, 'mr-1 text-[10px]']"></i>{{ opt.label }}
           </button>
         </div>
@@ -1379,8 +1465,8 @@
           <label class="block text-xs font-semibold text-gray-600 mb-1">पृष्ठभूमि इमेज URL</label>
           <input v-model="maintForm.bg_url" type="text" maxlength="1000"
             placeholder="https://images.unsplash.com/photo-..."
-            class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none" />
-          <div v-if="maintForm.bg_url" class="mt-2 h-24 rounded-md overflow-hidden border border-[#e6e7e9]">
+            class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none" />
+          <div v-if="maintForm.bg_url" class="mt-2 h-24 rounded-md overflow-hidden border border-gray-200">
             <img :src="maintForm.bg_url" class="w-full h-full object-cover"
               @error="e => e.target.style.display='none'" />
           </div>
@@ -1396,10 +1482,10 @@
 
       <!-- Preview + Save -->
       <div class="flex items-center gap-3">
-        <a href="/public" target="_blank"
-          class="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-[#e6e7e9] text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+        <a href="/admin/maintenance-preview" target="_blank"
+          class="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
           <i class="fa-solid fa-eye text-xs"></i>
-          सार्वजनिक दृश्य
+          मर्मत पृष्ठ प्रिभ्यू
         </a>
         <button type="button" @click="saveMaintenance" :disabled="maintSaving"
           class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg
@@ -1413,13 +1499,148 @@
 
     </div>
 
+    <!-- ── Survey Period Tab ─────────────────────────────────────────── -->
+    <div v-if="activeTab === 'survey_period'" class="space-y-5" :class="locked ? 'pointer-events-none opacity-60' : ''">
+
+      <!-- Status banner -->
+      <div class="flex items-center gap-3 px-4 py-3 rounded-lg border"
+        :class="{
+          'bg-red-50 border-red-200':    surveyStatus === 'frozen_manual',
+          'bg-orange-50 border-orange-200': surveyStatus === 'frozen_ended',
+          'bg-yellow-50 border-yellow-200': surveyStatus === 'not_started',
+          'bg-green-50 border-green-200':   surveyStatus === 'active',
+          'bg-gray-50 border-gray-200':     surveyStatus === 'unlimited',
+        }">
+        <div class="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+          :class="{
+            'bg-red-100':    surveyStatus === 'frozen_manual',
+            'bg-orange-100': surveyStatus === 'frozen_ended',
+            'bg-yellow-100': surveyStatus === 'not_started',
+            'bg-green-100':  surveyStatus === 'active',
+            'bg-gray-100':   surveyStatus === 'unlimited',
+          }">
+          <i class="text-sm"
+            :class="{
+              'fa-solid fa-lock text-red-500':          surveyStatus === 'frozen_manual',
+              'fa-solid fa-clock text-orange-500':      surveyStatus === 'frozen_ended',
+              'fa-solid fa-hourglass-start text-yellow-500': surveyStatus === 'not_started',
+              'fa-solid fa-circle-check text-green-500':surveyStatus === 'active',
+              'fa-solid fa-infinity text-gray-400':     surveyStatus === 'unlimited',
+            }"></i>
+        </div>
+        <div>
+          <p class="text-[13px] font-bold"
+            :class="{
+              'text-red-700':    surveyStatus === 'frozen_manual',
+              'text-orange-700': surveyStatus === 'frozen_ended',
+              'text-yellow-700': surveyStatus === 'not_started',
+              'text-green-700':  surveyStatus === 'active',
+              'text-gray-600':   surveyStatus === 'unlimited',
+            }">{{ surveyStatusLabel }}</p>
+          <p class="text-[11px] mt-0.5"
+            :class="{
+              'text-red-500':    surveyStatus === 'frozen_manual',
+              'text-orange-500': surveyStatus === 'frozen_ended',
+              'text-yellow-500': surveyStatus === 'not_started',
+              'text-green-500':  surveyStatus === 'active',
+              'text-gray-400':   surveyStatus === 'unlimited',
+            }">{{ surveyStatusSub }}</p>
+        </div>
+      </div>
+
+      <!-- Date range card -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
+        <h3 class="text-sm font-bold text-gray-700 flex items-center gap-2">
+          <i class="fa-solid fa-calendar-range text-[#206bc4] text-xs"></i>
+          सर्वेक्षण अवधि
+        </h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">
+              सुरु मिति <span class="font-normal text-gray-400">(AD)</span>
+            </label>
+            <input v-model="surveyForm.start_date" type="date"
+              class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-[#206bc4]/30 focus:border-[#206bc4] outline-none"
+              style="color:#1d273b" />
+            <p class="text-[11px] text-gray-400 mt-1">यस मितिभन्दा अघि सर्वेक्षण सुरु हुँदैन।</p>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">
+              अन्तिम मिति <span class="font-normal text-gray-400">(AD)</span>
+            </label>
+            <input v-model="surveyForm.end_date" type="date"
+              class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-[#206bc4]/30 focus:border-[#206bc4] outline-none"
+              style="color:#1d273b" />
+            <p class="text-[11px] text-gray-400 mt-1">यस मितिपछि गणकले नयाँ डाटा थप्न पाउँदैन।</p>
+          </div>
+        </div>
+        <p class="text-[11px] text-gray-400">
+          <i class="fa-solid fa-circle-info mr-1 text-[#206bc4]"></i>
+          मिति खाली छोड्दा त्यस तर्फ कुनै सीमा हुँदैन।
+        </p>
+      </div>
+
+      <!-- Manual freeze toggle -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        <div class="flex items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+              :class="surveyForm.manual_freeze ? 'bg-red-100' : 'bg-gray-100'">
+              <i class="fa-solid fa-lock text-base"
+                :class="surveyForm.manual_freeze ? 'text-red-500' : 'text-gray-400'"></i>
+            </div>
+            <div>
+              <p class="text-sm font-bold text-gray-800">म्यानुअल बन्द</p>
+              <p class="text-xs text-gray-500 mt-0.5">
+                {{ surveyForm.manual_freeze
+                  ? 'सक्रिय — गणकहरूले डाटा थप्न/सम्पादन गर्न सक्दैनन्'
+                  : 'निष्क्रिय — मितिअनुसार स्वतः नियन्त्रण हुन्छ' }}
+              </p>
+            </div>
+          </div>
+          <button type="button" @click="surveyForm.manual_freeze = !surveyForm.manual_freeze"
+            class="relative inline-flex h-7 w-14 items-center rounded-full transition-colors duration-300 focus:outline-none shrink-0"
+            :class="surveyForm.manual_freeze ? 'bg-red-500' : 'bg-gray-300'">
+            <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-300"
+              :class="surveyForm.manual_freeze ? 'translate-x-8' : 'translate-x-1'"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Custom freeze message -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-3">
+        <h3 class="text-sm font-bold text-gray-700 flex items-center gap-2">
+          <i class="fa-solid fa-message text-amber-400 text-xs"></i>
+          बन्द भएको सन्देश <span class="font-normal text-gray-400 text-xs">(वैकल्पिक)</span>
+        </h3>
+        <textarea v-model="surveyForm.freeze_message" rows="2" maxlength="300"
+          placeholder="जस्तै: सर्वेक्षण अवधि समाप्त भयो। थप जानकारीका लागि कार्यालयमा सम्पर्क गर्नुहोस्।"
+          class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-amber-300 focus:border-amber-400 outline-none resize-none"></textarea>
+        <p class="text-[11px] text-gray-400 text-right">{{ (surveyForm.freeze_message||'').length }}/300</p>
+        <p class="text-[11px] text-gray-400">
+          <i class="fa-solid fa-circle-info mr-1 text-amber-400"></i>
+          खाली छोड्दा पूर्वनिर्धारित सन्देश देखाइन्छ।
+        </p>
+      </div>
+
+      <!-- Save button -->
+      <button type="button" @click="saveSurveyPeriod" :disabled="surveySaving"
+        class="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#206bc4] hover:bg-[#1a5ba8]
+               text-sm font-bold text-white transition-colors disabled:opacity-60">
+        <i v-if="surveySaving" class="fa-solid fa-spinner fa-spin text-xs"></i>
+        <i v-else class="fa-solid fa-floppy-disk text-xs"></i>
+        सर्वेक्षण अवधि सुरक्षित गर्नुहोस्
+      </button>
+
+    </div>
+
     <!-- ── Downloads Tab ────────────────────────────────────────────── -->
     <div v-if="activeTab === 'downloads'" class="space-y-4" :class="locked ? 'pointer-events-none opacity-60' : ''">
 
       <!-- Header -->
       <div class="flex items-center justify-between">
         <div>
-          <h2 class="text-[15px] font-semibold text-[#1d273b]">डाउनलोड लिंकहरू</h2>
+          <h2 class="text-base font-bold text-gray-900">डाउनलोड लिंकहरू</h2>
           <p class="text-xs text-[#9aa0ac] mt-0.5">सार्वजनिक डाउनलोडका लागि URL लिंकहरू</p>
         </div>
         <button @click="openDownloadForm(null)"
@@ -1430,7 +1651,7 @@
 
       <!-- Empty state -->
       <div v-if="!props.downloadLinks.length"
-        class="bg-white border border-dashed border-[#e6e7e9] rounded-md py-12 flex flex-col items-center gap-3 text-gray-400">
+        class="bg-white border border-dashed border-gray-200 rounded-md py-12 flex flex-col items-center gap-3 text-gray-400">
         <i class="fa-solid fa-link text-3xl"></i>
         <p class="text-sm">अहिलेसम्म कुनै डाउनलोड लिंक थपिएको छैन</p>
         <button @click="openDownloadForm(null)" class="text-xs text-teal-600 hover:underline font-medium">+ लिंक थप्नुहोस्</button>
@@ -1439,49 +1660,308 @@
       <!-- List -->
       <div v-else class="space-y-2">
         <div v-for="dl in props.downloadLinks" :key="dl.id"
-          class="bg-white border border-[#e6e7e9] rounded-md shadow-sm overflow-hidden">
+          class="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
 
-          <!-- Row -->
-          <div class="flex items-start gap-4 px-5 py-4">
-            <!-- Thumbnail or icon -->
-            <div class="w-16 h-12 rounded-md overflow-hidden bg-teal-50 border border-teal-100 flex items-center justify-center shrink-0 mt-0.5">
-              <img v-if="dl.thumbnail_url" :src="dl.thumbnail_url"
-                class="w-full h-full object-cover"
-                @error="e => e.target.style.display='none'" />
-              <i v-else class="fa-solid fa-file-arrow-down text-teal-400 text-lg"></i>
-            </div>
-
-            <!-- Content -->
-            <div class="flex-1 min-w-0">
-              <p class="font-semibold text-[13.5px] text-[#1d273b] leading-tight truncate">{{ dl.title }}</p>
-              <p v-if="dl.description" class="text-xs text-gray-500 mt-0.5 line-clamp-2">{{ dl.description }}</p>
-              <div class="flex flex-wrap items-center gap-x-4 gap-y-0.5 mt-1.5">
-                <a :href="dl.url" target="_blank" rel="noopener"
-                  class="text-xs text-teal-700 hover:underline font-mono truncate max-w-[300px]">
-                  <i class="fa-solid fa-arrow-up-right-from-square mr-0.5 text-[9px]"></i>{{ dl.url }}
-                </a>
-                <span v-if="dl.created_date" class="text-xs text-gray-400">
+          <!-- Card: two-row layout -->
+          <div class="px-5 py-4">
+            <!-- Top row: icon + title + date + actions -->
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg overflow-hidden bg-teal-50 border border-teal-100 flex items-center justify-center shrink-0">
+                <img v-if="dl.thumbnail_url" :src="dl.thumbnail_url"
+                  class="w-full h-full object-cover"
+                  @error="e => e.target.style.display='none'" />
+                <i v-else class="fa-solid fa-file-arrow-down text-teal-400 text-sm"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="font-semibold text-[13.5px] text-[#1d273b] leading-tight truncate">{{ dl.title }}</p>
+                <p v-if="dl.description" class="text-xs text-gray-500 mt-0.5 line-clamp-1">{{ dl.description }}</p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <span v-if="dl.created_date" class="text-[11px] text-gray-400 hidden sm:inline">
                   <i class="fa-solid fa-calendar text-[9px] mr-0.5"></i>{{ String(dl.created_date).slice(0,10) }}
                 </span>
+                <button @click="openDownloadForm(dl)"
+                  class="text-xs text-teal-600 hover:text-teal-800 border border-teal-200 hover:border-teal-400 rounded px-2 py-1 transition-colors">
+                  <i class="fa-solid fa-pen text-[10px] mr-1"></i>सम्पादन
+                </button>
+                <button @click="confirmDeleteDownload(dl)"
+                  class="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 rounded px-2 py-1 transition-colors">
+                  <i class="fa-solid fa-trash text-[10px] mr-1"></i>हटाउनुहोस्
+                </button>
               </div>
             </div>
-
-            <!-- Actions -->
-            <div class="flex items-center gap-2 shrink-0 mt-0.5">
-              <button @click="openDownloadForm(dl)"
-                class="text-xs text-teal-600 hover:text-teal-800 border border-teal-200 hover:border-teal-400 rounded px-2 py-1 transition-colors">
-                <i class="fa-solid fa-pen text-[10px] mr-1"></i>सम्पादन
-              </button>
-              <button @click="confirmDeleteDownload(dl)"
-                class="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 rounded px-2 py-1 transition-colors">
-                <i class="fa-solid fa-trash text-[10px] mr-1"></i>हटाउनुहोस्
-              </button>
+            <!-- Bottom row: URL -->
+            <div class="mt-2 pl-13">
+              <a :href="dl.url" target="_blank" rel="noopener"
+                class="inline-flex items-center gap-1 text-[11px] text-teal-700 hover:underline font-mono truncate max-w-full">
+                <i class="fa-solid fa-arrow-up-right-from-square text-[9px] shrink-0"></i>
+                <span class="truncate">{{ dl.url }}</span>
+              </a>
             </div>
           </div>
 
         </div>
       </div>
     </div>
+
+    <!-- ── Google Sheets Tab ─────────────────────────────────────────── -->
+    <div v-if="activeTab === 'google_sheets'" class="space-y-5" :class="locked ? 'pointer-events-none opacity-60' : ''">
+
+      <!-- Info banner -->
+      <div class="flex items-start gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-md">
+        <i class="fa-brands fa-google text-blue-500 text-sm mt-0.5 shrink-0"></i>
+        <div class="text-[12px] text-blue-800 leading-relaxed space-y-1">
+          <p><strong>सेटअप गर्ने तरिका:</strong></p>
+          <ol class="list-decimal list-inside space-y-0.5 text-[11px]">
+            <li>Google Sheet खोल्नुहोस् → Share → "Anyone with the link" → Viewer</li>
+            <li>Sheet को URL बाट ID कपी गर्नुहोस्: <code class="bg-blue-100 px-1 rounded">...spreadsheets/d/<strong>ID_HERE</strong>/edit</code></li>
+            <li>तलको फारममा ID राख्नुहोस् र सुरक्षित गर्नुहोस्</li>
+            <li>Sheet को ढाँचा Bulk Import Template सँग मिल्नु पर्छ (8 sheets)</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Sheet ID form -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-5">
+        <h2 class="text-base font-bold text-gray-900 flex items-center gap-2">
+          <i class="fa-solid fa-table text-[#206bc4] text-xs"></i>
+          Google Sheet IDs
+        </h2>
+
+        <!-- Household -->
+        <div class="space-y-1.5">
+          <label class="field-label">घरधुरी Sheet ID</label>
+          <div class="flex gap-2 items-start">
+            <input v-model="gsForm.household_sheet_id" type="text" placeholder="e.g. 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
+              class="field-input flex-1 font-mono text-[12px]" />
+            <div class="flex flex-col gap-1 shrink-0">
+              <button type="button" @click="testSheet('household')" :disabled="!gsForm.household_sheet_id || gsTesting === 'household'"
+                class="px-3 py-2 rounded-md border border-gray-200 text-[12px] text-[#626976] hover:bg-gray-50 disabled:opacity-40 transition">
+                <i :class="gsTesting === 'household' ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-plug'" class="mr-1 text-[10px]"></i>
+                Test
+              </button>
+              <span v-if="gsTestResults.household"
+                :class="gsTestResults.household.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-600'"
+                class="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded border whitespace-nowrap">
+                <i :class="gsTestResults.household.ok ? 'fa-solid fa-check' : 'fa-solid fa-xmark'" class="text-[9px]"></i>
+                {{ gsTestResults.household.ok ? 'OK' : 'त्रुटि' }}
+              </span>
+            </div>
+          </div>
+          <p v-if="gsTestResults.household && !gsTestResults.household.ok" class="text-[11px] text-red-500">
+            {{ gsTestResults.household.message }}
+          </p>
+        </div>
+
+        <!-- Institution -->
+        <div class="space-y-1.5">
+          <label class="field-label">संस्था Sheet ID</label>
+          <div class="flex gap-2 items-start">
+            <input v-model="gsForm.institution_sheet_id" type="text"
+              placeholder="e.g. 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
+              class="field-input flex-1 font-mono text-[12px]" />
+            <div class="flex flex-col gap-1 shrink-0">
+              <button type="button" @click="testSheet('institution')" :disabled="!gsForm.institution_sheet_id || gsTesting === 'institution'"
+                class="px-3 py-2 rounded-md border border-gray-200 text-[12px] text-[#626976] hover:bg-gray-50 disabled:opacity-40 transition">
+                <i :class="gsTesting === 'institution' ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-plug'" class="mr-1 text-[10px]"></i>
+                Test
+              </button>
+              <span v-if="gsTestResults.institution"
+                :class="gsTestResults.institution.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-600'"
+                class="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded border whitespace-nowrap">
+                <i :class="gsTestResults.institution.ok ? 'fa-solid fa-check' : 'fa-solid fa-xmark'" class="text-[9px]"></i>
+                {{ gsTestResults.institution.ok ? 'OK' : 'त्रुटि' }}
+              </span>
+            </div>
+          </div>
+          <p v-if="gsTestResults.institution && !gsTestResults.institution.ok" class="text-[11px] text-red-500">
+            {{ gsTestResults.institution.message }}
+          </p>
+        </div>
+
+        <!-- Business -->
+        <div class="space-y-1.5">
+          <label class="field-label">व्यवसाय Sheet ID</label>
+          <div class="flex gap-2 items-start">
+            <input v-model="gsForm.business_sheet_id" type="text"
+              placeholder="e.g. 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
+              class="field-input flex-1 font-mono text-[12px]" />
+            <div class="flex flex-col gap-1 shrink-0">
+              <button type="button" @click="testSheet('business')" :disabled="!gsForm.business_sheet_id || gsTesting === 'business'"
+                class="px-3 py-2 rounded-md border border-gray-200 text-[12px] text-[#626976] hover:bg-gray-50 disabled:opacity-40 transition">
+                <i :class="gsTesting === 'business' ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-plug'" class="mr-1 text-[10px]"></i>
+                Test
+              </button>
+              <span v-if="gsTestResults.business"
+                :class="gsTestResults.business.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-600'"
+                class="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded border whitespace-nowrap">
+                <i :class="gsTestResults.business.ok ? 'fa-solid fa-check' : 'fa-solid fa-xmark'" class="text-[9px]"></i>
+                {{ gsTestResults.business.ok ? 'OK' : 'त्रुटि' }}
+              </span>
+            </div>
+          </div>
+          <p v-if="gsTestResults.business && !gsTestResults.business.ok" class="text-[11px] text-red-500">
+            {{ gsTestResults.business.message }}
+          </p>
+        </div>
+
+        <div class="flex items-center justify-between pt-2 border-t border-gray-200">
+          <a href="/admin/google-sync"
+            class="inline-flex items-center gap-1.5 text-[12px] text-[#206bc4] hover:underline">
+            <i class="fa-solid fa-arrows-rotate text-[10px]"></i>
+            Sync पृष्ठमा जानुहोस्
+          </a>
+          <button @click="saveGoogleSheets" :disabled="gsSaving"
+            class="inline-flex items-center gap-2 px-5 py-2 bg-[#206bc4] hover:bg-[#1a5ba8] disabled:opacity-50 text-white text-[13px] font-semibold rounded-md transition-colors">
+            <i :class="gsSaving ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-floppy-disk'" class="text-[11px]"></i>
+            {{ gsSaving ? 'सुरक्षित हुँदैछ...' : 'सुरक्षित गर्नुहोस्' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Import / Export Tab ───────────────────────────────────────── -->
+    <div v-if="activeTab === 'sync'" class="space-y-5">
+
+      <!-- Export card -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <div class="flex items-start gap-4">
+          <div class="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-file-export text-emerald-600 text-sm"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h2 class="text-base font-bold text-gray-900 mb-1">निर्यात गर्नुहोस् (Export)</h2>
+            <p class="text-[12px] text-[#626976] leading-relaxed mb-3">
+              सबै सेटिङ एउटा JSON फाइलमा निर्यात गर्नुहोस्।
+              फोटो/लोगो फाइलहरू समावेश हुँदैनन् — ती छुट्टै अपलोड गर्नुपर्छ।
+            </p>
+            <!-- Included sections chips -->
+            <div class="flex flex-wrap gap-1.5 mb-4">
+              <span v-for="s in importSections" :key="s.key"
+                class="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">
+                <i class="fa-solid fa-check text-[8px]"></i>{{ s.label }}
+              </span>
+            </div>
+            <a href="/admin/settings/export"
+              class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[13px] font-medium rounded-md transition-colors">
+              <i class="fa-solid fa-download text-[11px]"></i>
+              JSON डाउनलोड गर्नुहोस्
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Import card -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <div class="flex items-start gap-4 mb-5">
+          <div class="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-file-import text-blue-600 text-sm"></i>
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-gray-900 mb-1">आयात गर्नुहोस् (Import)</h2>
+            <p class="text-[12px] text-[#626976] leading-relaxed">
+              अर्को वातावरणबाट निर्यात गरिएको JSON फाइल अपलोड गर्नुहोस्। कुन खण्डहरू लागू गर्ने छान्नुहोस्।
+            </p>
+          </div>
+        </div>
+
+        <form @submit.prevent="submitImport" class="space-y-4">
+          <!-- File input -->
+          <div>
+            <label class="block text-[12px] font-semibold text-[#626976] uppercase tracking-wide mb-1.5">
+              JSON फाइल <span class="text-red-400">*</span>
+            </label>
+            <input ref="importFileInput" type="file" accept=".json"
+              @change="onImportFileChange"
+              class="w-full text-[13px] text-[#626976] file:mr-3 file:px-3 file:py-1.5 file:rounded file:border-0 file:bg-[#206bc4] file:text-white file:text-[12px] file:font-medium file:cursor-pointer border border-gray-200 rounded-md px-2 py-1.5"
+              :class="importForm.errors.file ? 'border-red-400' : ''" />
+            <p v-if="importForm.errors.file" class="text-[11px] text-red-500 mt-1">{{ importForm.errors.file }}</p>
+          </div>
+
+          <!-- Section checkboxes -->
+          <div>
+            <label class="block text-[12px] font-semibold text-[#626976] uppercase tracking-wide mb-2">
+              लागू गर्ने खण्डहरू
+            </label>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <label v-for="s in importSections" :key="s.key"
+                class="flex items-center gap-2 px-3 py-2 rounded border cursor-pointer transition-colors text-[12px]"
+                :class="importForm.sections.includes(s.key)
+                  ? 'border-[#206bc4] bg-[#206bc4]/5 text-[#206bc4] font-medium'
+                  : 'border-gray-200 text-[#626976] hover:border-[#206bc4]/40'">
+                <input type="checkbox" :value="s.key" v-model="importForm.sections" class="accent-[#206bc4]" />
+                {{ s.label }}
+              </label>
+            </div>
+            <p v-if="importForm.errors.sections" class="text-[11px] text-red-500 mt-1">{{ importForm.errors.sections }}</p>
+          </div>
+
+          <!-- Warning -->
+          <div class="flex items-start gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-md">
+            <i class="fa-solid fa-triangle-exclamation text-amber-500 text-[11px] mt-0.5 shrink-0"></i>
+            <p class="text-[11px] text-amber-700 leading-relaxed">
+              <strong>डाउनलोड लिंक, जनप्रतिनिधि र कर्मचारी</strong> आयात गर्दा फोटो नभएका पुराना रेकर्डहरू हटाइनेछन् र नयाँ थपिनेछन्।
+              वडा र टोल Upsert हुन्छन् (मेटाइँदैन)।
+            </p>
+          </div>
+
+          <!-- Submit -->
+          <div class="flex items-center justify-between pt-1">
+            <button type="button" @click="selectAllSections"
+              class="text-[12px] text-[#206bc4] hover:underline">
+              सबै छान्नुहोस्
+            </button>
+            <button type="submit" :disabled="!importForm.file || !importForm.sections.length || importForm.processing"
+              class="inline-flex items-center gap-2 px-5 py-2 bg-[#206bc4] hover:bg-[#1a5ba8] disabled:opacity-50 disabled:cursor-not-allowed text-white text-[13px] font-semibold rounded-md transition-colors">
+              <i :class="importForm.processing ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-file-import'" class="text-[11px]"></i>
+              {{ importForm.processing ? 'आयात हुँदैछ...' : 'आयात गर्नुहोस्' }}
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+
+    <!-- Ward edit modal -->
+    <Teleport to="body">
+      <div v-if="editingWardId" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+          <div class="flex items-center gap-3 mb-1">
+            <div class="w-9 h-9 rounded-lg bg-[#206bc4]/10 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-pen text-[#206bc4] text-sm"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-gray-900">वडा सम्पादन</h3>
+              <p class="text-xs text-gray-400">वडा नम्बर बदल्न मिल्दैन</p>
+            </div>
+          </div>
+          <form @submit.prevent="saveWardModal" class="space-y-3">
+            <div>
+              <label class="field-label">वडाध्यक्ष</label>
+              <input v-model="editWardForm.ward_chairperson" type="text" class="field-input"
+                placeholder="वडाध्यक्षको नाम" />
+            </div>
+            <div>
+              <label class="field-label">सम्पर्क फोन</label>
+              <input v-model="editWardForm.contact_phone" type="text" class="field-input"
+                placeholder="98XXXXXXXX" />
+            </div>
+            <div class="flex gap-3 pt-1">
+              <button type="button" @click="editingWardId = null"
+                class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                रद्द
+              </button>
+              <button type="submit" :disabled="editWardForm.processing || locked"
+                class="flex-1 btn-primary justify-center">
+                <i v-if="editWardForm.processing" class="fa-solid fa-spinner fa-spin text-xs"></i>
+                <i v-else class="fa-solid fa-floppy-disk text-xs"></i>
+                सुरक्षित
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- Ward delete confirm -->
     <Teleport to="body">
@@ -1496,7 +1976,7 @@
           </p>
           <div class="flex gap-3">
             <button @click="deleteWardTarget = null"
-              class="flex-1 py-2 rounded-md border border-[#e6e7e9] text-sm font-medium text-gray-700 hover:bg-gray-50">
+              class="flex-1 py-2 rounded-md border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
               रद्द गर्नुहोस्
             </button>
             <button @click="doDeleteWard"
@@ -1532,7 +2012,7 @@
               </ul>
             </div>
             <a href="/admin/settings/wards-settlements/template"
-              class="flex items-center gap-2 w-full px-4 py-2.5 border border-[#e6e7e9] rounded-md text-[13px] text-[#626976] hover:bg-gray-50 transition-colors">
+              class="flex items-center gap-2 w-full px-4 py-2.5 border border-gray-200 rounded-md text-[13px] text-[#626976] hover:bg-gray-50 transition-colors">
               <i class="fa-solid fa-file-arrow-down text-[#206bc4] text-[13px]"></i>
               <span>Template डाउनलोड <span class="text-[11px] text-[#9aa0ac]">(Reference sheet सहित)</span></span>
             </a>
@@ -1542,14 +2022,14 @@
               </label>
               <input ref="combinedFileInput" type="file" accept=".xlsx,.xls"
                 @change="onCombinedFileChange"
-                class="w-full text-[13px] text-[#626976] file:mr-3 file:px-3 file:py-1.5 file:rounded file:border-0 file:bg-[#206bc4] file:text-white file:text-[12px] file:font-medium file:cursor-pointer border border-[#e6e7e9] rounded-md px-2 py-1.5"
+                class="w-full text-[13px] text-[#626976] file:mr-3 file:px-3 file:py-1.5 file:rounded file:border-0 file:bg-[#206bc4] file:text-white file:text-[12px] file:font-medium file:cursor-pointer border border-gray-200 rounded-md px-2 py-1.5"
                 :class="combinedImportForm.errors.file ? 'border-red-400' : ''" />
               <p v-if="combinedImportForm.errors.file" class="text-[11px] text-red-500 mt-1">{{ combinedImportForm.errors.file }}</p>
             </div>
           </div>
-          <div class="px-5 py-3 bg-gray-50 border-t border-[#e6e7e9] rounded-b-md flex items-center justify-end gap-2">
+          <div class="px-5 py-3 bg-gray-50 border-t border-gray-200 rounded-b-md flex items-center justify-end gap-2">
             <button @click="closeCombinedImport"
-              class="px-4 py-2 text-[13px] font-medium text-[#626976] bg-white border border-[#e6e7e9] rounded hover:bg-gray-50 transition-colors">
+              class="px-4 py-2 text-[13px] font-medium text-[#626976] bg-white border border-gray-200 rounded hover:bg-gray-50 transition-colors">
               रद्द गर्नुहोस्
             </button>
             <button @click="submitCombinedImport" :disabled="!combinedImportForm.file || combinedImportForm.processing"
@@ -1624,7 +2104,7 @@
       class="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/50 overflow-y-auto"
       @click.self="empModal.open = false">
       <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl my-6">
-        <div class="flex items-center justify-between px-6 py-4 border-b border-[#e6e7e9] bg-cyan-50 rounded-t-xl">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-cyan-50 rounded-t-xl">
           <div class="flex items-center gap-3">
             <div class="w-8 h-8 rounded-lg bg-cyan-100 flex items-center justify-center">
               <i class="fa-solid fa-id-badge text-cyan-600 text-sm"></i>
@@ -1650,43 +2130,43 @@
               <div class="sm:col-span-2">
                 <label class="block text-xs font-semibold text-gray-600 mb-1">नाम <span class="text-red-500">*</span></label>
                 <input v-model="empForm.name" type="text" maxlength="150" required placeholder="पूरा नाम"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none" />
               </div>
 
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">पद</label>
                 <input v-model="empForm.position" type="text" maxlength="150" placeholder="पद/जागिर"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none" />
               </div>
 
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">शाखा</label>
                 <input v-model="empForm.department" type="text" maxlength="150" placeholder="शाखा/विभाग"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none" />
               </div>
 
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">पालिकामा पदबहाल मिति</label>
                 <NepaliDatePicker v-model="empForm.entry_date" placeholder="YYYY-MM-DD"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none" />
               </div>
 
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">जन्म मिति</label>
                 <NepaliDatePicker v-model="empForm.date_of_birth" placeholder="YYYY-MM-DD"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none" />
               </div>
 
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">जन्म स्थान</label>
                 <input v-model="empForm.birth_place" type="text" maxlength="150" placeholder="जन्म स्थान"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none" />
               </div>
 
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">लिङ्ग</label>
                 <select v-model="empForm.gender"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none">
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none">
                   <option value="">— छान्नुहोस् —</option>
                   <option value="male">पुरुष</option>
                   <option value="female">महिला</option>
@@ -1697,7 +2177,7 @@
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">जातजाति</label>
                 <select v-model="empForm.ethnicity"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none">
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none">
                   <option value="">— छान्नुहोस् —</option>
                   <option v-for="o in (props.surveyOptsForRep?.ethnicity ?? [])" :key="o.value" :value="o.value">{{ o.label_ne }}</option>
                 </select>
@@ -1706,7 +2186,7 @@
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">शैक्षिक योग्यता</label>
                 <select v-model="empForm.education"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none">
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none">
                   <option value="">— छान्नुहोस् —</option>
                   <option v-for="o in (props.surveyOptsForRep?.education_level ?? [])" :key="o.value" :value="o.value">{{ o.label_ne }}</option>
                 </select>
@@ -1715,19 +2195,19 @@
               <div class="sm:col-span-2">
                 <label class="block text-xs font-semibold text-gray-600 mb-1">स्थायी ठेगाना</label>
                 <input v-model="empForm.permanent_address" type="text" maxlength="255" placeholder="स्थायी ठेगाना"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none" />
               </div>
 
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">सम्पर्क नम्बर</label>
                 <input v-model="empForm.contact" type="text" maxlength="30" placeholder="फोन नम्बर"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none" />
               </div>
 
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">इमेल</label>
                 <input v-model="empForm.email" type="email" maxlength="100" placeholder="email@example.com"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 focus:border-cyan-400 outline-none" />
               </div>
 
               <!-- Photo -->
@@ -1747,7 +2227,7 @@
           </div>
 
           <!-- ── Social IDs ── -->
-          <div class="border-t border-[#e6e7e9] pt-4">
+          <div class="border-t border-gray-200 pt-4">
             <p class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
               <i class="fa-solid fa-share-nodes mr-1"></i> सामाजिक सञ्जाल
             </p>
@@ -1755,28 +2235,28 @@
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1"><i class="fa-brands fa-facebook text-blue-500 mr-1"></i>Facebook</label>
                 <input v-model="empForm.facebook" type="text" maxlength="255" placeholder="Username वा URL"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 outline-none" />
               </div>
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1"><i class="fa-brands fa-instagram text-pink-500 mr-1"></i>Instagram</label>
                 <input v-model="empForm.instagram" type="text" maxlength="255" placeholder="Username"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 outline-none" />
               </div>
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1"><i class="fa-brands fa-tiktok text-gray-700 mr-1"></i>TikTok</label>
                 <input v-model="empForm.tiktok" type="text" maxlength="255" placeholder="Username"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 outline-none" />
               </div>
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1"><i class="fa-brands fa-x-twitter text-gray-700 mr-1"></i>X (Twitter)</label>
                 <input v-model="empForm.twitter_x" type="text" maxlength="255" placeholder="Username"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 outline-none" />
               </div>
             </div>
           </div>
 
           <!-- ── Secondary fields ── -->
-          <div class="border-t border-[#e6e7e9] pt-4">
+          <div class="border-t border-gray-200 pt-4">
             <p class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
               <i class="fa-solid fa-circle-info mr-1"></i> थप विवरण
             </p>
@@ -1784,30 +2264,30 @@
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">बाबुको नाम</label>
                 <input v-model="empForm.father_name" type="text" maxlength="150"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 outline-none" />
               </div>
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">आमाको नाम</label>
                 <input v-model="empForm.mother_name" type="text" maxlength="150"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 outline-none" />
               </div>
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">श्रीमान/श्रीमती</label>
                 <input v-model="empForm.spouse_name" type="text" maxlength="150"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 outline-none" />
               </div>
               <div class="sm:col-span-2">
                 <label class="block text-xs font-semibold text-gray-600 mb-1">कार्य अनुभव</label>
                 <textarea v-model="empForm.work_experience" rows="3" maxlength="2000"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 outline-none resize-none"></textarea>
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-300 outline-none resize-none"></textarea>
               </div>
             </div>
           </div>
 
           <!-- Footer buttons -->
-          <div class="flex justify-end gap-3 border-t border-[#e6e7e9] pt-4">
+          <div class="flex justify-end gap-3 border-t border-gray-200 pt-4">
             <button type="button" @click="empModal.open = false"
-              class="px-4 py-2 rounded-md border border-[#e6e7e9] text-sm font-medium text-gray-700 hover:bg-gray-50">
+              class="px-4 py-2 rounded-md border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
               रद्द गर्नुहोस्
             </button>
             <button type="submit" :disabled="empSaving"
@@ -1834,7 +2314,7 @@
         </p>
         <div class="flex gap-3">
           <button @click="deleteEmpTarget = null"
-            class="flex-1 py-2 rounded-md border border-[#e6e7e9] text-sm font-medium text-gray-700 hover:bg-gray-50">
+            class="flex-1 py-2 rounded-md border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
             रद्द गर्नुहोस्
           </button>
           <button @click="doDeleteEmp"
@@ -1852,7 +2332,7 @@
       class="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/50 overflow-y-auto"
       @click.self="galleryModal.open = false">
       <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl my-6">
-        <div class="flex items-center justify-between px-6 py-4 border-b border-[#e6e7e9] bg-purple-50 rounded-t-xl">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-purple-50 rounded-t-xl">
           <div class="flex items-center gap-3">
             <div class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
               <i class="fa-solid fa-images text-purple-600 text-sm"></i>
@@ -1880,11 +2360,11 @@
                 <input v-model="galleryForm.photo_num" type="text" required
                   inputmode="numeric" maxlength="50"
                   placeholder="जस्तै: 001, 042, 1234"
-                  class="flex-1 rounded-md border border-[#e6e7e9] px-3 py-2 text-sm font-mono
+                  class="flex-1 rounded-md border border-gray-200 px-3 py-2 text-sm font-mono
                          focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none"
                   :class="galleryForm.photo_num && !/^\d+$/.test(galleryForm.photo_num) ? 'border-red-400' : ''" />
                 <select v-model="galleryForm.photo_ext"
-                  class="w-24 rounded-md border border-[#e6e7e9] px-2 py-2 text-sm font-mono
+                  class="w-24 rounded-md border border-gray-200 px-2 py-2 text-sm font-mono
                          focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none bg-white">
                   <option value="jpg">.jpg</option>
                   <option value="jpeg">.jpeg</option>
@@ -1903,7 +2383,7 @@
             <div class="sm:col-span-2">
               <label class="block text-xs font-semibold text-gray-600 mb-1">फोटोको विधा (Category)</label>
               <select v-model="galleryForm.category"
-                class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none">
+                class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none">
                 <option value="">— छान्नुहोस् —</option>
                 <option v-for="cat in PHOTO_CATEGORIES" :key="cat" :value="cat">{{ cat }}</option>
               </select>
@@ -1913,49 +2393,49 @@
             <div class="sm:col-span-2">
               <label class="block text-xs font-semibold text-gray-600 mb-1">फोटो शीर्षक (Title)</label>
               <input v-model="galleryForm.title" type="text" maxlength="255" placeholder="फोटोको शीर्षक"
-                class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none" />
+                class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none" />
             </div>
 
             <!-- Subtitle/Caption -->
             <div class="sm:col-span-2">
               <label class="block text-xs font-semibold text-gray-600 mb-1">Caption / Sub Title</label>
               <input v-model="galleryForm.subtitle" type="text" maxlength="255" placeholder="Caption"
-                class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none" />
+                class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 focus:border-purple-400 outline-none" />
             </div>
 
             <!-- GPS -->
             <div>
               <label class="block text-xs font-semibold text-gray-600 mb-1">GPS Location</label>
               <input v-model="galleryForm.gps_location" type="text" maxlength="150" placeholder="27.7172° N, 85.3240° E"
-                class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 outline-none font-mono" />
+                class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 outline-none font-mono" />
             </div>
 
             <!-- Date -->
             <div>
               <label class="block text-xs font-semibold text-gray-600 mb-1">फोटो मिति</label>
               <NepaliDatePicker v-model="galleryForm.photo_date" placeholder="YYYY-MM-DD"
-                class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 outline-none" />
+                class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 outline-none" />
             </div>
 
             <!-- Photo Credit -->
             <div class="sm:col-span-2">
               <label class="block text-xs font-semibold text-gray-600 mb-1">फोटो क्रेडिट (Photo Credit)</label>
               <input v-model="galleryForm.photo_credit" type="text" maxlength="150" placeholder="फोटोग्राफरको नाम"
-                class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 outline-none" />
+                class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 outline-none" />
             </div>
 
             <!-- Description -->
             <div class="sm:col-span-2">
               <label class="block text-xs font-semibold text-gray-600 mb-1">छोटो विवरण</label>
               <textarea v-model="galleryForm.description" rows="3" maxlength="2000"
-                class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 outline-none resize-none"></textarea>
+                class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-purple-300 outline-none resize-none"></textarea>
             </div>
           </div>
 
           <!-- Footer -->
-          <div class="flex justify-end gap-3 border-t border-[#e6e7e9] pt-4">
+          <div class="flex justify-end gap-3 border-t border-gray-200 pt-4">
             <button type="button" @click="galleryModal.open = false"
-              class="px-4 py-2 rounded-md border border-[#e6e7e9] text-sm font-medium text-gray-700 hover:bg-gray-50">
+              class="px-4 py-2 rounded-md border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
               रद्द गर्नुहोस्
             </button>
             <button type="submit" :disabled="gallerySaving"
@@ -1982,7 +2462,7 @@
         </p>
         <div class="flex gap-3">
           <button @click="deletePhotoTarget = null"
-            class="flex-1 py-2 rounded-md border border-[#e6e7e9] text-sm font-medium text-gray-700 hover:bg-gray-50">
+            class="flex-1 py-2 rounded-md border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
             रद्द गर्नुहोस्
           </button>
           <button @click="doDeletePhoto"
@@ -2001,7 +2481,7 @@
       @click.self="repModal.open = false">
       <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl my-6">
         <!-- Modal header -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-[#e6e7e9] bg-indigo-50 rounded-t-xl">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-indigo-50 rounded-t-xl">
           <div class="flex items-center gap-3">
             <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
               <i class="fa-solid fa-person-chalkboard text-indigo-600 text-sm"></i>
@@ -2028,14 +2508,14 @@
               <div class="sm:col-span-2">
                 <label class="block text-xs font-semibold text-gray-600 mb-1">नाम <span class="text-red-500">*</span></label>
                 <input v-model="repForm.name" type="text" maxlength="150" required placeholder="पूरा नाम"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" />
               </div>
 
               <!-- Position -->
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">पद <span class="text-red-500">*</span></label>
                 <select v-model="repForm.position" required
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none">
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none">
                   <option value="">— छान्नुहोस् —</option>
                   <option v-for="p in POSITIONS" :key="p.value" :value="p.value">{{ p.label }}</option>
                 </select>
@@ -2045,7 +2525,7 @@
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">प्रतिनिधि वार्ड</label>
                 <select v-model="repForm.ward_id"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none">
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none">
                   <option value="">— छान्नुहोस् —</option>
                   <option v-for="w in wardList" :key="w.id" :value="w.id">वडा {{ w.ward_number }}</option>
                 </select>
@@ -2055,7 +2535,7 @@
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">लिङ्ग</label>
                 <select v-model="repForm.gender"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none">
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none">
                   <option value="">— छान्नुहोस् —</option>
                   <option value="male">पुरुष</option>
                   <option value="female">महिला</option>
@@ -2067,7 +2547,7 @@
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">जातजाति</label>
                 <select v-model="repForm.ethnicity"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none">
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none">
                   <option value="">— छान्नुहोस् —</option>
                   <option v-for="o in (props.surveyOptsForRep?.ethnicity ?? [])" :key="o.value" :value="o.value">{{ o.label_ne }}</option>
                 </select>
@@ -2077,7 +2557,7 @@
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">शैक्षिक योग्यता</label>
                 <select v-model="repForm.education"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none">
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none">
                   <option value="">— छान्नुहोस् —</option>
                   <option v-for="o in (props.surveyOptsForRep?.education_level ?? [])" :key="o.value" :value="o.value">{{ o.label_ne }}</option>
                 </select>
@@ -2093,28 +2573,28 @@
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">जन्म स्थान</label>
                 <input v-model="repForm.birth_place" type="text" maxlength="150" placeholder="जन्म स्थान"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" />
               </div>
 
               <!-- Contact -->
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">सम्पर्क नं.</label>
                 <input v-model="repForm.contact" type="text" maxlength="30" placeholder="९८xxxxxxxx"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" />
               </div>
 
               <!-- Email -->
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">इमेल</label>
                 <input v-model="repForm.email" type="email" maxlength="100" placeholder="example@email.com"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" />
               </div>
 
               <!-- Address Ward -->
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">ठेगाना — वडा</label>
                 <select v-model="repForm.address_ward_id" @change="repForm.address_tole_id = ''"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none">
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none">
                   <option value="">— वडा छान्नुहोस् —</option>
                   <option v-for="w in wardList" :key="w.id" :value="w.id">वडा {{ w.ward_number }}</option>
                 </select>
@@ -2124,7 +2604,7 @@
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">ठेगाना — टोल/बस्ती</label>
                 <select v-model="repForm.address_tole_id"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none">
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none">
                   <option value="">— टोल छान्नुहोस् —</option>
                   <option v-for="s in filteredRepToles" :key="s.id" :value="s.id">{{ s.name_np }}</option>
                 </select>
@@ -2148,7 +2628,7 @@
           </div>
 
           <!-- ── Secondary fields ── -->
-          <div class="border-t border-[#e6e7e9] pt-4">
+          <div class="border-t border-gray-200 pt-4">
             <p class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
               <i class="fa-solid fa-circle-info mr-1"></i> थप विवरण
             </p>
@@ -2157,41 +2637,41 @@
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">बाबुको नाम</label>
                 <input v-model="repForm.father_name" type="text" maxlength="150" placeholder="बाबुको नाम"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" />
               </div>
 
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">आमाको नाम</label>
                 <input v-model="repForm.mother_name" type="text" maxlength="150" placeholder="आमाको नाम"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" />
               </div>
 
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">श्रीमान/श्रीमती</label>
                 <input v-model="repForm.spouse_name" type="text" maxlength="150" placeholder="श्रीमान/श्रीमतीको नाम"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" />
               </div>
 
               <div>
                 <label class="block text-xs font-semibold text-gray-600 mb-1">निर्वाचित दल</label>
                 <input v-model="repForm.elected_party" type="text" maxlength="150" placeholder="राजनैतिक दल"
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" />
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none" />
               </div>
 
               <div class="sm:col-span-2">
                 <label class="block text-xs font-semibold text-gray-600 mb-1">कार्य अनुभव</label>
                 <textarea v-model="repForm.work_experience" rows="3" maxlength="2000"
                   placeholder="अनुभव र योगदानको संक्षिप्त विवरण..."
-                  class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none resize-none"></textarea>
+                  class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 outline-none resize-none"></textarea>
               </div>
 
             </div>
           </div>
 
           <!-- Form actions -->
-          <div class="flex gap-3 pt-2 border-t border-[#e6e7e9]">
+          <div class="flex gap-3 pt-2 border-t border-gray-200">
             <button type="button" @click="repModal.open = false"
-              class="flex-1 py-2.5 rounded-md border border-[#e6e7e9] text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              class="flex-1 py-2.5 rounded-md border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
               रद्द गर्नुहोस्
             </button>
             <button type="submit" :disabled="repSaving"
@@ -2235,7 +2715,7 @@
             </label>
             <input v-model="downloadForm.title" type="text" required maxlength="255"
               placeholder="जस्तै: वार्षिक बजेट २०८१/८२"
-              class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none" />
+              class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none" />
           </div>
 
           <!-- URL -->
@@ -2245,7 +2725,7 @@
             </label>
             <input v-model="downloadForm.url" type="text" required maxlength="1000"
               placeholder="https://example.com/document.pdf"
-              class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none" />
+              class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none" />
           </div>
 
           <!-- Description -->
@@ -2253,7 +2733,7 @@
             <label class="block text-xs font-semibold text-gray-600 mb-1">विवरण</label>
             <textarea v-model="downloadForm.description" rows="3" maxlength="2000"
               placeholder="फाइलको संक्षिप्त विवरण..."
-              class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none resize-none"></textarea>
+              class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none resize-none"></textarea>
           </div>
 
           <!-- Thumbnail -->
@@ -2266,7 +2746,7 @@
                   class="w-full h-full object-cover" />
               </div>
               <div v-else
-                class="w-20 h-14 rounded-md border border-dashed border-[#e6e7e9] bg-gray-50 flex items-center justify-center shrink-0">
+                class="w-20 h-14 rounded-md border border-dashed border-gray-200 bg-gray-50 flex items-center justify-center shrink-0">
                 <i class="fa-solid fa-image text-gray-300 text-xl"></i>
               </div>
               <div class="flex-1">
@@ -2283,19 +2763,19 @@
             <div>
               <label class="block text-xs font-semibold text-gray-600 mb-1">सिर्जना मिति</label>
               <NepaliDatePicker v-model="downloadForm.created_date" placeholder="YYYY-MM-DD"
-                class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none" />
+                class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none" />
             </div>
             <div>
               <label class="block text-xs font-semibold text-gray-600 mb-1">क्रम</label>
               <input v-model.number="downloadForm.sort_order" type="number" min="0"
-                class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none" />
+                class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none" />
             </div>
           </div>
 
           <!-- Actions -->
-          <div class="flex gap-3 pt-1 border-t border-[#e6e7e9]">
+          <div class="flex gap-3 pt-1 border-t border-gray-200">
             <button type="button" @click="downloadModal.open = false"
-              class="flex-1 py-2.5 rounded-md border border-[#e6e7e9] text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              class="flex-1 py-2.5 rounded-md border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
               रद्द गर्नुहोस्
             </button>
             <button type="submit" :disabled="downloadSaving"
@@ -2324,7 +2804,7 @@
         </p>
         <div class="flex gap-3">
           <button @click="deleteDownloadTarget = null"
-            class="flex-1 py-2 rounded-md border border-[#e6e7e9] text-sm font-medium text-gray-700 hover:bg-gray-50">
+            class="flex-1 py-2 rounded-md border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
             रद्द गर्नुहोस्
           </button>
           <button @click="doDeleteDownload"
@@ -2349,7 +2829,7 @@
         </p>
         <div class="flex gap-3">
           <button @click="deleteRepTarget = null"
-            class="flex-1 py-2 rounded-md border border-[#e6e7e9] text-sm font-medium text-gray-700 hover:bg-gray-50">
+            class="flex-1 py-2 rounded-md border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
             रद्द गर्नुहोस्
           </button>
           <button @click="doDeleteRep"
@@ -2364,7 +2844,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, reactive, onMounted } from 'vue'
+import { ref, computed, watch, reactive, onMounted, onUnmounted } from 'vue'
 import { useForm, router, usePage } from '@inertiajs/vue3'
 import NepaliDatePicker from '@/components/NepaliDatePicker.vue'
 
@@ -2385,7 +2865,9 @@ const props = defineProps({
   employees:         { type: Array,   default: () => [] },
   photos:            { type: Array,   default: () => [] },
   downloadLinks:      { type: Array,   default: () => [] },
-  maintenanceConfig:  { type: Object,  default: () => ({}) },
+  maintenanceConfig:    { type: Object,  default: () => ({}) },
+  surveyConfig:         { type: Object,  default: () => ({}) },
+  googleSheetsConfig:   { type: Object,  default: () => ({}) },
   settlements:        { type: Array,   default: () => [] },
 })
 
@@ -2409,9 +2891,36 @@ const tabs = [
   { key: 'gallery',         label: 'फोटो ग्यालरी',     icon: 'fa-solid fa-images' },
   { key: 'downloads',       label: 'डाउनलोड लिंक',     icon: 'fa-solid fa-link' },
   { key: 'maintenance',     label: 'मर्मत अवस्था',      icon: 'fa-solid fa-triangle-exclamation' },
+  { key: 'survey_period',  label: 'सर्वेक्षण अवधि',   icon: 'fa-solid fa-calendar-check' },
+  { key: 'google_sheets',  label: 'Google Sheets',      icon: 'fa-brands fa-google' },
+  { key: 'sync',           label: 'आयात/निर्यात',      icon: 'fa-solid fa-arrows-rotate' },
 ]
 
-const activeTab = ref(props.tab)
+const activeTab    = ref(props.tab)
+const tabMenuOpen  = ref(false)
+const activeTabObj = computed(() => tabs.find(t => t.key === activeTab.value))
+
+function selectTab(key) {
+  activeTab.value   = key
+  tabMenuOpen.value = false
+}
+
+// ── Tab overflow detection ────────────────────────────────────────────────
+const fullTabBarRef = ref(null)
+const tabsOverflow  = ref(false)
+
+function checkTabOverflow() {
+  if (!fullTabBarRef.value) return
+  tabsOverflow.value = fullTabBarRef.value.scrollWidth > fullTabBarRef.value.clientWidth
+}
+
+let _tabBarRO = null
+onMounted(() => {
+  checkTabOverflow()
+  _tabBarRO = new ResizeObserver(checkTabOverflow)
+  if (fullTabBarRef.value) _tabBarRO.observe(fullTabBarRef.value)
+})
+onUnmounted(() => _tabBarRO?.disconnect())
 
 // ── Province → District → Local Level cascade ─────────────────────────────
 const selectedProvince = ref(
@@ -2491,8 +3000,15 @@ const logoInputRef = ref(null)
 const logoFile     = ref(null)
 const logoForm     = useForm({ logo: null })
 function onLogoSelect(e) {
-  logoFile.value     = e.target.files[0] ?? null
-  logoForm.logo      = logoFile.value
+  logoFile.value = e.target.files[0] ?? null
+  logoForm.logo  = logoFile.value
+}
+function onLogoDrop(e) {
+  const file = e.dataTransfer.files[0]
+  if (file && file.type.startsWith('image/')) {
+    logoFile.value = file
+    logoForm.logo  = file
+  }
 }
 function uploadLogo() {
   if (locked.value) return
@@ -2500,6 +3016,19 @@ function uploadLogo() {
 }
 
 // ── Profile form ───────────────────────────────────────────────────────────
+const profileHints = {
+  introduction:      'पालिकाको संक्षिप्त परिचय — इतिहास, स्थापना, भौगोलिक विशेषता',
+  vision:            'पालिकाको दीर्घकालीन दृष्टि र लक्ष्य',
+  mission:           'पालिकाको मुख्य उद्देश्य र कार्यनीति',
+  services:          'पालिकाले प्रदान गर्ने सेवाहरू — स्वास्थ्य, शिक्षा, पूर्वाधार आदि',
+  geography:         'भौगोलिक अवस्था, क्षेत्रफल, उचाई, सीमाना',
+  demographics:      'जनसंख्या, जातजाति, धर्म, भाषा सम्बन्धी विवरण',
+  economy:           'मुख्य आर्थिक गतिविधि, आय स्रोत, व्यवसाय',
+  infrastructure:    'सडक, पुल, बिजुली, पानी, सञ्चार आदि पूर्वाधार',
+  natural_resources: 'वन, खनिज, जलस्रोत, पर्यटन स्थल',
+  achievements:      'उल्लेखनीय उपलब्धि, पुरस्कार, विशेष कार्यक्रम',
+}
+
 const profileInitial = {}
 for (const key of Object.keys(props.profileSections)) {
   profileInitial[key] = props.lg.profile_content?.[key] ?? ''
@@ -2512,10 +3041,12 @@ function saveProfile() {
 
 // ── Map form ───────────────────────────────────────────────────────────────
 const mapForm = useForm({
-  center_lat: props.lg.map_config?.center_lat ?? 27.7172,
-  center_lng: props.lg.map_config?.center_lng ?? 85.3240,
-  zoom:       props.lg.map_config?.zoom       ?? 10,
-  markers:    [...(props.lg.map_config?.markers ?? [])],
+  center_lat:            props.lg.map_config?.center_lat           ?? 27.7172,
+  center_lng:            props.lg.map_config?.center_lng           ?? 85.3240,
+  zoom:                  props.lg.map_config?.zoom                 ?? 10,
+  geojson_url:           props.lg.map_config?.geojson_url          ?? '',
+  ward_number_property:  props.lg.map_config?.ward_number_property ?? 'WARD_NO',
+  markers:               [...(props.lg.map_config?.markers ?? [])],
 })
 function addMarker() {
   mapForm.markers.push({ name: '', lat: '', lng: '', type: 'other', popup: '' })
@@ -2617,9 +3148,9 @@ function startEditWard(ward) {
   editWardForm.ward_chairperson = ward.ward_chairperson ?? ''
   editWardForm.contact_phone    = ward.contact_phone    ?? ''
 }
-function saveWard(ward) {
-  if (locked.value) return
-  editWardForm.patch(`/admin/settings/wards/${ward.id}`, {
+function saveWardModal() {
+  if (locked.value || !editingWardId.value) return
+  editWardForm.patch(`/admin/settings/wards/${editingWardId.value}`, {
     onSuccess: () => { editingWardId.value = null },
   })
 }
@@ -2918,6 +3449,14 @@ const PHOTO_CATEGORIES = [
 const openPhotos = reactive({})
 function togglePhoto(id) { openPhotos[id] = !openPhotos[id] }
 
+const _categoryColors = ['#7c3aed','#2563eb','#059669','#d97706','#dc2626','#db2777','#0891b2','#65a30d']
+function categoryThumbBg(cat) {
+  if (!cat) return '#e5e7eb'
+  let h = 0
+  for (let i = 0; i < cat.length; i++) h = (h * 31 + cat.charCodeAt(i)) & 0xFFFFFF
+  return _categoryColors[Math.abs(h) % _categoryColors.length]
+}
+
 const galleryModal = reactive({ open: false, isEdit: false, id: null })
 const gallerySaving = ref(false)
 
@@ -3039,6 +3578,48 @@ function deleteMaintBg() {
   router.delete('/admin/settings/maintenance/bg')
 }
 
+// ── Survey Period ──────────────────────────────────────────────────────────
+const sc = props.surveyConfig ?? {}
+const surveyForm = reactive({
+  start_date:     sc.start_date     ?? '',
+  end_date:       sc.end_date       ?? '',
+  manual_freeze:  sc.manual_freeze  ?? false,
+  freeze_message: sc.freeze_message ?? '',
+})
+const surveySaving = ref(false)
+
+const surveyStatus = computed(() => {
+  if (surveyForm.manual_freeze) return 'frozen_manual'
+  const today = new Date().toISOString().slice(0, 10)
+  if (surveyForm.start_date && today < surveyForm.start_date) return 'not_started'
+  if (surveyForm.end_date   && today > surveyForm.end_date)   return 'frozen_ended'
+  if (surveyForm.start_date || surveyForm.end_date)           return 'active'
+  return 'unlimited'
+})
+
+const surveyStatusLabel = computed(() => ({
+  frozen_manual: 'डाटा संकलन बन्द छ (म्यानुअल)',
+  frozen_ended:  'सर्वेक्षण अवधि समाप्त भयो',
+  not_started:   'सर्वेक्षण अझ सुरु भएको छैन',
+  active:        'सर्वेक्षण सक्रिय छ',
+  unlimited:     'कुनै समय सीमा छैन',
+})[surveyStatus.value])
+
+const surveyStatusSub = computed(() => ({
+  frozen_manual: 'गणकहरू डाटा थप्न वा सम्पादन गर्न असक्षम छन्।',
+  frozen_ended:  `अन्तिम मिति ${surveyForm.end_date} पार भयो। गणकहरूको पहुँच बन्द छ।`,
+  not_started:   `सुरु मिति ${surveyForm.start_date} देखि गणकहरू काम गर्न सक्छन्।`,
+  active:        'गणकहरूले सामान्य रूपमा डाटा थप्न र सम्पादन गर्न सक्छन्।',
+  unlimited:     'सर्वेक्षण अवधि कुनै मितिले सीमित छैन — सधैं खुला।',
+})[surveyStatus.value])
+
+function saveSurveyPeriod() {
+  surveySaving.value = true
+  router.patch('/admin/settings/survey-period', { ...surveyForm }, {
+    onFinish: () => { surveySaving.value = false },
+  })
+}
+
 // ── Download Links ─────────────────────────────────────────────────────────
 
 const downloadModal      = reactive({ open: false, isEdit: false, id: null, existingThumb: null })
@@ -3129,10 +3710,96 @@ function submitCombinedImport() {
     onSuccess: () => { showCombinedImport.value = false },
   })
 }
+
+// ── Google Sheets Settings ─────────────────────────────────────────────────
+
+const gsForm = reactive({
+  household_sheet_id:   props.googleSheetsConfig.household_sheet_id   ?? '',
+  institution_sheet_id: props.googleSheetsConfig.institution_sheet_id ?? '',
+  business_sheet_id:    props.googleSheetsConfig.business_sheet_id    ?? '',
+})
+const gsSaving      = ref(false)
+const gsTesting     = ref(null)   // 'household' | 'institution' | 'business' | null
+const gsTestResults = reactive({ household: null, institution: null, business: null })
+
+function saveGoogleSheets() {
+  gsSaving.value = true
+  router.patch('/admin/settings/google-sheets', { ...gsForm }, {
+    onFinish: () => { gsSaving.value = false },
+  })
+}
+
+async function testSheet(type) {
+  const idMap = {
+    household:   gsForm.household_sheet_id,
+    institution: gsForm.institution_sheet_id,
+    business:    gsForm.business_sheet_id,
+  }
+  const sheetId = idMap[type]
+  if (!sheetId) return
+  gsTesting.value = type
+  gsTestResults[type] = null
+  try {
+    const res = await fetch('/admin/settings/test-google-sheet', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content ?? '' },
+      body:    JSON.stringify({ sheet_id: sheetId }),
+    })
+    gsTestResults[type] = await res.json()
+  } catch {
+    gsTestResults[type] = { ok: false, message: 'जडान भएन।' }
+  } finally {
+    gsTesting.value = null
+  }
+}
+
+// ── Settings Import / Export ───────────────────────────────────────────────
+
+const importSections = [
+  { key: 'general',              label: 'सामान्य विवरण' },
+  { key: 'map_config',           label: 'नक्सा सेटिङ' },
+  { key: 'maintenance_config',   label: 'मर्मत अवस्था' },
+  { key: 'survey_config',        label: 'सर्वेक्षण अवधि' },
+  { key: 'welcome_config',       label: 'स्वागत सन्देश' },
+  { key: 'profile_content',      label: 'प्रोफाइल सामग्री' },
+  { key: 'photo_dir',            label: 'फोटो डाइरेक्टरी' },
+  { key: 'wards',                label: 'वडा र टोल' },
+  { key: 'survey_options',       label: 'सर्वेक्षण विकल्प' },
+  { key: 'download_links',       label: 'डाउनलोड लिंक' },
+  { key: 'representatives',      label: 'जनप्रतिनिधि' },
+  { key: 'employees',            label: 'कर्मचारी' },
+  { key: 'google_sheets_config', label: 'Google Sheets कन्फिग' },
+  { key: 'gallery',              label: 'फोटो ग्यालरी (metadata)' },
+]
+
+const importFileInput = ref(null)
+const importForm = useForm({
+  file:     null,
+  sections: importSections.map(s => s.key),
+})
+
+function onImportFileChange(e) {
+  importForm.file = e.target.files?.[0] ?? null
+}
+
+function selectAllSections() {
+  importForm.sections = importSections.map(s => s.key)
+}
+
+function submitImport() {
+  importForm.post('/admin/settings/import', {
+    forceFormData: true,
+    onSuccess: () => {
+      importForm.reset('file', 'sections')
+      if (importFileInput.value) importFileInput.value.value = ''
+      importForm.sections = importSections.map(s => s.key)
+    },
+  })
+}
 </script>
 
 <style scoped>
 .field-label { @apply block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5; }
-.field-input { @apply w-full px-3 py-2.5 rounded-md border border-[#e6e7e9] text-sm focus:ring-2 focus:ring-[#206bc4]/30 focus:border-[#206bc4] transition-colors; }
+.field-input { @apply w-full px-3 py-2.5 rounded-md border border-gray-200 text-sm focus:ring-2 focus:ring-[#206bc4]/30 focus:border-[#206bc4] transition-colors; }
 .field-error { @apply text-xs text-red-500 mt-1; }
 </style>

@@ -30,6 +30,10 @@
               <div class="flex items-center gap-2 mb-1.5 flex-wrap">
                 <span class="font-mono text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">{{ hh.unique_code }}</span>
                 <span class="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">पेस भएको</span>
+                <span v-if="hh.completeness" :class="['inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full', completenessClass(hh.completeness.score)]"
+                  :title="`${hh.completeness.filled}/${hh.completeness.total} फिल्ड भरिएको`">
+                  <i class="fa-solid fa-circle-half-stroke text-[9px]"></i>{{ hh.completeness.score }}%
+                </span>
               </div>
               <p class="font-semibold text-gray-900 text-sm">{{ hh.respondent_name }}</p>
               <div class="flex flex-wrap items-center gap-3 mt-1 text-xs text-gray-500">
@@ -78,6 +82,20 @@
             <p class="text-xs font-semibold text-red-700 mb-2">
               <i class="fa-solid fa-circle-exclamation mr-1"></i>अस्वीकृतिको कारण <span class="text-red-500">*</span>
             </p>
+            <!-- Preset reason chips -->
+            <div class="flex flex-wrap gap-1.5 mb-2">
+              <button
+                v-for="reason in rejectReasons" :key="reason"
+                type="button"
+                @click="comments[hh.id] = reason"
+                :class="[
+                  'text-[11px] px-2.5 py-1 rounded-full border transition-colors',
+                  comments[hh.id] === reason
+                    ? 'bg-red-600 border-red-600 text-white'
+                    : 'bg-white border-red-200 text-red-700 hover:bg-red-100'
+                ]"
+              >{{ reason }}</button>
+            </div>
             <textarea v-model="comments[hh.id]" rows="2" placeholder="अस्वीकृतिको विस्तृत कारण लेख्नुहोस्..."
               class="w-full rounded-md border border-red-200 px-3 py-2 text-sm focus:ring-2 focus:ring-red-400 focus:border-red-400 bg-white resize-none mb-2">
             </textarea>
@@ -161,6 +179,24 @@ import { Link, router } from '@inertiajs/vue3'
 const props = defineProps({
   households: { type: Object, default: () => ({ data: [], meta: {}, links: {} }) },
 })
+
+function completenessClass(score) {
+  if (score >= 90) return 'bg-green-100 text-green-700'
+  if (score >= 75) return 'bg-yellow-100 text-yellow-700'
+  if (score >= 50) return 'bg-amber-100 text-amber-700'
+  return 'bg-red-100 text-red-700'
+}
+
+const rejectReasons = [
+  'GPS स्थान भरिएको छैन',
+  'फोटो नम्बर भरिएको छैन',
+  'डुप्लिकेट प्रविष्टि',
+  'उत्तरदाताको नाम अपूर्ण',
+  'सदस्य विवरण अपूर्ण',
+  'वडा नम्बर मेल खाँदैन',
+  'सर्वेक्षण मिति भरिएको छैन',
+  'अपूर्ण विवरण',
+]
 
 const openPanel  = ref({})
 const comments   = ref({})

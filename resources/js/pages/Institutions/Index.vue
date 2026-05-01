@@ -1,5 +1,16 @@
 <template>
   <div class="space-y-4">
+
+    <!-- Survey freeze banner -->
+    <div v-if="surveyFrozen"
+      class="flex items-center gap-3 px-4 py-3 bg-orange-50 border border-orange-200 rounded-md">
+      <i class="fa-solid fa-lock text-orange-500 shrink-0"></i>
+      <div>
+        <p class="text-[13px] font-semibold text-orange-700">सर्वेक्षण अवधि बन्द छ</p>
+        <p class="text-[11px] text-orange-500 mt-0.5">नयाँ संस्था थप्न वा सम्पादन गर्न सकिँदैन। थप जानकारीका लागि प्रशासकसँग सम्पर्क गर्नुहोस्।</p>
+      </div>
+    </div>
+
     <!-- Page header -->
     <div class="flex items-center justify-between">
       <div>
@@ -10,10 +21,15 @@
           जम्मा <span class="font-semibold text-[#626976]">{{ institutions.meta?.total ?? 0 }}</span> संस्थाहरू
         </p>
       </div>
-      <a href="/institutions/create"
+      <a v-if="!surveyFrozen" href="/institutions/create"
         class="inline-flex items-center gap-1.5 h-9 px-4 bg-[#206bc4] hover:bg-[#1a5ba8] text-white rounded text-[13px] font-medium transition">
         <i class="fa-solid fa-plus text-[11px]"></i> नयाँ संस्था
       </a>
+      <span v-else
+        class="inline-flex items-center gap-1.5 h-9 px-4 bg-gray-200 text-gray-400 rounded text-[13px] font-medium cursor-not-allowed"
+        title="सर्वेक्षण अवधि बन्द छ">
+        <i class="fa-solid fa-lock text-[11px]"></i> नयाँ संस्था
+      </span>
     </div>
 
       <!-- Filters -->
@@ -77,6 +93,7 @@
                 <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">वडा</th>
                 <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">स्वामित्व</th>
                 <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">अवस्था</th>
+                <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">पूर्णता</th>
                 <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">गणक</th>
                 <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">कार्यहरू</th>
               </tr>
@@ -109,6 +126,12 @@
                 <td class="px-4 py-3">
                   <span :class="['text-xs px-2.5 py-1 rounded-full font-medium', statusBadge(inst.status)]">
                     {{ statusLabel(inst.status) }}
+                  </span>
+                </td>
+                <td class="px-4 py-3">
+                  <span v-if="inst.completeness" :class="['inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full', completenessClass(inst.completeness.score)]"
+                    :title="`${inst.completeness.filled}/${inst.completeness.total} फिल्ड भरिएको`">
+                    {{ inst.completeness.score }}%
                   </span>
                 </td>
                 <td class="px-4 py-3 text-xs text-gray-500">{{ inst.enumerator?.name || '—' }}</td>
@@ -208,7 +231,10 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { router } from '@inertiajs/vue3'
+import { router, usePage } from '@inertiajs/vue3'
+
+const page = usePage()
+const surveyFrozen = computed(() => page.props.surveyFrozen && page.props.auth?.user?.role === 'enumerator')
 
 const props = defineProps({
   institutions: { type: Object, default: () => ({ data: [], meta: {}, links: [] }) },
@@ -226,6 +252,13 @@ let searchTimeout = null
 const hasActiveFilters = computed(() => searchQuery.value || wardFilter.value || statusFilter.value)
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+function completenessClass(score) {
+  if (score >= 90) return 'bg-green-100 text-green-700'
+  if (score >= 75) return 'bg-yellow-100 text-yellow-700'
+  if (score >= 50) return 'bg-amber-100 text-amber-700'
+  return 'bg-red-100 text-red-700'
+}
 
 function statusBadge(s) {
   const map = {

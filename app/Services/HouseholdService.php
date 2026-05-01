@@ -45,6 +45,7 @@ class HouseholdService
     {
         return DB::transaction(function () use ($household, $data) {
             $household->update([
+                'sync_locked'        => true,
                 'settlement_id'      => array_key_exists('settlement_id', $data)  ? ($data['settlement_id'] ?: null)          : $household->settlement_id,
                 'respondent_name'    => $data['respondent_name']    ?? $household->respondent_name,
                 'respondent_contact' => $data['respondent_contact'] ?: null,

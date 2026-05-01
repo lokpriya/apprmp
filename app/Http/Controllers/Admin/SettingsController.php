@@ -22,6 +22,7 @@ use App\Models\Ward;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Inertia\Inertia;
@@ -81,7 +82,9 @@ class SettingsController extends Controller
             ]));
 
         return Inertia::render('Admin/Settings/Index', [
-            'maintenanceConfig' => $lg->maintenance_config ?? [],
+            'maintenanceConfig'    => $lg->maintenance_config    ?? [],
+            'surveyConfig'         => $lg->survey_config         ?? [],
+            'googleSheetsConfig'   => $lg->google_sheets_config  ?? [],
             'lg'             => $lg,
             'provinces'      => $provinces,
             'districts'      => $districts,
@@ -157,6 +160,7 @@ class SettingsController extends Controller
         ]);
 
         $lg->update($data);
+        Cache::forget('active_lg_full');
 
         return redirect()->route('admin.settings.index', ['tab' => 'general'])
             ->with('success', 'General settings saved.');
@@ -179,6 +183,7 @@ class SettingsController extends Controller
 
         $path = $request->file('logo')->store('logos', 'public');
         $lg->update(['logo' => $path]);
+        Cache::forget('active_lg_full');
 
         return redirect()->route('admin.settings.index', ['tab' => 'general'])
             ->with('success', 'Logo updated.');
@@ -222,15 +227,17 @@ class SettingsController extends Controller
         $lg = $this->lg();
 
         $data = $request->validate([
-            'center_lat'        => 'required|numeric|between:-90,90',
-            'center_lng'        => 'required|numeric|between:-180,180',
-            'zoom'              => 'required|integer|between:5,18',
-            'markers'           => 'nullable|array',
-            'markers.*.name'    => 'required_with:markers|string|max:200',
-            'markers.*.lat'     => 'required_with:markers|numeric|between:-90,90',
-            'markers.*.lng'     => 'required_with:markers|numeric|between:-180,180',
-            'markers.*.type'    => 'required_with:markers|in:office,school,health,ward,tourism,other',
-            'markers.*.popup'   => 'nullable|string|max:500',
+            'center_lat'           => 'required|numeric|between:-90,90',
+            'center_lng'           => 'required|numeric|between:-180,180',
+            'zoom'                 => 'required|integer|between:5,18',
+            'geojson_url'          => 'nullable|string|max:1000',
+            'ward_number_property' => 'nullable|string|max:100',
+            'markers'              => 'nullable|array',
+            'markers.*.name'       => 'required_with:markers|string|max:200',
+            'markers.*.lat'        => 'required_with:markers|numeric|between:-90,90',
+            'markers.*.lng'        => 'required_with:markers|numeric|between:-180,180',
+            'markers.*.type'       => 'required_with:markers|in:office,school,health,ward,tourism,other',
+            'markers.*.popup'      => 'nullable|string|max:500',
         ]);
 
         $markers = [];
@@ -248,12 +255,15 @@ class SettingsController extends Controller
 
         $lg->update([
             'map_config' => [
-                'center_lat' => (float) $data['center_lat'],
-                'center_lng' => (float) $data['center_lng'],
-                'zoom'       => (int)   $data['zoom'],
-                'markers'    => $markers,
+                'center_lat'           => (float) $data['center_lat'],
+                'center_lng'           => (float) $data['center_lng'],
+                'zoom'                 => (int)   $data['zoom'],
+                'geojson_url'          => $data['geojson_url'] ?? null,
+                'ward_number_property' => $data['ward_number_property'] ?? 'WARD_NO',
+                'markers'              => $markers,
             ],
         ]);
+        Cache::forget('active_lg_full');
 
         return redirect()->route('admin.settings.index', ['tab' => 'map'])
             ->with('success', 'Map settings saved.');
@@ -1128,6 +1138,296 @@ class SettingsController extends Controller
         if ($link->local_government_id !== auth()->user()->local_government_id) {
             abort(403);
         }
+    }
+
+    // ── Survey Period ─────────────────────────────────────────────────────────
+
+    public function saveSurveyPeriod(Request $request): RedirectResponse
+    {
+        $this->abortIfLocked();
+        $lg = $this->lg();
+
+        $data = $request->validate([
+            'start_date'     => 'nullable|date_format:Y-m-d',
+            'end_date'       => 'nullable|date_format:Y-m-d|after_or_equal:start_date',
+            'manual_freeze'  => 'boolean',
+            'freeze_message' => 'nullable|string|max:300',
+        ]);
+
+        $lg->update(['survey_config' => array_merge($lg->survey_config ?? [], [
+            'start_date'     => $data['start_date']     ?? null,
+            'end_date'       => $data['end_date']       ?? null,
+            'manual_freeze'  => (bool) ($data['manual_freeze'] ?? false),
+            'freeze_message' => $data['freeze_message'] ?? null,
+        ])]);
+
+        return redirect()->route('admin.settings.index', ['tab' => 'survey_period'])
+            ->with('success', 'सर्वेक्षण अवधि सेटिङ सुरक्षित गरियो।');
+    }
+
+    // ── Google Sheets Config ──────────────────────────────────────────────────
+
+    public function saveGoogleSheets(Request $request): RedirectResponse
+    {
+        $this->abortIfLocked();
+        $lg = $this->lg();
+
+        $data = $request->validate([
+            'household_sheet_id'   => 'nullable|string|max:200',
+            'institution_sheet_id' => 'nullable|string|max:200',
+            'business_sheet_id'    => 'nullable|string|max:200',
+        ]);
+
+        $lg->update(['google_sheets_config' => array_filter($data, fn($v) => $v !== null)]);
+
+        return redirect()->route('admin.settings.index', ['tab' => 'google_sheets'])
+            ->with('success', 'Google Sheets सेटिङ सुरक्षित भयो।');
+    }
+
+    public function testGoogleSheet(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data     = $request->validate(['sheet_id' => 'required|string|max:200']);
+        $sheetId  = trim($data['sheet_id']);
+        $url      = "https://docs.google.com/spreadsheets/d/{$sheetId}/export?format=xlsx";
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(10)->head($url);
+            if ($response->successful() || $response->status() === 302) {
+                return response()->json(['ok' => true, 'message' => 'Sheet पहुँचयोग्य छ।']);
+            }
+            return response()->json(['ok' => false, 'message' => 'Sheet पहुँच गर्न सकिएन (HTTP '.$response->status().'). Sheet "Anyone with link can view" मा सेट गर्नुभएको छ?']);
+        } catch (\Exception $e) {
+            return response()->json(['ok' => false, 'message' => 'जडान भएन: ' . $e->getMessage()]);
+        }
+    }
+
+    // ── Settings Export / Import ──────────────────────────────────────────────
+
+    public function exportSettings(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        abort_unless(auth()->user()?->isAdmin(), 403);
+        $lg    = $this->lg();
+        $wards = Ward::where('local_government_id', $lg->id)
+            ->with('settlements')
+            ->orderBy('ward_number')
+            ->get();
+
+        $cleanWelcome = collect($lg->welcome_config ?? [])->except(['map_image'])->map(function ($val, $key) {
+            if (in_array($key, ['chairperson', 'vice_chairperson', 'cao']) && is_array($val)) {
+                return collect($val)->except(['photo'])->toArray();
+            }
+            return $val;
+        })->toArray();
+
+        $payload = [
+            'version'     => '1.1',
+            'app'         => 'apprmp',
+            'exported_at' => now()->toIso8601String(),
+            'general' => [
+                'name_np'          => $lg->name_np,
+                'name_en'          => $lg->name_en,
+                'type'             => $lg->type,
+                'contact_email'    => $lg->contact_email,
+                'contact_phone'    => $lg->contact_phone,
+                'website'          => $lg->website,
+                'established_date' => $lg->established_date?->format('Y-m-d'),
+            ],
+            'map_config'         => $lg->map_config         ?? [],
+            'maintenance_config' => collect($lg->maintenance_config ?? [])->except(['bg_image'])->toArray(),
+            'survey_config'      => $lg->survey_config      ?? [],
+            'welcome_config'     => $cleanWelcome,
+            'profile_content'    => $lg->profile_content    ?? [],
+            'photo_dir'          => $lg->photo_dir          ?? [],
+            'wards' => $wards->map(fn($w) => [
+                'ward_number'      => $w->ward_number,
+                'ward_chairperson' => $w->ward_chairperson,
+                'contact_phone'    => $w->contact_phone,
+                'settlements'      => $w->settlements->map(fn($s) => [
+                    'name_np'         => $s->name_np,
+                    'name_en'         => $s->name_en,
+                    'settlement_type' => $s->settlement_type,
+                ])->values()->toArray(),
+            ])->toArray(),
+            'survey_options' => SurveyOption::where('local_government_id', $lg->id)
+                ->orderBy('category')->orderBy('sort_order')
+                ->get(['category', 'value', 'label_ne', 'label_en', 'is_active', 'sort_order'])
+                ->toArray(),
+            'download_links' => LgDownloadLink::where('local_government_id', $lg->id)
+                ->orderBy('sort_order')
+                ->get(['title', 'description', 'url', 'created_date', 'sort_order'])
+                ->toArray(),
+            'representatives' => LgRepresentative::where('local_government_id', $lg->id)
+                ->orderBy('sort_order')->get()
+                ->map(fn($r) => collect($r->toArray())->except(['id', 'local_government_id', 'photo', 'created_at', 'updated_at'])->toArray())
+                ->toArray(),
+            'employees' => LgEmployee::where('local_government_id', $lg->id)
+                ->orderBy('sort_order')->get()
+                ->map(fn($e) => collect($e->toArray())->except(['id', 'local_government_id', 'photo', 'created_at', 'updated_at'])->toArray())
+                ->toArray(),
+            'google_sheets_config' => $lg->google_sheets_config ?? [],
+            'gallery' => LgPhoto::where('local_government_id', $lg->id)
+                ->orderBy('sort_order')->get()
+                ->map(fn($p) => collect($p->toArray())->except(['id', 'local_government_id', 'photo', 'created_at', 'updated_at'])->toArray())
+                ->toArray(),
+        ];
+
+        $filename = \Illuminate\Support\Str::slug($lg->name_en ?? 'settings') . '-settings-' . now()->format('Ymd-His') . '.json';
+
+        return response()->streamDownload(function () use ($payload) {
+            echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        }, $filename, ['Content-Type' => 'application/json']);
+    }
+
+    public function importSettings(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()?->isAdmin(), 403);
+
+        $request->validate([
+            'file'       => 'required|file|max:2048',
+            'sections'   => 'required|array|min:1',
+            'sections.*' => 'string|in:general,map_config,maintenance_config,survey_config,welcome_config,profile_content,photo_dir,wards,survey_options,download_links,representatives,employees,google_sheets_config,gallery',
+        ]);
+
+        $content = file_get_contents($request->file('file')->getRealPath());
+        $data    = json_decode($content, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE || empty($data['version'])) {
+            return back()->withErrors(['file' => 'अमान्य JSON फाइल। सही सेटिङ निर्यात फाइल अपलोड गर्नुहोस्।']);
+        }
+
+        $lg       = $this->lg();
+        $sections = $request->input('sections', []);
+        $applied  = [];
+
+        if (in_array('general', $sections) && !empty($data['general'])) {
+            $g = $data['general'];
+            $update = array_filter([
+                'name_np'          => $g['name_np']          ?? null,
+                'name_en'          => $g['name_en']          ?? null,
+                'type'             => $g['type']             ?? null,
+                'contact_email'    => $g['contact_email']    ?? null,
+                'contact_phone'    => $g['contact_phone']    ?? null,
+                'website'          => $g['website']          ?? null,
+                'established_date' => $g['established_date'] ?? null,
+            ], fn($v) => $v !== null);
+            if ($update) $lg->update($update);
+            $applied[] = 'सामान्य विवरण';
+        }
+
+        foreach (['map_config', 'maintenance_config', 'survey_config', 'profile_content', 'photo_dir'] as $field) {
+            if (in_array($field, $sections) && array_key_exists($field, $data)) {
+                $lg->update([$field => $data[$field]]);
+                $applied[] = $field;
+            }
+        }
+
+        if (in_array('welcome_config', $sections) && array_key_exists('welcome_config', $data)) {
+            $existing = $lg->welcome_config ?? [];
+            $imported = $data['welcome_config'];
+            // Preserve existing uploaded photo paths
+            if (!empty($existing['map_image'])) $imported['map_image'] = $existing['map_image'];
+            foreach (['chairperson', 'vice_chairperson', 'cao'] as $role) {
+                if (!empty($existing[$role]['photo'])) {
+                    $imported[$role] = array_merge($imported[$role] ?? [], ['photo' => $existing[$role]['photo']]);
+                }
+            }
+            $lg->update(['welcome_config' => $imported]);
+            $applied[] = 'स्वागत सन्देश';
+        }
+
+        if (in_array('wards', $sections) && !empty($data['wards'])) {
+            foreach ($data['wards'] as $wData) {
+                $ward = Ward::firstOrCreate(
+                    ['local_government_id' => $lg->id, 'ward_number' => $wData['ward_number']],
+                    ['ward_chairperson' => $wData['ward_chairperson'] ?? null, 'contact_phone' => $wData['contact_phone'] ?? null]
+                );
+                if (!$ward->wasRecentlyCreated) {
+                    $ward->update([
+                        'ward_chairperson' => $wData['ward_chairperson'] ?? $ward->ward_chairperson,
+                        'contact_phone'    => $wData['contact_phone']    ?? $ward->contact_phone,
+                    ]);
+                }
+                foreach ($wData['settlements'] ?? [] as $sData) {
+                    \App\Models\Settlement::firstOrCreate(
+                        ['ward_id' => $ward->id, 'name_np' => $sData['name_np']],
+                        ['name_en' => $sData['name_en'] ?? $sData['name_np'], 'settlement_type' => $sData['settlement_type'] ?? 'tole']
+                    );
+                }
+            }
+            $actual = Ward::where('local_government_id', $lg->id)->count();
+            if ($actual > $lg->ward_count) $lg->update(['ward_count' => $actual]);
+            $applied[] = 'वडाहरू';
+        }
+
+        if (in_array('survey_options', $sections) && !empty($data['survey_options'])) {
+            foreach ($data['survey_options'] as $opt) {
+                SurveyOption::updateOrCreate(
+                    ['local_government_id' => $lg->id, 'category' => $opt['category'], 'value' => $opt['value']],
+                    ['label_ne' => $opt['label_ne'] ?? null, 'label_en' => $opt['label_en'] ?? null, 'is_active' => $opt['is_active'] ?? true, 'sort_order' => $opt['sort_order'] ?? 0]
+                );
+            }
+            $applied[] = 'सर्वेक्षण विकल्पहरू';
+        }
+
+        if (in_array('download_links', $sections) && array_key_exists('download_links', $data)) {
+            LgDownloadLink::where('local_government_id', $lg->id)->whereNull('thumbnail')->delete();
+            foreach ($data['download_links'] as $i => $lData) {
+                LgDownloadLink::create([
+                    'local_government_id' => $lg->id,
+                    'title'               => $lData['title'] ?? '',
+                    'description'         => $lData['description'] ?? null,
+                    'url'                 => $lData['url'] ?? '',
+                    'created_date'        => $lData['created_date'] ?? null,
+                    'sort_order'          => $lData['sort_order'] ?? $i,
+                ]);
+            }
+            $applied[] = 'डाउनलोड लिंक';
+        }
+
+        if (in_array('representatives', $sections) && array_key_exists('representatives', $data)) {
+            LgRepresentative::where('local_government_id', $lg->id)->whereNull('photo')->delete();
+            foreach ($data['representatives'] as $i => $rData) {
+                LgRepresentative::create(array_merge(
+                    collect($rData)->except(['id', 'local_government_id', 'photo'])->toArray(),
+                    ['local_government_id' => $lg->id, 'sort_order' => $rData['sort_order'] ?? $i]
+                ));
+            }
+            $applied[] = 'जनप्रतिनिधि';
+        }
+
+        if (in_array('employees', $sections) && array_key_exists('employees', $data)) {
+            LgEmployee::where('local_government_id', $lg->id)->whereNull('photo')->delete();
+            foreach ($data['employees'] as $i => $eData) {
+                LgEmployee::create(array_merge(
+                    collect($eData)->except(['id', 'local_government_id', 'photo'])->toArray(),
+                    ['local_government_id' => $lg->id, 'sort_order' => $eData['sort_order'] ?? $i]
+                ));
+            }
+            $applied[] = 'कर्मचारी';
+        }
+
+        if (in_array('google_sheets_config', $sections) && array_key_exists('google_sheets_config', $data)) {
+            $lg->update(['google_sheets_config' => $data['google_sheets_config']]);
+            $applied[] = 'Google Sheets कन्फिग';
+        }
+
+        if (in_array('gallery', $sections) && array_key_exists('gallery', $data)) {
+            // Only delete photo-less records so existing uploaded photos are preserved
+            LgPhoto::where('local_government_id', $lg->id)->whereNull('photo')->delete();
+            foreach ($data['gallery'] as $i => $pData) {
+                LgPhoto::create(array_merge(
+                    collect($pData)->except(['id', 'local_government_id', 'photo'])->toArray(),
+                    ['local_government_id' => $lg->id, 'sort_order' => $pData['sort_order'] ?? $i]
+                ));
+            }
+            $applied[] = 'फोटो ग्यालरी (मेटाडेटा)';
+        }
+
+        $msg = count($applied)
+            ? 'सेटिङ सफलतापूर्वक आयात गरियो: ' . implode(', ', $applied) . '।'
+            : 'कुनै परिवर्तन लागू गरिएन।';
+
+        return redirect()->route('admin.settings.index', ['tab' => 'sync'])->with('success', $msg);
     }
 
     // ── Authorization helper ──────────────────────────────────────────────────

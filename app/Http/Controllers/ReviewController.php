@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Household;
 use App\Models\Institution;
 use App\Models\MemberBusiness;
+use App\Services\CompletenessScoreService;
 use App\Services\WorkflowService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -38,7 +39,7 @@ class ReviewController extends Controller
     {
         $wardIds = $this->scopedWardIds();
 
-        $households = Household::with(['ward', 'settlement', 'enumerator'])
+        $households = Household::with(['ward', 'settlement', 'enumerator', 'housing', 'utilities', 'economic', 'members'])
             ->whereIn('ward_id', $wardIds)
             ->where('status', 'submitted')
             ->latest('submitted_at')
@@ -51,6 +52,7 @@ class ReviewController extends Controller
                 'settlement'     => $hh->settlement ? ['name_np' => $hh->settlement->name_np] : null,
                 'enumerator'     => $hh->enumerator ? ['name' => $hh->enumerator->name] : null,
                 'submitted_at'   => $hh->submitted_at?->diffForHumans(),
+                'completeness'   => CompletenessScoreService::score($hh),
             ]);
 
         return Inertia::render('Review/Households', compact('households'));
@@ -60,7 +62,7 @@ class ReviewController extends Controller
     {
         $wardIds = $this->scopedWardIds();
 
-        $institutions = Institution::with(['ward', 'settlement', 'institutionType', 'enumerator'])
+        $institutions = Institution::with(['ward', 'settlement', 'institutionType', 'enumerator', 'infrastructure'])
             ->whereIn('ward_id', $wardIds)
             ->where('status', 'submitted')
             ->latest('submitted_at')
@@ -75,6 +77,7 @@ class ReviewController extends Controller
                 'ownership_type'  => $i->ownership_type,
                 'enumerator'      => $i->enumerator ? ['name' => $i->enumerator->name] : null,
                 'submitted_at'    => $i->submitted_at?->diffForHumans(),
+                'completeness'    => CompletenessScoreService::institution($i),
             ]);
 
         return Inertia::render('Review/Institutions', compact('institutions'));
@@ -143,6 +146,18 @@ class ReviewController extends Controller
         }
     }
 
+    public function escalateInstitution(Request $request, Institution $institution)
+    {
+        $this->authorizeWardAccess($institution->ward_id);
+
+        try {
+            $this->workflow->escalate($institution, auth()->user(), $request->input('comment'));
+            return back()->with('success', "Institution {$institution->unique_code} escalated to admin.");
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+    }
+
     public function businesses(Request $request)
     {
         $wardIds = $this->scopedWardIds();
@@ -167,6 +182,7 @@ class ReviewController extends Controller
                 'settlement'    => $b->settlement ? ['name_np'   => $b->settlement->name_np]    : null,
                 'enumerator'    => $b->enumerator ? ['name'      => $b->enumerator->name]       : null,
                 'submitted_at'  => $b->submitted_at?->diffForHumans(),
+                'completeness'  => CompletenessScoreService::business($b),
             ]);
 
         return Inertia::render('Review/Businesses', compact('businesses'));
@@ -192,6 +208,18 @@ class ReviewController extends Controller
         try {
             $this->workflow->reject($business, auth()->user(), $request->comment);
             return back()->with('success', "Business {$business->unique_code} rejected.");
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function escalateBusiness(Request $request, MemberBusiness $business)
+    {
+        $this->authorizeWardAccess($business->ward_id);
+
+        try {
+            $this->workflow->escalate($business, auth()->user(), $request->input('comment'));
+            return back()->with('success', "Business {$business->unique_code} escalated to admin.");
         } catch (\RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }

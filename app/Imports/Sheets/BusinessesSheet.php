@@ -7,6 +7,7 @@ use App\Models\HouseholdMember;
 use App\Models\MemberBusiness;
 use App\Models\Settlement;
 use App\Models\Ward;
+use App\Services\SurveyValueValidator;
 use App\Services\UniqueCodeService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,7 @@ class BusinessesSheet implements ToCollection, WithHeadingRow, WithStartRow, Ski
     public function __construct(
         private readonly int  $enumeratorId,
         private readonly ?int $forceWardId = null,
+        private readonly ?SurveyValueValidator $validator = null,
     ) {}
 
     public function collection(Collection $rows): void
@@ -111,6 +113,19 @@ class BusinessesSheet implements ToCollection, WithHeadingRow, WithStartRow, Ski
         if (!$businessName) {
             $this->errors[] = "Row {$rowNum}: business_name is required.";
             return;
+        }
+
+        // ── Survey option validation ──────────────────────────────────────────
+        if ($this->validator) {
+            $errs = $this->validator->checkFields([
+                'business_type'     => trim($row['business_type']     ?? ''),
+                'business_field'    => trim($row['business_field']    ?? ''),
+                'business_location' => trim($row['business_location'] ?? ''),
+            ], $rowNum);
+            if ($errs) {
+                foreach ($errs as $e) $this->errors[] = $e;
+                return;
+            }
         }
 
         // ── Generate or use provided code ────────────────────────────────────
