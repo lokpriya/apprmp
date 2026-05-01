@@ -46,11 +46,20 @@ define('LARAVEL_START', microtime(true));
         @symlink($target, $link);
     }
 
-    // build/ symlink (Vite assets — JS, CSS, fonts)
-    $buildLink   = __DIR__ . '/build';
-    $buildTarget = LARAVEL_ROOT . '/public/build';
-    if (!file_exists($buildLink) && is_dir($buildTarget)) {
-        @symlink($buildTarget, $buildLink);
+    // build/ copy (symlinks outside public_html blocked on shared hosting)
+    $buildDst = __DIR__ . '/build';
+    $buildSrc = LARAVEL_ROOT . '/public/build';
+    if (!is_dir($buildDst) && is_dir($buildSrc)) {
+        // One-time recursive copy on first request after deploy
+        $copy = function($s, $d) use (&$copy) {
+            if (!is_dir($d)) mkdir($d, 0755, true);
+            foreach (scandir($s) as $f) {
+                if ($f === '.' || $f === '..') continue;
+                $ss = $s.'/'.$f; $dd = $d.'/'.$f;
+                is_dir($ss) ? $copy($ss, $dd) : @copy($ss, $dd);
+            }
+        };
+        $copy($buildSrc, $buildDst);
     }
 
     // Copy individual public files that must be web-accessible

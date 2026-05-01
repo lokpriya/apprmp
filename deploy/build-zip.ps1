@@ -101,6 +101,51 @@ if (Test-Path $buildDir) {
     Write-Host '    WARNING: public/build/ missing - run npm run build first!' -ForegroundColor Red
 }
 
+# --- Build webroot/ bundle (goes directly into public_html/apprmp/) ---
+# This avoids the manual "copy public/* to webroot" step on cPanel.
+Write-Host '  Building webroot/ bundle...' -ForegroundColor Yellow
+$webrootDir = Join-Path $TempDir 'webroot'
+New-Item -ItemType Directory -Path $webrootDir -Force | Out-Null
+
+# Copy build/ (Vite assets)
+$pubBuild = Join-Path $ProjectRoot 'public\build'
+if (Test-Path $pubBuild) {
+    Copy-Item -Path $pubBuild -Destination (Join-Path $webrootDir 'build') -Recurse -Force
+    Write-Host '    OK webroot/build/ copied' -ForegroundColor Green
+}
+
+# Copy individual public files
+$webrootFiles = @('.htaccess', 'sw.js', 'offline.html', 'manifest.webmanifest',
+                  'pwa-192.png', 'pwa-512.png', 'robots.txt', 'favicon.ico')
+foreach ($f in $webrootFiles) {
+    $src = Join-Path $ProjectRoot "public\$f"
+    if (Test-Path $src) {
+        Copy-Item $src (Join-Path $webrootDir $f) -Force
+        Write-Host "    OK webroot/$f copied" -ForegroundColor DarkGray
+    }
+}
+# workbox file (hashed filename)
+Get-ChildItem (Join-Path $ProjectRoot 'public') -Filter 'workbox-*.js' | ForEach-Object {
+    Copy-Item $_.FullName (Join-Path $webrootDir $_.Name) -Force
+    Write-Host "    OK webroot/$($_.Name) copied" -ForegroundColor DarkGray
+}
+
+# Copy index.php entry point (pre-filled with placeholder LARAVEL_ROOT)
+$indexSrc = Join-Path $ProjectRoot 'deploy\cpanel-public-index.php'
+if (Test-Path $indexSrc) {
+    Copy-Item $indexSrc (Join-Path $webrootDir 'index.php') -Force
+    Write-Host '    OK webroot/index.php (entry point) copied' -ForegroundColor Green
+}
+
+# Copy run.php deploy helper
+$runSrc = Join-Path $ProjectRoot 'deploy\run.php'
+if (Test-Path $runSrc) {
+    Copy-Item $runSrc (Join-Path $webrootDir 'run.php') -Force
+    Write-Host '    OK webroot/run.php copied' -ForegroundColor Green
+}
+
+Write-Host '    webroot/ bundle ready — upload its contents to public_html/apprmp/' -ForegroundColor Green
+
 # --- Verify vendor ---
 $vendorDir = Join-Path $TempDir 'vendor'
 if (Test-Path $vendorDir) {

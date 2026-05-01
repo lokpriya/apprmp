@@ -10,14 +10,25 @@ $root = '/home2/prayasne/apprmp';
 
 chdir($root);
 
-// Fix public assets — symlink build/ and copy PWA/htaccess files
-$webRoot    = __DIR__;                    // public_html/apprmp/
-$laravelPub = $root . '/public';          // apprmp/public/
+// Fix public assets — copy build/ recursively + individual files
+// (symlinks to outside public_html are blocked on cPanel shared hosting)
+$webRoot    = __DIR__;          // public_html/apprmp/
+$laravelPub = $root . '/public';
 
-// Symlink build/
-$buildLink = $webRoot . '/build';
-if (!file_exists($buildLink)) {
-    @symlink($laravelPub . '/build', $buildLink);
+function copyDirRecursive($src, $dst) {
+    if (!is_dir($dst)) mkdir($dst, 0755, true);
+    foreach (scandir($src) as $f) {
+        if ($f === '.' || $f === '..') continue;
+        $s = $src . '/' . $f; $d = $dst . '/' . $f;
+        is_dir($s) ? copyDirRecursive($s, $d) : copy($s, $d);
+    }
+}
+
+// Copy build/ directory (Vite assets)
+$buildSrc = $laravelPub . '/build';
+$buildDst = $webRoot . '/build';
+if (is_dir($buildSrc) && !is_dir($buildDst)) {
+    copyDirRecursive($buildSrc, $buildDst);
 }
 
 // Copy individual files
