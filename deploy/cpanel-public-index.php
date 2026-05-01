@@ -36,13 +36,33 @@ use Illuminate\Http\Request;
 
 define('LARAVEL_START', microtime(true));
 
-// Auto-create storage symlink if missing.
+// Auto-create symlinks and copy public assets if missing.
 // __DIR__ is public_html/apprmp/ — the correct web-accessible location.
 (function () {
+    // storage symlink
     $link   = __DIR__ . '/storage';
     $target = LARAVEL_ROOT . '/storage/app/public';
     if (!file_exists($link) && is_dir($target)) {
         @symlink($target, $link);
+    }
+
+    // build/ symlink (Vite assets — JS, CSS, fonts)
+    $buildLink   = __DIR__ . '/build';
+    $buildTarget = LARAVEL_ROOT . '/public/build';
+    if (!file_exists($buildLink) && is_dir($buildTarget)) {
+        @symlink($buildTarget, $buildLink);
+    }
+
+    // Copy individual public files that must be web-accessible
+    $filesToCopy = ['sw.js', 'workbox-*.js', 'manifest.webmanifest', 'offline.html',
+                    'pwa-192.png', 'pwa-512.png', 'favicon.ico', 'robots.txt', '.htaccess'];
+    foreach ($filesToCopy as $pattern) {
+        foreach (glob(LARAVEL_ROOT . '/public/' . $pattern) ?: [] as $src) {
+            $dest = __DIR__ . '/' . basename($src);
+            if (!file_exists($dest)) {
+                @copy($src, $dest);
+            }
+        }
     }
 })();
 
