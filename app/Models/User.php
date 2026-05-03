@@ -18,16 +18,18 @@ class User extends Authenticatable
     protected $fillable = [
         'name', 'email', 'password', 'role', 'local_government_id',
         'phone', 'is_active', 'last_login_at', 'login_attempts', 'locked_until',
+        'two_factor_secret', 'two_factor_recovery_codes', 'two_factor_confirmed_at',
     ];
 
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = ['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'];
 
     protected $casts = [
-        'email_verified_at' => 'datetime',
-        'password' => 'hashed',
-        'is_active' => 'boolean',
-        'last_login_at' => 'datetime',
-        'locked_until' => 'datetime',
+        'email_verified_at'       => 'datetime',
+        'password'                => 'hashed',
+        'is_active'               => 'boolean',
+        'last_login_at'           => 'datetime',
+        'locked_until'            => 'datetime',
+        'two_factor_confirmed_at' => 'datetime',
     ];
 
     public function localGovernment(): BelongsTo
@@ -64,6 +66,22 @@ class User extends Authenticatable
         $saved = $lg?->role_permissions ?? [];
         $perms = $saved[$this->role] ?? \App\Support\RolePermissions::defaults()[$this->role] ?? [];
         return in_array($perm, $perms);
+    }
+
+    public function hasTwoFactorEnabled(): bool
+    {
+        return !is_null($this->two_factor_confirmed_at) && !is_null($this->two_factor_secret);
+    }
+
+    public function twoFactorRequiredForRole(): bool
+    {
+        return in_array($this->role, ['super_admin', 'municipal_admin']);
+    }
+
+    public function getRecoveryCodes(): array
+    {
+        if (!$this->two_factor_recovery_codes) return [];
+        return json_decode(decrypt($this->two_factor_recovery_codes), true) ?? [];
     }
 
     public function isLocked(): bool

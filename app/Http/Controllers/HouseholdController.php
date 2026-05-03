@@ -95,7 +95,7 @@ class HouseholdController extends Controller
                     ->map(fn($label, $value) => ['value' => $value, 'label' => $label])
                     ->values()->all()
                 )->all(),
-            'mapConfig'     => \App\Models\LocalGovernment::find($lgId)?->map_config ?? [],
+            'mapConfig'     => \App\Models\LocalGovernment::getCached($lgId)?->map_config ?? [],
         ]);
     }
 
@@ -169,7 +169,7 @@ class HouseholdController extends Controller
                     ->map(fn($label, $value) => ['value' => $value, 'label' => $label])
                     ->values()->all()
                 )->all(),
-            'mapConfig'     => \App\Models\LocalGovernment::find($lgId)?->map_config ?? [],
+            'mapConfig'     => \App\Models\LocalGovernment::getCached($lgId)?->map_config ?? [],
         ]);
     }
 
@@ -179,6 +179,14 @@ class HouseholdController extends Controller
             'ward_id'         => 'required|exists:wards,id',
             'respondent_name' => 'required|string|max:200',
         ]);
+
+        $user = auth()->user();
+        if (!$user->isAdmin()) {
+            $lg = \App\Models\LocalGovernment::getCached($user->local_government_id);
+            if ($lg?->isSurveyFrozen()) {
+                abort(403, 'सर्भेक्षण अवधि बन्द छ।');
+            }
+        }
 
         $data = $request->except('save_draft', 'duplicate_confirmed');
         $data['survey_data'] = [
@@ -218,6 +226,14 @@ class HouseholdController extends Controller
     public function update(Request $request, Household $household)
     {
         $this->authorize('update', $household);
+
+        $user = auth()->user();
+        if (!$user->isAdmin()) {
+            $lg = \App\Models\LocalGovernment::getCached($user->local_government_id);
+            if ($lg?->isSurveyFrozen()) {
+                abort(403, 'सर्भेक्षण अवधि बन्द छ।');
+            }
+        }
 
         $wasPublished = $household->status === 'published';
         $oldValues    = $wasPublished ? $household->toArray() : null;

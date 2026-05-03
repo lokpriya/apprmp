@@ -11,13 +11,15 @@ use App\Services\UniqueCodeService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithStartRow;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 
-class InstitutionsSheet implements ToCollection, WithHeadingRow, WithStartRow, SkipsEmptyRows
+class InstitutionsSheet implements ToCollection, WithChunkReading, WithHeadingRow, WithStartRow, SkipsEmptyRows
 {
     public function startRow(): int { return 3; }
+    public function chunkSize(): int { return 200; }
 
     /** institution_code => Institution id */
     private array $codeToId = [];
@@ -30,6 +32,8 @@ class InstitutionsSheet implements ToCollection, WithHeadingRow, WithStartRow, S
     private array $settlementMap = [];   // "ward_id:name_lower" => Settlement
     private array $typeMap       = [];   // slug_lower => InstitutionType
     private array $existingCodes = [];   // unique_code => true
+    private bool  $preloaded    = false;
+    private DuplicateDetectionService $dupService;
 
     public function __construct(
         private readonly int  $enumeratorId,
@@ -40,30 +44,38 @@ class InstitutionsSheet implements ToCollection, WithHeadingRow, WithStartRow, S
     {
         $codeService = app(UniqueCodeService::class);
 
-        // Pre-load wards
-        foreach (Ward::all() as $ward) {
-            $this->wardMap[$ward->ward_number] = $ward;
-            $this->wardById[$ward->id]         = $ward;
-        }
+        if (!$this->preloaded) {
+            // Pre-load wards
+            foreach (Ward::all() as $ward) {
+                $this->wardMap[$ward->ward_number] = $ward;
+                $this->wardById[$ward->id]         = $ward;
+            }
 
-        // Pre-load settlements
-        $settlQuery = Settlement::query();
-        if ($this->forceWardId) {
-            $settlQuery->where('ward_id', $this->forceWardId);
-        }
-        foreach ($settlQuery->get() as $s) {
-            $this->settlementMap[$s->ward_id . ':' . mb_strtolower(trim($s->name_en))] = $s;
-            $this->settlementMap[$s->ward_id . ':' . mb_strtolower(trim($s->name_np))] = $s;
-        }
+            // Pre-load settlements
+            $settlQuery = Settlement::query();
+            if ($this->forceWardId) {
+                $settlQuery->where('ward_id', $this->forceWardId);
+            }
+            foreach ($settlQuery->get() as $s) {
+                $this->settlementMap[$s->ward_id . ':' . mb_strtolower(trim($s->name_en))] = $s;
+                $this->settlementMap[$s->ward_id . ':' . mb_strtolower(trim($s->name_np))] = $s;
+            }
 
-        // Pre-load institution types
-        foreach (InstitutionType::all() as $t) {
-            $this->typeMap[strtolower($t->slug)]    = $t;
-            $this->typeMap[strtolower($t->name_en)] = $t;
-        }
+            // Pre-load institution types
+            foreach (InstitutionType::all() as $t) {
+                $this->typeMap[strtolower($t->slug)]    = $t;
+                $this->typeMap[strtolower($t->name_en)] = $t;
+            }
 
-        // Pre-load existing codes
-        $this->existingCodes = Institution::pluck('unique_code')->flip()->toArray();
+            // Pre-load existing codes
+            $this->existingCodes = Institution::pluck('unique_code')->flip()->toArray();
+
+            // Preload duplicate-detection maps once for the whole batch
+            $this->dupService = app(DuplicateDetectionService::class);
+            $this->dupService->preloadInstitutions(array_keys($this->wardById));
+
+            $this->preloaded = true;
+        }
 
         DB::transaction(function () use ($rows, $codeService) {
             foreach ($rows as $index => $row) {
@@ -142,7 +154,7 @@ class InstitutionsSheet implements ToCollection, WithHeadingRow, WithStartRow, S
             'gps_lat'             => $row['gps_lat'] ?? null,
             'gps_lng'             => $row['gps_lng'] ?? null,
         ];
-        $dup = app(DuplicateDetectionService::class)->checkInstitution($dupCheck);
+        $dup = $this->dupService->checkInstitution($dupCheck);
         if ($dup['found']) {
             $codes   = implode(', ', array_column($dup['matches'], 'unique_code'));
             $reasons = implode('; ', $dup['matches'][0]['reasons'] ?? []);

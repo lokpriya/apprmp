@@ -422,6 +422,11 @@
                 <i class="fa-solid fa-circle-user w-4 text-[#9aa0ac] text-center"></i>
                 मेरो प्रोफाइल
               </a>
+              <!-- 2FA -->
+              <a href="/two-factor/setup" class="flex items-center gap-3 px-4 py-2.5 text-[13px] text-[#626976] hover:bg-gray-50 transition-colors">
+                <i class="fa-solid fa-shield-halved w-4 text-[#9aa0ac] text-center"></i>
+                2FA सुरक्षा
+              </a>
               <!-- Sign out -->
               <button @click="logout"
                 class="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-red-600 hover:bg-red-50 transition-colors">

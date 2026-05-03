@@ -97,7 +97,7 @@ class InstitutionController extends Controller
             'initialWardId'    => $user->isEnumerator()
                                        ? $user->assignedWards()->first()?->id
                                        : null,
-            'mapConfig'        => \App\Models\LocalGovernment::find($lgId)?->map_config ?? [],
+            'mapConfig'        => \App\Models\LocalGovernment::getCached($lgId)?->map_config ?? [],
         ]);
     }
 
@@ -194,7 +194,7 @@ class InstitutionController extends Controller
                                                 ->get(['category', 'value', 'label_ne'])
                                                 ->groupBy('category'),
             'initialWardId'    => null,
-            'mapConfig'        => \App\Models\LocalGovernment::find($lgId)?->map_config ?? [],
+            'mapConfig'        => \App\Models\LocalGovernment::getCached($lgId)?->map_config ?? [],
         ]);
     }
 
@@ -204,6 +204,14 @@ class InstitutionController extends Controller
             'ward_id' => 'required|exists:wards,id',
             'name_en' => 'required|string|max:200',
         ]);
+
+        $user = auth()->user();
+        if (!$user->isAdmin()) {
+            $lg = \App\Models\LocalGovernment::getCached($user->local_government_id);
+            if ($lg?->isSurveyFrozen()) {
+                abort(403, 'सर्भेक्षण अवधि बन्द छ।');
+            }
+        }
 
         $data = $request->except('duplicate_confirmed');
         $data['survey_data'] = $data['survey_data'] ?? $this->buildSurveyData($data);
@@ -230,6 +238,14 @@ class InstitutionController extends Controller
     public function update(Request $request, Institution $institution)
     {
         $this->authorize('update', $institution);
+
+        $user = auth()->user();
+        if (!$user->isAdmin()) {
+            $lg = \App\Models\LocalGovernment::getCached($user->local_government_id);
+            if ($lg?->isSurveyFrozen()) {
+                abort(403, 'सर्भेक्षण अवधि बन्द छ।');
+            }
+        }
 
         $wasPublished = $institution->status === 'published';
         $oldValues    = $wasPublished ? $institution->toArray() : null;
@@ -284,7 +300,7 @@ class InstitutionController extends Controller
 
     public function publish(Request $request, Institution $institution)
     {
-        abort_unless(auth()->user()->isAdmin(), 403);
+        $this->authorize('publish', $institution);
 
         try {
             $this->workflow->publish($institution, auth()->user());

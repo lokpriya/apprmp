@@ -17,7 +17,7 @@ class GoogleSyncController extends Controller
 
     public function index(): Response
     {
-        $lg    = LocalGovernment::first();
+        $lg    = LocalGovernment::getFirstCached();
         $wards = Ward::where('local_government_id', $lg?->id)
             ->orderBy('ward_number')
             ->get(['id', 'ward_number']);
@@ -40,7 +40,7 @@ class GoogleSyncController extends Controller
             'ward_id' => ['required', 'integer', 'exists:wards,id'],
         ]);
 
-        $lg       = LocalGovernment::first();
+        $lg       = LocalGovernment::getFirstCached();
         $config   = $lg?->google_sheets_config ?? [];
         $sheetId  = $request->type === 'households'
             ? ($config['household_sheet_id'] ?? null)
@@ -87,7 +87,7 @@ class GoogleSyncController extends Controller
             'force_locked' => ['boolean'],
         ]);
 
-        $lg       = LocalGovernment::first();
+        $lg       = LocalGovernment::getFirstCached();
         $config   = $lg?->google_sheets_config ?? [];
         $sheetId  = $request->type === 'households'
             ? ($config['household_sheet_id'] ?? null)

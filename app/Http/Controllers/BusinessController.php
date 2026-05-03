@@ -192,7 +192,7 @@ class BusinessController extends Controller
 
     public function show(MemberBusiness $business)
     {
-        $this->authorizeWard($business->ward_id);
+        $this->authorize('view', $business);
 
         $business->load(['member.household', 'ward', 'settlement', 'enumerator', 'wardReviewer', 'publisher', 'fieldVerification.verifier']);
 
@@ -237,11 +237,8 @@ class BusinessController extends Controller
 
     public function edit(MemberBusiness $business)
     {
-        $this->authorizeWard($business->ward_id);
+        $this->authorize('update', $business);
         $user = auth()->user();
-        if (!$user->isAdmin()) {
-            abort_unless(in_array($business->status, ['draft', 'rejected']), 403, 'यो रेकर्ड सम्पादन गर्न सकिँदैन।');
-        }
 
         $business->load(['member', 'ward', 'settlement']);
 
@@ -269,11 +266,8 @@ class BusinessController extends Controller
 
     public function update(Request $request, MemberBusiness $business)
     {
-        $this->authorizeWard($business->ward_id);
+        $this->authorize('update', $business);
         $user = auth()->user();
-        if (!$user->isAdmin()) {
-            abort_unless(in_array($business->status, ['draft', 'rejected']), 403);
-        }
 
         $request->validate([
             'business_name' => 'required|string|max:200',
@@ -397,7 +391,7 @@ class BusinessController extends Controller
 
     public function publish(Request $request, MemberBusiness $business)
     {
-        abort_unless(auth()->user()->isAdmin(), 403);
+        $this->authorize('publish', $business);
         $this->workflow->publish($business, auth()->user());
         return back()->with('success', "व्यवसाय {$business->unique_code} प्रकाशित गरियो।");
     }

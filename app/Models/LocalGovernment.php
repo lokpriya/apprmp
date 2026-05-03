@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
 
 class LocalGovernment extends Model
 {
@@ -21,6 +22,8 @@ class LocalGovernment extends Model
         'maintenance_config',
         'survey_config',
         'google_sheets_config',
+        'licensed_until',
+        'license_key',
     ];
 
     protected $casts = [
@@ -35,7 +38,38 @@ class LocalGovernment extends Model
         'survey_config'         => 'array',
         'google_sheets_config'  => 'array',
         'settings_locked_at'    => 'datetime',
+        'licensed_until'        => 'date',
     ];
+
+    protected static function boot(): void
+    {
+        parent::boot();
+        static::saved(fn (LocalGovernment $lg) => static::bustCache($lg->id));
+    }
+
+    public static function getCached(int $id): ?self
+    {
+        return Cache::rememberForever("lg_{$id}", fn () => static::find($id));
+    }
+
+    public static function getFirstCached(): ?self
+    {
+        return Cache::rememberForever('lg_first', fn () => static::where('is_active', true)->first() ?? static::first());
+    }
+
+    public static function bustCache(int $id): void
+    {
+        Cache::forget("lg_{$id}");
+        Cache::forget('lg_first');
+        Cache::forget("survey_frozen_{$id}");
+        Cache::forget('active_lg_full');
+    }
+
+    public function isLicensed(): bool
+    {
+        if (!$this->licensed_until) return false;
+        return $this->licensed_until->greaterThanOrEqualTo(now()->startOfDay());
+    }
 
     public function isSettingsLocked(): bool
     {

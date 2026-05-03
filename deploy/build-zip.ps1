@@ -130,14 +130,26 @@ Get-ChildItem (Join-Path $ProjectRoot 'public') -Filter 'workbox-*.js' | ForEach
     Write-Host "    OK webroot/$($_.Name) copied" -ForegroundColor DarkGray
 }
 
-# Copy index.php entry point (pre-filled with placeholder LARAVEL_ROOT)
+# Copy index.php entry point and auto-fill LARAVEL_ROOT
 $indexSrc = Join-Path $ProjectRoot 'deploy\cpanel-public-index.php'
+$indexDst = Join-Path $webrootDir 'index.php'
 if (Test-Path $indexSrc) {
-    Copy-Item $indexSrc (Join-Path $webrootDir 'index.php') -Force
-    Write-Host '    OK webroot/index.php (entry point) copied' -ForegroundColor Green
+    $indexContent = Get-Content $indexSrc -Raw -Encoding UTF8
+    $indexContent = $indexContent -replace "define\('LARAVEL_ROOT', '[^']+'\)", "define('LARAVEL_ROOT', '/home2/prayasne/apprmp')"
+    [System.IO.File]::WriteAllText($indexDst, $indexContent, [System.Text.UTF8Encoding]::new($false))
+    Write-Host '    OK webroot/index.php — LARAVEL_ROOT pre-set to /home2/prayasne/apprmp' -ForegroundColor Green
 }
 
-# Copy run.php deploy helper
+# Copy install.php (web installer — runs migrations + seeders)
+$installSrc = Join-Path $ProjectRoot 'public\install.php'
+if (Test-Path $installSrc) {
+    Copy-Item $installSrc (Join-Path $webrootDir 'install.php') -Force
+    Write-Host '    OK webroot/install.php copied' -ForegroundColor Green
+} else {
+    Write-Host '    WARNING: public/install.php not found!' -ForegroundColor Red
+}
+
+# Copy run.php deploy helper (post-install artisan runner)
 $runSrc = Join-Path $ProjectRoot 'deploy\run.php'
 if (Test-Path $runSrc) {
     Copy-Item $runSrc (Join-Path $webrootDir 'run.php') -Force
@@ -176,16 +188,29 @@ Write-Host "  File : $ZipPath" -ForegroundColor Green
 Write-Host "  Size : $sizeMB MB" -ForegroundColor Green
 Write-Host '  ============================================' -ForegroundColor Green
 Write-Host ''
-Write-Host '  DEPLOYMENT STEPS (cPanel):' -ForegroundColor Cyan
-Write-Host '  1. cPanel -> MySQL Databases -> create DB + user + ALL PRIVILEGES'
-Write-Host '  2. cPanel -> MultiPHP Manager -> set PHP 8.2 for subdomain'
-Write-Host '  3. Upload apprmp-deploy.zip to /home/username/ via File Manager'
-Write-Host '  4. Extract -> rename folder to: apprmp'
-Write-Host '  5. Create folder: public_html/apprmp/'
-Write-Host '  6. Copy apprmp/public/* into public_html/apprmp/'
-Write-Host '  7. Copy deploy/cpanel-public-index.php to public_html/apprmp/index.php'
-Write-Host '  8. Edit index.php: set LARAVEL_ROOT = /home/username/apprmp'
-Write-Host '  9. Visit: https://yourdomain.com/apprmp/install.php'
-Write-Host ' 10. Follow the 6-step web installer'
-Write-Host ' 11. Delete install.php after completion (installer provides a button)'
+Write-Host '  FRESH INSTALL STEPS (cPanel — apprmp.prayasnepal.com):' -ForegroundColor Cyan
+Write-Host ''
+Write-Host '  --- REMOTE CLEANUP ------------------------------------------' -ForegroundColor DarkGray
+Write-Host '  1. MySQL Databases: DROP prayasne_apprmp15 + recreate it'
+Write-Host '     Grant ALL PRIVILEGES to prayasne_bhagwanuser'
+Write-Host '  2. File Manager: delete /home2/prayasne/apprmp/ entirely'
+Write-Host '  3. File Manager: delete all files in /home2/prayasne/public_html/apprmp/'
+Write-Host ''
+Write-Host '  --- UPLOAD --------------------------------------------------' -ForegroundColor DarkGray
+Write-Host '  4. Upload apprmp-deploy.zip to /home2/prayasne/ via File Manager'
+Write-Host '  5. Extract zip, rename extracted folder to: apprmp'
+Write-Host '  6. Upload ALL files inside webroot/ to public_html/apprmp/'
+Write-Host '     (index.php has LARAVEL_ROOT pre-set, no editing needed)'
+Write-Host ''
+Write-Host '  --- INSTALL -------------------------------------------------' -ForegroundColor DarkGray
+Write-Host '  7. Visit: https://apprmp.prayasnepal.com/install.php'
+Write-Host '  8. Step 2: DB host=localhost  db=prayasne_apprmp15'
+Write-Host '            user=prayasne_bhagwanuser  pass=prayasne_apprmp15'
+Write-Host '     Step 3: APP_URL=https://apprmp.prayasnepal.com'
+Write-Host '     Steps 4-7: migrations, seeders, admin user, done'
+Write-Host '     Click "Delete install.php" on final step'
+Write-Host ''
+Write-Host '  --- POST-INSTALL --------------------------------------------' -ForegroundColor DarkGray
+Write-Host '  9. MultiPHP Manager: confirm PHP 8.4 (ea-php84) is set'
+Write-Host ' 10. Test login, PDF export, photo upload'
 Write-Host ''

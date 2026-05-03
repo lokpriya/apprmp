@@ -6,15 +6,18 @@ use App\Models\InstitutionEducation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithStartRow;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 
-class InstEducationSheet implements ToCollection, WithHeadingRow, WithStartRow, SkipsEmptyRows
+class InstEducationSheet implements ToCollection, WithChunkReading, WithHeadingRow, WithStartRow, SkipsEmptyRows
 {
     public function startRow(): int { return 3; }
+    public function chunkSize(): int { return 200; }
 
-    private array $errors = [];
+    private array $errors  = [];
+    private bool  $deleted = false;
 
     public function __construct(private readonly InstitutionsSheet $parent) {}
 
@@ -23,9 +26,10 @@ class InstEducationSheet implements ToCollection, WithHeadingRow, WithStartRow, 
         $map = $this->parent->getCodeToIdMap();
 
         DB::transaction(function () use ($rows, $map) {
-            $ids = array_values($map);
-            if ($ids) {
-                InstitutionEducation::whereIn('institution_id', $ids)->delete();
+            if (!$this->deleted) {
+                $ids = array_values($map);
+                if ($ids) InstitutionEducation::whereIn('institution_id', $ids)->delete();
+                $this->deleted = true;
             }
 
             foreach ($rows as $index => $row) {

@@ -15,6 +15,8 @@ use App\Http\Controllers\Admin\ProgressController;
 use App\Http\Controllers\Admin\DataExportController;
 use App\Http\Controllers\Admin\GoogleSyncController;
 use App\Http\Controllers\Admin\AuditLogController;
+use App\Http\Controllers\Admin\LicenseController;
+use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\EditRequestController;
 use App\Http\Controllers\FieldVerificationController;
 use App\Http\Controllers\NotificationController;
@@ -106,7 +108,13 @@ Route::get('/', function () {
     return redirect()->route('public.dashboard');
 });
 
-Route::middleware(['auth'])->group(function () {
+// ── 2FA challenge (guest — happens before full login) ────────────────────────
+Route::middleware('guest')->group(function () {
+    Route::get('/two-factor-challenge',  [TwoFactorController::class, 'showChallenge'])  ->name('two-factor.challenge');
+    Route::post('/two-factor-challenge', [TwoFactorController::class, 'verifyChallenge'])->name('two-factor.verify');
+});
+
+Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
 
     // Dashboard — redirects based on role
     Route::get('/dashboard', function () {
@@ -153,6 +161,13 @@ Route::middleware(['auth'])->group(function () {
         Route::get('institutions/{institution}/pdf',[PdfController::class, 'institution'])->name('institutions.pdf');
         Route::get('businesses/{business}/pdf',    [PdfController::class, 'business'])   ->name('businesses.pdf');
     });
+
+    // ─── 2FA management (authenticated users) ────────────────────────────────
+    Route::get('/two-factor/setup',              [TwoFactorController::class, 'showSetupPage'])  ->name('two-factor.setup-page');
+    Route::post('/two-factor/setup',             [TwoFactorController::class, 'setup'])          ->name('two-factor.setup');
+    Route::post('/two-factor/confirm',           [TwoFactorController::class, 'confirm'])        ->name('two-factor.confirm');
+    Route::post('/two-factor/disable',           [TwoFactorController::class, 'disable'])        ->name('two-factor.disable');
+    Route::post('/two-factor/recovery-codes',    [TwoFactorController::class, 'regenerateCodes'])->name('two-factor.recovery-codes');
 
     // ─── Notifications ──────────────────────────────────────────────────────
     Route::post('notifications/{id}/read',  [NotificationController::class, 'markRead'])   ->name('notifications.read');
@@ -306,6 +321,10 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/settings/import', [SettingsController::class, 'importSettings']) ->name('settings.import');
             Route::patch('/settings/google-sheets',      [SettingsController::class, 'saveGoogleSheets'])  ->name('settings.google-sheets.save');
             Route::post('/settings/test-google-sheet',   [SettingsController::class, 'testGoogleSheet'])   ->name('settings.google-sheets.test');
+
+            // License
+            Route::post('/settings/license/generate',  [LicenseController::class, 'generate']) ->name('settings.license.generate');
+            Route::post('/settings/license/activate',  [LicenseController::class, 'activate']) ->name('settings.license.activate');
         });
 });
 

@@ -48,6 +48,16 @@ class InstitutionPolicy
         return false;
     }
 
+    public function reject(User $user, Institution $institution): bool
+    {
+        if ($user->isAdmin()) return in_array($institution->status, ['ward_approved', 'escalated', 'published']);
+        if ($user->isReviewer()) {
+            return in_array($institution->status, ['submitted', 'ward_approved'])
+                && in_array($institution->ward_id, $user->getAssignedWardIds());
+        }
+        return false;
+    }
+
     public function publish(User $user, Institution $institution): bool
     {
         return $user->isAdmin() && in_array($institution->status, ['ward_approved', 'escalated']);

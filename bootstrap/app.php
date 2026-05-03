@@ -15,12 +15,14 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\HandleInertiaRequests::class,
         ]);
         $middleware->alias([
-            'role'        => \App\Http\Middleware\EnsureRole::class,
-            'ward.scope'  => \App\Http\Middleware\ScopeToWard::class,
+            'role'           => \App\Http\Middleware\EnsureRole::class,
+            'ward.scope'     => \App\Http\Middleware\ScopeToWard::class,
             'data.freeze'    => \App\Http\Middleware\CheckDataFreeze::class,
             'maintenance'    => \App\Http\Middleware\CheckMaintenance::class,
+            'license'        => \App\Http\Middleware\CheckLicense::class,
             'survey.period'  => \App\Http\Middleware\CheckSurveyPeriod::class,
             'public.access'  => \App\Http\Middleware\CheckPublicAccess::class,
+            '2fa.require'    => \App\Http\Middleware\RequireTwoFactor::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -7,16 +7,19 @@ use App\Models\HouseholdLivestock;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithStartRow;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 
-class LivestockSheet implements ToCollection, WithHeadingRow, WithStartRow, SkipsEmptyRows
+class LivestockSheet implements ToCollection, WithChunkReading, WithHeadingRow, WithStartRow, SkipsEmptyRows
 {
     public function startRow(): int { return 3; }
+    public function chunkSize(): int { return 200; }
 
-    private array $errors   = [];
-    private int   $imported = 0;
+    private array $errors        = [];
+    private int   $imported      = 0;
+    private array $beeFishByCoe  = [];  // householdId => accumulated bee/fish/silk data
 
     public function __construct(private readonly HouseholdsSheet $householdsSheet) {}
 
@@ -24,10 +27,7 @@ class LivestockSheet implements ToCollection, WithHeadingRow, WithStartRow, Skip
     {
         $codeMap = $this->householdsSheet->getCodeToIdMap();
 
-        // Accumulate bee/fish/silk data per household (template: "fill once per household")
-        $beeFishByCoe = [];
-
-        DB::transaction(function () use ($rows, $codeMap, &$beeFishByCoe) {
+        DB::transaction(function () use ($rows, $codeMap) {
             foreach ($rows as $index => $row) {
                 $rowNum = $index + 2;
                 try {
@@ -51,8 +51,8 @@ class LivestockSheet implements ToCollection, WithHeadingRow, WithStartRow, Skip
                         $this->imported++;
                     }
 
-                    // ── Bee / Fish / Silk snapshot (fill once per household, merge non-empty) ──
-                    $bfs = &$beeFishByCoe[$householdId];
+                    // ── Bee / Fish / Silk snapshot ──
+                    $bfs = &$this->beeFishByCoe[$householdId];
                     if (!isset($bfs)) $bfs = [];
 
                     if ($this->bool($row['has_beekeeping'] ?? 0)) {
@@ -77,8 +77,8 @@ class LivestockSheet implements ToCollection, WithHeadingRow, WithStartRow, Skip
                 }
             }
 
-            // ── Persist bee/fish/silk into survey_data.beeFishSilk ──
-            foreach ($beeFishByCoe as $householdId => $bfsData) {
+            // ── Persist bee/fish/silk accumulated in this chunk ──
+            foreach ($this->beeFishByCoe as $householdId => $bfsData) {
                 if (empty($bfsData)) continue;
                 $hh = Household::find($householdId);
                 if ($hh) {
@@ -87,6 +87,7 @@ class LivestockSheet implements ToCollection, WithHeadingRow, WithStartRow, Skip
                     $hh->update(['survey_data' => $sd]);
                 }
             }
+            $this->beeFishByCoe = [];
         });
     }
 

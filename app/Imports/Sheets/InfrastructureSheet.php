@@ -6,13 +6,15 @@ use App\Models\InstitutionInfrastructure;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithStartRow;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 
-class InfrastructureSheet implements ToCollection, WithHeadingRow, WithStartRow, SkipsEmptyRows
+class InfrastructureSheet implements ToCollection, WithChunkReading, WithHeadingRow, WithStartRow, SkipsEmptyRows
 {
     public function startRow(): int { return 3; }
+    public function chunkSize(): int { return 200; }
 
     private array $errors = [];
 

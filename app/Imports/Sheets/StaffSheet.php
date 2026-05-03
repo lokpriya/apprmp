@@ -6,15 +6,18 @@ use App\Models\InstitutionStaff;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithStartRow;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 
-class StaffSheet implements ToCollection, WithHeadingRow, WithStartRow, SkipsEmptyRows
+class StaffSheet implements ToCollection, WithChunkReading, WithHeadingRow, WithStartRow, SkipsEmptyRows
 {
     public function startRow(): int { return 3; }
+    public function chunkSize(): int { return 200; }
 
-    private array $errors = [];
+    private array $errors  = [];
+    private bool  $deleted = false;
 
     public function __construct(private readonly InstitutionsSheet $parent) {}
 
@@ -23,10 +26,11 @@ class StaffSheet implements ToCollection, WithHeadingRow, WithStartRow, SkipsEmp
         $map = $this->parent->getCodeToIdMap();
 
         DB::transaction(function () use ($rows, $map) {
-            // Delete existing staff records for all institutions being imported
-            $ids = array_values($map);
-            if ($ids) {
-                InstitutionStaff::whereIn('institution_id', $ids)->delete();
+            // Delete existing staff records once (guarded so re-runs on subsequent chunks don't wipe new data)
+            if (!$this->deleted) {
+                $ids = array_values($map);
+                if ($ids) InstitutionStaff::whereIn('institution_id', $ids)->delete();
+                $this->deleted = true;
             }
 
             foreach ($rows as $index => $row) {

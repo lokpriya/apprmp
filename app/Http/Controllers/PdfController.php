@@ -21,7 +21,7 @@ class PdfController extends Controller
             'members', 'livestock',
         ]);
 
-        $lg   = $household->ward?->localGovernment ?? LocalGovernment::find(auth()->user()->local_government_id);
+        $lg   = $household->ward?->localGovernment ?? LocalGovernment::getCached(auth()->user()->local_government_id);
         $opts = $this->surveyLabels($lg?->id);
         $html = view('pdf.household', compact('household', 'lg', 'opts'))->render();
 
@@ -37,7 +37,7 @@ class PdfController extends Controller
             'infrastructure', 'staff', 'services', 'education', 'healthDetail',
         ]);
 
-        $lg   = $institution->ward?->localGovernment ?? LocalGovernment::find(auth()->user()->local_government_id);
+        $lg   = $institution->ward?->localGovernment ?? LocalGovernment::getCached(auth()->user()->local_government_id);
         $opts = $this->surveyLabels($lg?->id);
         $html = view('pdf.institution', compact('institution', 'lg', 'opts'))->render();
 

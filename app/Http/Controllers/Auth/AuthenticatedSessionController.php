@@ -17,7 +17,7 @@ class AuthenticatedSessionController extends Controller
      */
     public function create(): \Inertia\Response
     {
-        $lg = LocalGovernment::select('id', 'name_np', 'name_en', 'logo')->first();
+        $lg = LocalGovernment::getFirstCached();
         return Inertia::render('Auth/Login', [
             'status' => session('status'),
             'lg'     => $lg,
@@ -30,6 +30,16 @@ class AuthenticatedSessionController extends Controller
     public function store(LoginRequest $request): RedirectResponse
     {
         $request->authenticate();
+
+        // If 2FA is enabled, park login in session and challenge instead of completing it
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user->hasTwoFactorEnabled()) {
+            $remember = $request->boolean('remember');
+            \Illuminate\Support\Facades\Auth::logout();
+            $request->session()->put('login.id', $user->id);
+            $request->session()->put('login.remember', $remember);
+            return redirect()->route('two-factor.challenge');
+        }
 
         $request->session()->regenerate();
 

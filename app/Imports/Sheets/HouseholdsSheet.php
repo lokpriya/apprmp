@@ -10,14 +10,15 @@ use App\Services\UniqueCodeService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithStartRow;
-use Maatwebsite\Excel\Concerns\WithValidation;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 
-class HouseholdsSheet implements ToCollection, WithHeadingRow, WithStartRow, SkipsEmptyRows
+class HouseholdsSheet implements ToCollection, WithChunkReading, WithHeadingRow, WithStartRow, SkipsEmptyRows
 {
     public function startRow(): int { return 3; }
+    public function chunkSize(): int { return 200; }
 
     /** household_code => Household id */
     private array $codeToId  = [];
@@ -29,6 +30,8 @@ class HouseholdsSheet implements ToCollection, WithHeadingRow, WithStartRow, Ski
     private array $wardById      = [];   // ward_id     => Ward
     private array $settlementMap = [];   // "ward_id:name_lower" => Settlement
     private array $existingCodes = [];   // unique_code => true
+    private bool  $preloaded    = false;
+    private DuplicateDetectionService $dupService;
 
     public function __construct(
         private readonly int  $enumeratorId,
@@ -39,27 +42,35 @@ class HouseholdsSheet implements ToCollection, WithHeadingRow, WithStartRow, Ski
     {
         $codeService = app(UniqueCodeService::class);
 
-        // Pre-load all wards once
-        $wards = Ward::all();
-        foreach ($wards as $ward) {
-            $this->wardMap[$ward->ward_number] = $ward;
-            $this->wardById[$ward->id]         = $ward;
-        }
+        if (!$this->preloaded) {
+            // Pre-load all wards once
+            $wards = Ward::all();
+            foreach ($wards as $ward) {
+                $this->wardMap[$ward->ward_number] = $ward;
+                $this->wardById[$ward->id]         = $ward;
+            }
 
-        // If force ward, pre-load settlements for that ward only; otherwise all
-        $settlQuery = Settlement::query();
-        if ($this->forceWardId) {
-            $settlQuery->where('ward_id', $this->forceWardId);
-        }
-        foreach ($settlQuery->get() as $s) {
-            $key = $s->ward_id . ':' . mb_strtolower(trim($s->name_en));
-            $this->settlementMap[$key] = $s;
-            $key2 = $s->ward_id . ':' . mb_strtolower(trim($s->name_np));
-            $this->settlementMap[$key2] = $s;
-        }
+            // If force ward, pre-load settlements for that ward only; otherwise all
+            $settlQuery = Settlement::query();
+            if ($this->forceWardId) {
+                $settlQuery->where('ward_id', $this->forceWardId);
+            }
+            foreach ($settlQuery->get() as $s) {
+                $key = $s->ward_id . ':' . mb_strtolower(trim($s->name_en));
+                $this->settlementMap[$key] = $s;
+                $key2 = $s->ward_id . ':' . mb_strtolower(trim($s->name_np));
+                $this->settlementMap[$key2] = $s;
+            }
 
-        // Pre-load all existing household codes so we can check existence in-memory
-        $this->existingCodes = Household::pluck('unique_code')->flip()->toArray();
+            // Pre-load all existing household codes so we can check existence in-memory
+            $this->existingCodes = Household::pluck('unique_code')->flip()->toArray();
+
+            // Preload duplicate-detection maps once for the whole batch
+            $this->dupService = app(DuplicateDetectionService::class);
+            $this->dupService->preloadHouseholds(array_keys($this->wardById));
+
+            $this->preloaded = true;
+        }
 
         DB::transaction(function () use ($rows, $codeService) {
             foreach ($rows as $index => $row) {
@@ -110,15 +121,16 @@ class HouseholdsSheet implements ToCollection, WithHeadingRow, WithStartRow, Ski
             return;
         }
 
-        // Duplicate detection (still runs per-row, but only for new codes)
+        // Duplicate detection — uses preloaded in-memory maps (O(1) per row)
         $dupCheck = [
             'ward_id'            => $wardId,
             'respondent_name'    => trim($row['respondent_name'] ?? ''),
             'respondent_contact' => trim($row['respondent_contact'] ?? ''),
             'gps_lat'            => $row['gps_lat'] ?? null,
             'gps_lng'            => $row['gps_lng'] ?? null,
+            'survey_data'        => ['social' => ['family_head' => trim($row['family_head'] ?? '') ?: null]],
         ];
-        $dup = app(DuplicateDetectionService::class)->checkHousehold($dupCheck);
+        $dup = $this->dupService->checkHousehold($dupCheck);
         if ($dup['found']) {
             $codes   = implode(', ', array_column($dup['matches'], 'unique_code'));
             $reasons = implode('; ', $dup['matches'][0]['reasons'] ?? []);

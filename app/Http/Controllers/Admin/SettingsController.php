@@ -85,6 +85,14 @@ class SettingsController extends Controller
             'maintenanceConfig'    => $lg->maintenance_config    ?? [],
             'surveyConfig'         => $lg->survey_config         ?? [],
             'googleSheetsConfig'   => $lg->google_sheets_config  ?? [],
+            'licenseData'          => [
+                'licensed_until'  => $lg->licensed_until?->format('Y-m-d'),
+                'is_licensed'     => $lg->isLicensed(),
+                'days_remaining'  => $lg->licensed_until
+                    ? (int) now()->startOfDay()->diffInDays($lg->licensed_until->startOfDay(), false)
+                    : null,
+                'license_key'     => $lg->license_key,
+            ],
             'lg'             => $lg,
             'provinces'      => $provinces,
             'districts'      => $districts,

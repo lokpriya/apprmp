@@ -20,7 +20,8 @@ class InstitutionReportController extends Controller
 {
     private function defaultLg(): ?LocalGovernment
     {
-        return LocalGovernment::with(['district.province'])->first();
+        return LocalGovernment::with(['district.province'])->where('is_active', true)->first()
+            ?? LocalGovernment::with(['district.province'])->first();
     }
 
     private function lgProps(LocalGovernment $lg): array

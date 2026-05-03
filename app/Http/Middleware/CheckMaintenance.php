@@ -16,7 +16,7 @@ class CheckMaintenance
             return $next($request);
         }
 
-        $lg     = LocalGovernment::first();
+        $lg     = LocalGovernment::getFirstCached();
         $config = $lg?->maintenance_config ?? [];
 
         if ($config['is_active'] ?? false) {

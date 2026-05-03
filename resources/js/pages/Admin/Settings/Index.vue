@@ -1922,6 +1922,147 @@
 
     </div>
 
+    <!-- ── License Tab (super_admin only) ────────────────────────────── -->
+    <div v-if="activeTab === 'license' && isSuperAdmin" class="space-y-5">
+
+      <!-- Status card -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <h2 class="section-heading mb-4">
+          <span class="section-heading-icon"><i class="fa-solid fa-shield-halved text-violet-600 text-sm"></i></span>
+          लाइसेन्स अवस्था
+        </h2>
+        <div class="flex items-start gap-4 flex-wrap">
+          <div v-if="props.licenseData.is_licensed"
+            class="flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg flex-1 min-w-0">
+            <i class="fa-solid fa-shield-check text-emerald-500 text-xl shrink-0"></i>
+            <div class="min-w-0">
+              <p class="text-[13px] font-bold text-emerald-700">सक्रिय छ</p>
+              <p class="text-[12px] text-emerald-600 mt-0.5">
+                म्याद: <strong>{{ props.licenseData.licensed_until }}</strong>
+                <span v-if="props.licenseData.days_remaining !== null" class="ml-2 text-[11px] text-emerald-500">
+                  ({{ props.licenseData.days_remaining }} दिन बाँकी)
+                </span>
+              </p>
+            </div>
+          </div>
+          <div v-else
+            class="flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-lg flex-1">
+            <i class="fa-solid fa-shield-xmark text-red-500 text-xl shrink-0"></i>
+            <div>
+              <p class="text-[13px] font-bold text-red-700">
+                {{ props.licenseData.licensed_until ? 'म्याद सकियो' : 'लाइसेन्स छैन' }}
+              </p>
+              <p v-if="props.licenseData.licensed_until" class="text-[12px] text-red-500 mt-0.5">
+                म्याद सकिएको मिति: {{ props.licenseData.licensed_until }}
+              </p>
+              <p v-else class="text-[12px] text-red-500 mt-0.5">
+                कुनै लाइसेन्स सक्रिय छैन
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Current key display -->
+        <template v-if="props.licenseData.license_key">
+          <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mt-5 mb-1.5">हालको लाइसेन्स की</p>
+          <div class="relative">
+            <textarea readonly rows="2"
+              class="w-full px-3 py-2 rounded-md border border-gray-200 bg-gray-50 font-mono text-[11px] text-gray-600 resize-none pr-20"
+              :value="showCurrentKey ? props.licenseData.license_key : '••••••••••••••••••••••••••••••••••••••••'"></textarea>
+            <div class="absolute top-2 right-2 flex gap-1">
+              <button type="button" @click="showCurrentKey = !showCurrentKey"
+                class="px-2 py-1 bg-white border border-gray-200 rounded text-[10px] text-gray-500 hover:bg-gray-100 transition-colors">
+                <i :class="showCurrentKey ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'"></i>
+              </button>
+              <button type="button" @click="copyKey(props.licenseData.license_key)"
+                class="px-2 py-1 bg-white border border-gray-200 rounded text-[10px] transition-colors"
+                :class="keyCopied ? 'text-emerald-600 border-emerald-300' : 'text-gray-500 hover:bg-gray-100'">
+                <i :class="keyCopied ? 'fa-solid fa-check' : 'fa-solid fa-copy'"></i>
+              </button>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Generate license card -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <h2 class="section-heading mb-1">
+          <span class="section-heading-icon"><i class="fa-solid fa-wand-magic-sparkles text-violet-600 text-sm"></i></span>
+          नयाँ लाइसेन्स उत्पन्न गर्नुहोस्
+        </h2>
+        <p class="text-[12px] text-[#626976] mb-4">
+          म्याद अवधि राखी "उत्पन्न गर्नुहोस्" थिच्नुहोस् — की स्वतः उत्पन्न र सक्रिय हुनेछ।
+        </p>
+        <form @submit.prevent="generateLicense" class="space-y-4">
+          <div class="flex items-end gap-3">
+            <div class="flex-1">
+              <label class="field-label">म्याद (दिनमा) <span class="text-red-400">*</span></label>
+              <input v-model.number="generateDays" type="number" min="1" max="3650" required
+                class="field-input" placeholder="365" />
+            </div>
+            <div class="pb-0.5">
+              <p class="text-[11px] text-gray-400 mb-1.5">
+                ≈ {{ generateDays ? Math.round(generateDays / 365 * 10) / 10 : '—' }} वर्ष
+              </p>
+            </div>
+          </div>
+
+          <!-- Generated key result -->
+          <div v-if="newGeneratedKey" class="rounded-lg border border-emerald-200 bg-emerald-50 p-4 space-y-2">
+            <p class="text-[12px] font-semibold text-emerald-700">
+              <i class="fa-solid fa-circle-check mr-1.5"></i>
+              लाइसेन्स उत्पन्न र सक्रिय भयो!
+            </p>
+            <div class="relative">
+              <textarea readonly rows="2"
+                class="w-full px-3 py-2 rounded-md border border-emerald-200 bg-white font-mono text-[11px] text-gray-700 resize-none pr-12"></textarea>
+              <div class="absolute inset-0 pointer-events-none px-3 py-2 font-mono text-[11px] text-gray-700 break-all leading-relaxed overflow-hidden">{{ newGeneratedKey }}</div>
+              <button type="button" @click="copyKey(newGeneratedKey)"
+                class="absolute top-2 right-2 px-2 py-1 bg-white border rounded text-[10px] transition-colors"
+                :class="keyCopied ? 'text-emerald-600 border-emerald-300' : 'text-gray-500 border-gray-200 hover:bg-gray-50'">
+                <i :class="keyCopied ? 'fa-solid fa-check' : 'fa-solid fa-copy'"></i>
+              </button>
+            </div>
+            <p class="text-[11px] text-emerald-600">यो की सुरक्षित स्थानमा सुरक्षित राख्नुहोस्।</p>
+          </div>
+
+          <button type="submit" :disabled="generateLoading"
+            class="inline-flex items-center gap-2 h-9 px-5 bg-violet-600 hover:bg-violet-700 text-white text-[13px] font-medium rounded-md transition-colors disabled:opacity-50">
+            <i v-if="generateLoading" class="fa-solid fa-spinner fa-spin text-[11px]"></i>
+            <i v-else class="fa-solid fa-wand-magic-sparkles text-[11px]"></i>
+            {{ generateLoading ? 'उत्पन्न हुँदैछ...' : 'उत्पन्न गर्नुहोस्' }}
+          </button>
+        </form>
+      </div>
+
+      <!-- Activate external key card -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <h2 class="section-heading mb-1">
+          <span class="section-heading-icon"><i class="fa-solid fa-key text-violet-600 text-sm"></i></span>
+          बाह्य लाइसेन्स की सक्रिय गर्नुहोस्
+        </h2>
+        <p class="text-[12px] text-[#626976] mb-4">
+          Artisan कमाण्ड <code class="bg-gray-100 px-1.5 py-0.5 rounded text-[11px] font-mono">php artisan license:generate</code> वा अर्को प्रणालीबाट उत्पन्न की यहाँ टाँस्नुहोस्।
+        </p>
+        <form @submit.prevent="activateLicense" class="space-y-3">
+          <div>
+            <label class="field-label">लाइसेन्स की <span class="text-red-400">*</span></label>
+            <textarea v-model="licenseKey" rows="3" required
+              class="field-input font-mono text-[12px]"
+              placeholder="1|2027-05-01|abc123def456..."></textarea>
+            <p v-if="licenseError" class="field-error mt-1">{{ licenseError }}</p>
+          </div>
+          <button type="submit" :disabled="licenseActivating"
+            class="inline-flex items-center gap-2 h-9 px-5 bg-violet-600 hover:bg-violet-700 text-white text-[13px] font-medium rounded-md transition-colors disabled:opacity-50">
+            <i v-if="licenseActivating" class="fa-solid fa-spinner fa-spin text-[11px]"></i>
+            <i v-else class="fa-solid fa-shield-check text-[11px]"></i>
+            {{ licenseActivating ? 'सक्रिय हुँदैछ...' : 'सक्रिय गर्नुहोस्' }}
+          </button>
+        </form>
+      </div>
+
+    </div>
+
     <!-- Ward edit modal -->
     <Teleport to="body">
       <div v-if="editingWardId" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -2868,7 +3009,8 @@ const props = defineProps({
   maintenanceConfig:    { type: Object,  default: () => ({}) },
   surveyConfig:         { type: Object,  default: () => ({}) },
   googleSheetsConfig:   { type: Object,  default: () => ({}) },
-  settlements:        { type: Array,   default: () => [] },
+  settlements:          { type: Array,   default: () => [] },
+  licenseData:          { type: Object,  default: () => ({ licensed_until: null, is_licensed: false, days_remaining: null, license_key: null }) },
 })
 
 // ── Lock / Unlock ─────────────────────────────────────────────────────────────
@@ -2878,27 +3020,31 @@ const locked = computed(() => props.isLocked)
 function lockSettings()   { router.post('/admin/settings/lock') }
 function unlockSettings() { router.post('/admin/settings/unlock') }
 
-const tabs = [
-  { key: 'general',         label: 'सामान्य',           icon: 'fa-solid fa-gear' },
-  { key: 'wards',           label: 'वडाहरू',            icon: 'fa-solid fa-map-pin' },
-  { key: 'toles',           label: 'टोल/बस्ती',        icon: 'fa-solid fa-location-dot' },
-  { key: 'profile',         label: 'प्रोफाइल',         icon: 'fa-solid fa-file-lines' },
-  { key: 'map',             label: 'नक्सा',            icon: 'fa-solid fa-map' },
-  { key: 'photo',           label: 'फोटो डाइरेक्टरी', icon: 'fa-solid fa-camera' },
-  { key: 'welcome',         label: 'स्वागत सन्देश',    icon: 'fa-solid fa-bullhorn' },
-  { key: 'representatives', label: 'जनप्रतिनिधि',      icon: 'fa-solid fa-people-group' },
-  { key: 'employees',       label: 'कर्मचारी',          icon: 'fa-solid fa-id-badge' },
-  { key: 'gallery',         label: 'फोटो ग्यालरी',     icon: 'fa-solid fa-images' },
-  { key: 'downloads',       label: 'डाउनलोड लिंक',     icon: 'fa-solid fa-link' },
-  { key: 'maintenance',     label: 'मर्मत अवस्था',      icon: 'fa-solid fa-triangle-exclamation' },
-  { key: 'survey_period',  label: 'सर्वेक्षण अवधि',   icon: 'fa-solid fa-calendar-check' },
-  { key: 'google_sheets',  label: 'Google Sheets',      icon: 'fa-brands fa-google' },
-  { key: 'sync',           label: 'आयात/निर्यात',      icon: 'fa-solid fa-arrows-rotate' },
-]
+const tabs = computed(() => {
+  const base = [
+    { key: 'general',         label: 'सामान्य',           icon: 'fa-solid fa-gear' },
+    { key: 'wards',           label: 'वडाहरू',            icon: 'fa-solid fa-map-pin' },
+    { key: 'toles',           label: 'टोल/बस्ती',        icon: 'fa-solid fa-location-dot' },
+    { key: 'profile',         label: 'प्रोफाइल',         icon: 'fa-solid fa-file-lines' },
+    { key: 'map',             label: 'नक्सा',            icon: 'fa-solid fa-map' },
+    { key: 'photo',           label: 'फोटो डाइरेक्टरी', icon: 'fa-solid fa-camera' },
+    { key: 'welcome',         label: 'स्वागत सन्देश',    icon: 'fa-solid fa-bullhorn' },
+    { key: 'representatives', label: 'जनप्रतिनिधि',      icon: 'fa-solid fa-people-group' },
+    { key: 'employees',       label: 'कर्मचारी',          icon: 'fa-solid fa-id-badge' },
+    { key: 'gallery',         label: 'फोटो ग्यालरी',     icon: 'fa-solid fa-images' },
+    { key: 'downloads',       label: 'डाउनलोड लिंक',     icon: 'fa-solid fa-link' },
+    { key: 'maintenance',     label: 'मर्मत अवस्था',      icon: 'fa-solid fa-triangle-exclamation' },
+    { key: 'survey_period',  label: 'सर्वेक्षण अवधि',   icon: 'fa-solid fa-calendar-check' },
+    { key: 'google_sheets',  label: 'Google Sheets',      icon: 'fa-brands fa-google' },
+    { key: 'sync',           label: 'आयात/निर्यात',      icon: 'fa-solid fa-arrows-rotate' },
+  ]
+  if (props.isSuperAdmin) base.push({ key: 'license', label: 'लाइसेन्स', icon: 'fa-solid fa-shield-halved' })
+  return base
+})
 
 const activeTab    = ref(props.tab)
 const tabMenuOpen  = ref(false)
-const activeTabObj = computed(() => tabs.find(t => t.key === activeTab.value))
+const activeTabObj = computed(() => tabs.value.find(t => t.key === activeTab.value))
 
 function selectTab(key) {
   activeTab.value   = key
@@ -3794,6 +3940,54 @@ function submitImport() {
       if (importFileInput.value) importFileInput.value.value = ''
       importForm.sections = importSections.map(s => s.key)
     },
+  })
+}
+
+// ── License ────────────────────────────────────────────────────────────────
+const licenseKey        = ref('')
+const licenseError      = ref('')
+const licenseActivating = ref(false)
+
+// Generate
+const generateDays    = ref(365)
+const generateLoading = ref(false)
+const newGeneratedKey = ref(page.props.flash?.generated_key ?? '')
+const showCurrentKey  = ref(false)
+const keyCopied       = ref(false)
+
+function copyKey(key) {
+  navigator.clipboard.writeText(key).then(() => {
+    keyCopied.value = true
+    setTimeout(() => { keyCopied.value = false }, 2000)
+  })
+}
+
+function generateLicense() {
+  generateLoading.value = true
+  newGeneratedKey.value = ''
+  router.post('/admin/settings/license/generate', { days: generateDays.value }, {
+    onError: () => { generateLoading.value = false },
+    onSuccess: () => {
+      newGeneratedKey.value = page.props.flash?.generated_key ?? ''
+      generateLoading.value = false
+    },
+    onFinish: () => { generateLoading.value = false },
+  })
+}
+
+function activateLicense() {
+  licenseError.value = ''
+  licenseActivating.value = true
+  router.post('/admin/settings/license/activate', { license_key: licenseKey.value }, {
+    onError: (errors) => {
+      licenseError.value = errors.license_key ?? 'अज्ञात त्रुटि भयो।'
+      licenseActivating.value = false
+    },
+    onSuccess: () => {
+      licenseKey.value = ''
+      licenseActivating.value = false
+    },
+    onFinish: () => { licenseActivating.value = false },
   })
 }
 </script>

@@ -151,6 +151,11 @@ function ins_writeEnv(string $root, array $d): bool {
     $env .= "MAIL_USERNAME=null\nMAIL_PASSWORD=null\nMAIL_ENCRYPTION=null\n";
     $env .= "MAIL_FROM_ADDRESS=\"noreply@example.com\"\nMAIL_FROM_NAME=\"\${APP_NAME}\"\n\n";
     $env .= "FILESYSTEM_DISK=local\n";
+    $webRoot = $d['webroot'] ?? '';
+    if ($webRoot) {
+        $env .= "PUBLIC_DISK_ROOT={$webRoot}/uploads\n";
+        $env .= "PUBLIC_DISK_URL=" . rtrim($d['app_url'], '/') . "/uploads\n";
+    }
     return file_put_contents($root . '/.env', $env) !== false;
 }
 
@@ -318,7 +323,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$completed) {
             $log = [];
             // Write .env
             $envData = array_merge($app, ['db_host'=>$db['host'],'db_port'=>$db['port'],
-                                          'db_name'=>$db['name'],'db_user'=>$db['user'],'db_pass'=>$db['pass']]);
+                                          'db_name'=>$db['name'],'db_user'=>$db['user'],'db_pass'=>$db['pass'],
+                                          'webroot'=>__DIR__]);
             if (!ins_writeEnv($lRoot, $envData)) {
                 $errors[] = '.env write failed — ensure ' . h($lRoot) . ' is writable.';
             } else {
@@ -355,6 +361,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$completed) {
                     }
                 }
                 $log[] = ['ok'=>true, 'label'=>'Set storage/bootstrap permissions (755/644)', 'out'=>'Done'];
+                // create uploads/ folder in webroot for public disk
+                $uploadsDir = __DIR__ . '/uploads';
+                if (!is_dir($uploadsDir)) {
+                    @mkdir($uploadsDir, 0755, true);
+                }
+                $log[] = ['ok'=>true, 'label'=>'Create uploads/ folder for public storage', 'out'=>is_dir($uploadsDir) ? 'OK: '.$uploadsDir : 'Already exists or skipped'];
                 // clear caches
                 ins_artisan($lRoot, 'config:clear');
                 ins_artisan($lRoot, 'route:clear');

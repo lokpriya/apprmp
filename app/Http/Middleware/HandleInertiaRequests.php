@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\EditRequest;
+use App\Models\LocalGovernment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Middleware;
@@ -27,8 +28,12 @@ class HandleInertiaRequests extends Middleware
                     'email' => $request->user()->email,
                     'role'  => $request->user()->role,
                 ],
-                'local_government' => $request->user()->localGovernment?->name_np,
-                'lg' => $request->user()->localGovernment?->only('id', 'name_np', 'name_en', 'photo_dir'),
+                'local_government' => ($request->user()->local_government_id
+                    ? LocalGovernment::getCached($request->user()->local_government_id)?->name_np
+                    : null),
+                'lg' => ($request->user()->local_government_id
+                    ? LocalGovernment::getCached($request->user()->local_government_id)?->only('id', 'name_np', 'name_en', 'photo_dir')
+                    : null),
             ] : null,
 
             // Cached for 30 s — cheap for a toggle that rarely changes mid-session
@@ -36,13 +41,15 @@ class HandleInertiaRequests extends Middleware
                 ? Cache::remember(
                     'survey_frozen_' . ($request->user()->local_government_id ?? 0),
                     30,
-                    fn () => (bool) $request->user()->localGovernment?->isSurveyFrozen()
+                    fn () => (bool) ($request->user()->local_government_id
+                        ? LocalGovernment::getCached($request->user()->local_government_id)?->isSurveyFrozen()
+                        : false)
                 )
                 : false,
 
-            // Cached 60 s per LG — bust via EditRequest::saved/deleted observer
+            // rememberForever — busted by EditRequest::booted() on created/updated/deleted
             'editRequestsCount' => fn () => $request->user()?->isAdmin()
-                ? Cache::remember('edit_requests_pending', 60, fn () =>
+                ? Cache::rememberForever('edit_requests_pending', fn () =>
                     EditRequest::where('status', 'pending')->count()
                   )
                 : 0,
@@ -70,9 +77,12 @@ class HandleInertiaRequests extends Middleware
                   )
                 : [],
 
+            'twoFactorEnabled' => fn () => (bool) $request->user()?->hasTwoFactorEnabled(),
+
             'flash' => [
                 'success'                         => fn () => $request->session()->get('success'),
                 'error'                           => fn () => $request->session()->get('error'),
+                'generated_key'                   => fn () => $request->session()->get('generated_key'),
                 'import_result'                   => fn () => $request->session()->get('import_result'),
                 'settlement_import_result'        => fn () => $request->session()->get('settlement_import_result'),
                 'ward_import_result'              => fn () => $request->session()->get('ward_import_result'),

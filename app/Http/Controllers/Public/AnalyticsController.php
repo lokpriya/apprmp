@@ -25,7 +25,8 @@ class AnalyticsController extends Controller
     {
         // 10-minute cache — busted by SettingsController on general/map save
         return Cache::remember('active_lg_full', 600, fn () =>
-            LocalGovernment::with(['district.province'])->first()
+            LocalGovernment::with(['district.province'])->where('is_active', true)->first()
+                ?? LocalGovernment::with(['district.province'])->first()
         );
     }
 
@@ -591,7 +592,8 @@ class AnalyticsController extends Controller
                 'type'    => $i->institutionType?->name_en,
             ]);
 
-        $lg = LocalGovernment::with(['district.province'])->first();
+        $lg = LocalGovernment::with(['district.province'])->where('is_active', true)->first()
+            ?? LocalGovernment::with(['district.province'])->first();
 
         return Inertia::render('Public/Ward', [
             'lg'           => $lg ? $this->lgProps($lg) : null,
