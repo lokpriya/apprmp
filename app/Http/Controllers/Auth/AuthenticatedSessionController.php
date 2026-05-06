@@ -20,7 +20,12 @@ class AuthenticatedSessionController extends Controller
         $lg = LocalGovernment::getFirstCached();
         return Inertia::render('Auth/Login', [
             'status' => session('status'),
-            'lg'     => $lg,
+            'lg'     => $lg ? [
+                'name_np'        => $lg->name_np,
+                'name_en'        => $lg->name_en,
+                'logo'           => $lg->logo,
+                'login_branding' => $lg->welcome_config['login_branding'] ?? null,
+            ] : null,
         ]);
     }
 
@@ -36,8 +41,10 @@ class AuthenticatedSessionController extends Controller
         if ($user->hasTwoFactorEnabled()) {
             $remember = $request->boolean('remember');
             \Illuminate\Support\Facades\Auth::logout();
+            $request->session()->regenerate();
             $request->session()->put('login.id', $user->id);
             $request->session()->put('login.remember', $remember);
+            $request->session()->put('login.parked_at', now()->timestamp);
             return redirect()->route('two-factor.challenge');
         }
 

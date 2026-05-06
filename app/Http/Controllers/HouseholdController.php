@@ -30,7 +30,7 @@ class HouseholdController extends Controller
         if ($user->isEnumerator()) {
             $wardIds = $user->assignedWards()->pluck('wards.id')->toArray();
             $query->whereIn('ward_id', $wardIds)->where('enumerator_id', $user->id);
-        } elseif ($user->isReviewer()) {
+        } elseif ($user->isReviewer() || $user->isWardAdmin()) {
             $wardIds = $user->assignedWards()->pluck('wards.id')->toArray();
             $query->whereIn('ward_id', $wardIds);
         } elseif ($user->isAdmin()) {
@@ -55,9 +55,9 @@ class HouseholdController extends Controller
                 'survey_date'       => $hh->survey_date?->format('Y-m-d'),
                 'status'            => $hh->status,
                 'enumerator'        => $hh->enumerator ? ['name' => $hh->enumerator->name] : null,
-                'can_edit'          => $user->isAdmin() || (in_array($hh->status, ['draft','rejected']) && $hh->enumerator_id === $user->id),
-                'can_submit'        => in_array($hh->status, ['draft', 'rejected']) && ($user->isAdmin() || $hh->enumerator_id === $user->id),
-                'can_approve'       => ($user->isReviewer() || $user->isAdmin()) && $hh->status === 'submitted',
+                'can_edit'          => $user->hasPermission('households.edit') && ($user->isAdmin() || ($user->isWardAdmin() && in_array($hh->ward_id, $user->getAssignedWardIds())) || (in_array($hh->status, ['draft','rejected','submitted']) && ($user->isReviewer() || $hh->enumerator_id === $user->id))),
+                'can_submit'        => $user->hasPermission('households.submit') && in_array($hh->status, ['draft', 'rejected']) && ($user->isAdmin() || $user->isWardAdmin() || $user->isReviewer() || $hh->enumerator_id === $user->id),
+                'can_approve'       => $user->hasPermission('households.approve') && (($user->isAdmin() && $hh->status === 'ward_approved') || (($user->isWardAdmin() || $user->isReviewer()) && $hh->status === 'submitted' && in_array($hh->ward_id, $user->getAssignedWardIds()))),
                 'completeness'      => CompletenessScoreService::score($hh),
             ]);
 
@@ -115,10 +115,20 @@ class HouseholdController extends Controller
         $fv   = $household->fieldVerification;
         return Inertia::render('Households/Show', [
             'household'  => $household,
-            'canEdit'        => $user->isAdmin()
-                                 || (in_array($household->status, ['draft','rejected']) && $household->enumerator_id === $user->id),
-            'canSubmit'      => in_array($household->status, ['draft', 'rejected']) && ($user->isAdmin() || $household->enumerator_id === $user->id),
-            'canPublish'     => in_array($household->status, ['ward_approved', 'escalated']) && $user->isAdmin(),
+            'canEdit'        => $user->hasPermission('households.edit')
+                                 && ($user->isAdmin()
+                                     || ($user->isWardAdmin() && in_array($household->ward_id, $user->getAssignedWardIds()))
+                                     || (in_array($household->status, ['draft','rejected','submitted']) && ($user->isReviewer() || $household->enumerator_id === $user->id))),
+            'canSubmit'      => $user->hasPermission('households.submit') && in_array($household->status, ['draft', 'rejected']) && ($user->isAdmin() || $user->isWardAdmin() || $user->isReviewer() || $household->enumerator_id === $user->id),
+            'canPublish'     => $user->hasPermission('households.publish') && in_array($household->status, ['ward_approved', 'escalated'])
+                                 && ($user->isAdmin() || ($user->isWardAdmin() && in_array($household->ward_id, $user->getAssignedWardIds()))),
+            'canApprove'     => $user->hasPermission('households.approve')
+                                 && (($user->isAdmin() && $household->status === 'ward_approved')
+                                     || (($user->isWardAdmin() || $user->isReviewer()) && $household->status === 'submitted' && in_array($household->ward_id, $user->getAssignedWardIds()))),
+            'canReject'      => $user->hasPermission('households.reject')
+                                 && ($user->isAdmin()
+                                     ? in_array($household->status, ['ward_approved', 'escalated', 'published'])
+                                     : in_array($household->status, ['submitted', 'ward_approved']) && in_array($household->ward_id, $user->getAssignedWardIds())),
             'canRequestEdit' => $user->isReviewer() && $household->status === 'published'
                                  && !EditRequest::where('requestable_type', Household::class)
                                                 ->where('requestable_id', $household->id)
@@ -128,7 +138,7 @@ class HouseholdController extends Controller
                                                 ->where('requestable_id', $household->id)
                                                 ->where('status', 'pending')
                                                 ->exists(),
-            'canVerify'          => ($user->isReviewer() || $user->isAdmin()) && $household->status !== 'draft',
+            'canVerify'          => ($user->isReviewer() || $user->isWardAdmin() || $user->isAdmin()) && $household->status !== 'draft',
             'canMarkDeceased'    => $user->hasPermission('households.mark_deceased'),
             'fieldVerification' => $fv ? [
                 'visited_at'  => $fv->visited_at?->format('Y-m-d'),
@@ -476,8 +486,8 @@ class HouseholdController extends Controller
         $user = auth()->user();
         return response()->json([
             'household' => $household,
-            'canEdit'   => in_array($household->status, ['draft','rejected']) && ($user->isAdmin() || $household->enumerator_id === $user->id),
-            'canSubmit' => in_array($household->status, ['draft', 'rejected']) && ($user->isAdmin() || $household->enumerator_id === $user->id),
+            'canEdit'   => $user->hasPermission('households.edit') && ($user->isAdmin() || (in_array($household->status, ['draft','rejected']) && ($user->isReviewer() || $household->enumerator_id === $user->id))),
+            'canSubmit' => $user->hasPermission('households.submit') && in_array($household->status, ['draft', 'rejected']) && ($user->isAdmin() || $user->isReviewer() || $household->enumerator_id === $user->id),
         ]);
     }
 

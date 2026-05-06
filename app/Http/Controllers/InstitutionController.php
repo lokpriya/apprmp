@@ -30,7 +30,7 @@ class InstitutionController extends Controller
         if ($user->isEnumerator()) {
             $wardIds = $user->assignedWards()->pluck('wards.id')->toArray();
             $query->whereIn('ward_id', $wardIds)->where('enumerator_id', $user->id);
-        } elseif ($user->isReviewer()) {
+        } elseif ($user->isReviewer() || $user->isWardAdmin()) {
             $wardIds = $user->assignedWards()->pluck('wards.id')->toArray();
             $query->whereIn('ward_id', $wardIds);
         } elseif ($user->isAdmin()) {
@@ -54,8 +54,8 @@ class InstitutionController extends Controller
                 'ownership_type'   => $i->ownership_type,
                 'status'           => $i->status,
                 'enumerator'       => $i->enumerator ? ['name' => $i->enumerator->name] : null,
-                'can_edit'         => $user->isAdmin() || (in_array($i->status, ['draft','rejected']) && $i->enumerator_id === $user->id),
-                'can_submit'       => in_array($i->status, ['draft', 'rejected']) && ($user->isAdmin() || $i->enumerator_id === $user->id),
+                'can_edit'         => $user->hasPermission('institutions.edit') && ($user->isAdmin() || ($user->isWardAdmin() && in_array($i->ward_id, $user->getAssignedWardIds())) || (in_array($i->status, ['draft','rejected','submitted']) && ($user->isReviewer() || $i->enumerator_id === $user->id))),
+                'can_submit'       => $user->hasPermission('institutions.submit') && in_array($i->status, ['draft', 'rejected']) && ($user->isAdmin() || $user->isWardAdmin() || $user->isReviewer() || $i->enumerator_id === $user->id),
                 'completeness'     => CompletenessScoreService::institution($i),
             ]);
 
@@ -132,10 +132,20 @@ class InstitutionController extends Controller
         return Inertia::render('Institutions/Show', [
             'institution' => $institutionData,
             'surveyOpts'  => $surveyOpts,
-            'canEdit'        => $user->isAdmin()
-                                  || (in_array($institution->status, ['draft','rejected']) && $institution->enumerator_id === $user->id),
-            'canSubmit'      => in_array($institution->status, ['draft', 'rejected']) && ($user->isAdmin() || $institution->enumerator_id === $user->id),
-            'canPublish'     => in_array($institution->status, ['ward_approved', 'escalated']) && $user->isAdmin(),
+            'canEdit'        => $user->hasPermission('institutions.edit')
+                                  && ($user->isAdmin()
+                                      || ($user->isWardAdmin() && in_array($institution->ward_id, $user->getAssignedWardIds()))
+                                      || (in_array($institution->status, ['draft','rejected','submitted']) && ($user->isReviewer() || $institution->enumerator_id === $user->id))),
+            'canSubmit'      => $user->hasPermission('institutions.submit') && in_array($institution->status, ['draft', 'rejected']) && ($user->isAdmin() || $user->isWardAdmin() || $user->isReviewer() || $institution->enumerator_id === $user->id),
+            'canPublish'     => $user->hasPermission('institutions.publish') && in_array($institution->status, ['ward_approved', 'escalated'])
+                                  && ($user->isAdmin() || ($user->isWardAdmin() && in_array($institution->ward_id, $user->getAssignedWardIds()))),
+            'canApprove'     => $user->hasPermission('institutions.approve')
+                                  && (($user->isAdmin() && $institution->status === 'ward_approved')
+                                      || (($user->isWardAdmin() || $user->isReviewer()) && $institution->status === 'submitted' && in_array($institution->ward_id, $user->getAssignedWardIds()))),
+            'canReject'      => $user->hasPermission('institutions.reject')
+                                  && ($user->isAdmin()
+                                      ? in_array($institution->status, ['ward_approved', 'escalated', 'published'])
+                                      : in_array($institution->status, ['submitted', 'ward_approved']) && in_array($institution->ward_id, $user->getAssignedWardIds())),
             'canRequestEdit' => $user->isReviewer() && $institution->status === 'published'
                                   && !EditRequest::where('requestable_type', Institution::class)
                                                  ->where('requestable_id', $institution->id)
@@ -145,7 +155,7 @@ class InstitutionController extends Controller
                                                  ->where('requestable_id', $institution->id)
                                                  ->where('status', 'pending')
                                                  ->exists(),
-            'canVerify'      => ($user->isReviewer() || $user->isAdmin()) && $institution->status !== 'draft',
+            'canVerify'      => ($user->isReviewer() || $user->isWardAdmin() || $user->isAdmin()) && $institution->status !== 'draft',
             'fieldVerification' => $fv ? [
                 'visited_at'  => $fv->visited_at?->format('Y-m-d'),
                 'is_verified' => $fv->is_verified,

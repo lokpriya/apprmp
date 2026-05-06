@@ -169,5 +169,17 @@ const categories = [
     labelKey: 'reports.cat.economics',
     descKey:  'reports.desc.economics',
   },
+  {
+    href: '/public/reports/agriculture',
+    icon: '🌾', bgRaw: '#f4f9f0',
+    labelKey: 'reports.cat.agriculture',
+    descKey:  'reports.desc.agriculture',
+  },
+  {
+    href: '/public/reports/migration',
+    icon: '✈️',  bgRaw: '#f0f4ff',
+    labelKey: 'reports.cat.migration',
+    descKey:  'reports.desc.migration',
+  },
 ]
 </script>

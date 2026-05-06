@@ -37,7 +37,7 @@ Route::middleware('maintenance')->group(function () {
         if ($op === '-' && $a < $b) [$a, $b] = [$b, $a];
         $answer = match($op) { '+' => $a + $b, '-' => $a - $b, '×' => $a * $b };
         session(['captcha_answer' => $answer]);
-        $lg = \App\Models\LocalGovernment::first();
+        $lg = \App\Models\LocalGovernment::getFirstCached();
         return view('public.verify', ['problem' => "$a $op $b", 'lg' => $lg]);
     })->name('public.verify');
 
@@ -78,9 +78,12 @@ Route::prefix('public')->name('public.')->middleware(['maintenance', 'public.acc
         Route::get('/housing',             [ReportController::class,    'housing'])        ->name('housing');
         Route::get('/utilities',           [ReportController::class,    'utilities'])      ->name('utilities');
         Route::get('/economics',           [ReportController::class,    'economics'])      ->name('economics');
+        Route::get('/agriculture',         [ReportController::class,    'agriculture'])    ->name('agriculture');
+        Route::get('/migration',           [ReportController::class,    'migration'])      ->name('migration');
         Route::get('/export/{category}',   [ReportExportController::class, 'download'])   ->name('export');
         Route::get('/population-pyramid',  [AnalyticsController::class, 'populationPyramid'])->name('population-pyramid');
         Route::get('/ward-summary',        [AnalyticsController::class, 'wardSummaryPage'])  ->name('ward-summary');
+        Route::get('/ward/{wardId}',       [AnalyticsController::class, 'wardProfile'])      ->name('ward-profile');
     });
 
     // ── Public Business Reports ──────────────────────────────────────────────
@@ -122,6 +125,7 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
         return match($role) {
             'enumerator'      => redirect()->route('households.index'),
             'ward_reviewer'   => redirect()->route('review.index'),
+            'ward_admin'      => redirect()->route('households.index'),
             'municipal_admin',
             'super_admin'     => redirect()->route('admin.dashboard'),
             default           => view('dashboard'),
@@ -136,7 +140,7 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
     // ─── Enumerator + Reviewer Routes ───────────────────────────────────────
     // ward_reviewer included so they can access show/index pages for records they review.
     // Controller-level policies enforce write restrictions per role.
-    Route::middleware(['role:enumerator,ward_reviewer,municipal_admin,super_admin', 'ward.scope', 'survey.period'])->group(function () {
+    Route::middleware(['role:enumerator,ward_reviewer,ward_admin,municipal_admin,super_admin', 'ward.scope', 'survey.period'])->group(function () {
         Route::get('households/{household}/preview', [HouseholdController::class, 'preview'])->name('households.preview');
         Route::get('households/{household}/members/{member}', [HouseholdController::class, 'showMember'])->name('households.members.show');
         Route::post('households/bulk-submit',  [HouseholdController::class, 'bulkSubmit']) ->name('households.bulk-submit');
@@ -156,7 +160,7 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
     });
 
     // ─── PDF Export ─────────────────────────────────────────────────────────
-    Route::middleware(['role:enumerator,ward_reviewer,municipal_admin,super_admin'])->group(function () {
+    Route::middleware(['role:enumerator,ward_reviewer,ward_admin,municipal_admin,super_admin'])->group(function () {
         Route::get('households/{household}/pdf',   [PdfController::class, 'household'])  ->name('households.pdf');
         Route::get('institutions/{institution}/pdf',[PdfController::class, 'institution'])->name('institutions.pdf');
         Route::get('businesses/{business}/pdf',    [PdfController::class, 'business'])   ->name('businesses.pdf');
@@ -173,27 +177,27 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
     Route::post('notifications/{id}/read',  [NotificationController::class, 'markRead'])   ->name('notifications.read');
     Route::post('notifications/read-all',   [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
 
-    // ─── Edit Requests (Ward Reviewer can submit) ────────────────────────────
-    Route::middleware(['role:ward_reviewer,municipal_admin,super_admin'])
+    // ─── Edit Requests (Ward Reviewer+ can submit) ──────────────────────────
+    Route::middleware(['role:ward_reviewer,ward_admin,municipal_admin,super_admin'])
         ->post('edit-requests', [EditRequestController::class, 'store'])
         ->name('edit-requests.store');
 
     // ─── Field Verification ──────────────────────────────────────────────────
-    Route::middleware(['role:ward_reviewer,municipal_admin,super_admin'])->group(function () {
+    Route::middleware(['role:ward_reviewer,ward_admin,municipal_admin,super_admin'])->group(function () {
         Route::post('households/{household}/field-verify',   [FieldVerificationController::class, 'saveHousehold'])  ->name('households.field-verify');
         Route::post('institutions/{institution}/field-verify',[FieldVerificationController::class, 'saveInstitution'])->name('institutions.field-verify');
         Route::post('businesses/{business}/field-verify',    [FieldVerificationController::class, 'saveBusiness'])   ->name('businesses.field-verify');
     });
 
     // ─── Deceased status (ward_reviewer+, bypasses workflow) ────────────────────
-    Route::middleware(['role:ward_reviewer,municipal_admin,super_admin', 'ward.scope'])
+    Route::middleware(['role:ward_reviewer,ward_admin,municipal_admin,super_admin', 'ward.scope'])
         ->group(function () {
             Route::patch('households/{household}/members/{member}/deceased', [HouseholdController::class, 'markDeceased'])->name('households.members.deceased');
             Route::delete('households/{household}/members/{member}/deceased', [HouseholdController::class, 'unmarkDeceased'])->name('households.members.undeceased');
         });
 
-    // ─── Ward Reviewer Routes ────────────────────────────────────────────────
-    Route::middleware(['role:ward_reviewer,municipal_admin,super_admin', 'ward.scope'])
+    // ─── Ward Reviewer + Ward Admin Routes (review/approve/reject) ─────────
+    Route::middleware(['role:ward_reviewer,ward_admin,municipal_admin,super_admin', 'ward.scope'])
         ->prefix('review')->name('review.')->group(function () {
             Route::get('/', [ReviewController::class, 'index'])->name('index');
             Route::get('/households', [ReviewController::class, 'households'])->name('households');
@@ -208,6 +212,27 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
             Route::patch('/businesses/{business}/approve',      [ReviewController::class, 'approveBusiness'])   ->name('businesses.approve');
             Route::patch('/businesses/{business}/reject',       [ReviewController::class, 'rejectBusiness'])    ->name('businesses.reject');
             Route::patch('/businesses/{business}/escalate',     [ReviewController::class, 'escalateBusiness'])  ->name('businesses.escalate');
+        });
+
+    // ─── Ward Admin + Municipal Admin shared routes ──────────────────────────
+    // Publish actions, publish queue, edit requests — accessible to ward_admin too
+    Route::middleware(['role:ward_admin,municipal_admin,super_admin', 'ward.scope'])
+        ->prefix('admin')->name('admin.')->group(function () {
+            Route::patch('/households/{household}/publish',       [HouseholdController::class,    'publish'])->name('households.publish');
+            Route::patch('/institutions/{institution}/publish',   [InstitutionController::class,  'publish'])->name('institutions.publish');
+            Route::patch('/businesses/{business}/publish',        [BusinessController::class,     'publish'])->name('businesses.publish');
+
+            Route::get('/publish-queue', [PublishQueueController::class, 'index'])->name('publish-queue');
+            Route::patch('/publish-queue/households/{household}/publish',     [PublishQueueController::class, 'publishHousehold'])   ->name('publish-queue.households.publish');
+            Route::patch('/publish-queue/households/{household}/reject',      [PublishQueueController::class, 'rejectHousehold'])    ->name('publish-queue.households.reject');
+            Route::patch('/publish-queue/institutions/{institution}/publish', [PublishQueueController::class, 'publishInstitution']) ->name('publish-queue.institutions.publish');
+            Route::patch('/publish-queue/institutions/{institution}/reject',  [PublishQueueController::class, 'rejectInstitution'])  ->name('publish-queue.institutions.reject');
+            Route::patch('/publish-queue/businesses/{business}/publish',      [PublishQueueController::class, 'publishBusiness'])    ->name('publish-queue.businesses.publish');
+            Route::patch('/publish-queue/businesses/{business}/reject',       [PublishQueueController::class, 'rejectBusiness'])     ->name('publish-queue.businesses.reject');
+
+            Route::get('/edit-requests',                         [EditRequestController::class, 'index'])  ->name('edit-requests.index');
+            Route::patch('/edit-requests/{editRequest}/approve', [EditRequestController::class, 'approve'])->name('edit-requests.approve');
+            Route::patch('/edit-requests/{editRequest}/reject',  [EditRequestController::class, 'reject']) ->name('edit-requests.reject');
         });
 
     // ─── Admin Routes ────────────────────────────────────────────────────────
@@ -225,23 +250,6 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
             Route::patch('/users/{user}/assign-wards',  [UserController::class, 'assignWards'])  ->name('users.assign-wards');
             Route::get('/role-permissions',              [RolePermissionsController::class, 'index'])->name('role-permissions');
             Route::patch('/role-permissions',            [RolePermissionsController::class, 'update'])->name('role-permissions.update');
-            Route::patch('/households/{household}/publish', [HouseholdController::class, 'publish'])->name('households.publish');
-            Route::patch('/institutions/{institution}/publish', [InstitutionController::class, 'publish'])->name('institutions.publish');
-            Route::patch('/businesses/{business}/publish', [BusinessController::class, 'publish'])->name('businesses.publish');
-
-            // Publish Queue
-            Route::get('/publish-queue', [PublishQueueController::class, 'index'])->name('publish-queue');
-            Route::patch('/publish-queue/households/{household}/publish', [PublishQueueController::class, 'publishHousehold'])->name('publish-queue.households.publish');
-            Route::patch('/publish-queue/households/{household}/reject',  [PublishQueueController::class, 'rejectHousehold']) ->name('publish-queue.households.reject');
-            Route::patch('/publish-queue/institutions/{institution}/publish', [PublishQueueController::class, 'publishInstitution'])->name('publish-queue.institutions.publish');
-            Route::patch('/publish-queue/institutions/{institution}/reject',  [PublishQueueController::class, 'rejectInstitution']) ->name('publish-queue.institutions.reject');
-            Route::patch('/publish-queue/businesses/{business}/publish',      [PublishQueueController::class, 'publishBusiness'])    ->name('publish-queue.businesses.publish');
-            Route::patch('/publish-queue/businesses/{business}/reject',       [PublishQueueController::class, 'rejectBusiness'])     ->name('publish-queue.businesses.reject');
-
-            // Edit Requests (reviewer → admin workflow)
-            Route::get('/edit-requests',                          [EditRequestController::class, 'index'])  ->name('edit-requests.index');
-            Route::patch('/edit-requests/{editRequest}/approve',  [EditRequestController::class, 'approve'])->name('edit-requests.approve');
-            Route::patch('/edit-requests/{editRequest}/reject',   [EditRequestController::class, 'reject']) ->name('edit-requests.reject');
 
             // Survey Options (super_admin only)
             Route::get('/survey-options',                        [SurveyOptionsController::class, 'index'])           ->name('survey-options');
@@ -273,7 +281,7 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
             Route::post('/settings/maintenance/bg',      [SettingsController::class, 'uploadMaintenanceBg']) ->name('settings.maintenance.bg');
             Route::delete('/settings/maintenance/bg',    [SettingsController::class, 'deleteMaintenanceBg']) ->name('settings.maintenance.bg.delete');
             Route::get('/maintenance-preview', fn () => view('maintenance', [
-                'lg' => \App\Models\LocalGovernment::first(),
+                'lg' => \App\Models\LocalGovernment::getFirstCached(),
             ]))->name('maintenance.preview');
 
             // Municipal Settings
@@ -285,7 +293,10 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
             Route::patch('/settings/profile', [SettingsController::class, 'updateProfile'])->name('settings.profile');
             Route::patch('/settings/map', [SettingsController::class, 'updateMap'])->name('settings.map');
             Route::patch('/settings/photo-dir',  [SettingsController::class, 'updatePhotoDir'])   ->name('settings.photo-dir');
-            Route::patch('/settings/welcome',     [SettingsController::class, 'updateWelcome'])    ->name('settings.welcome');
+            Route::patch('/settings/welcome',           [SettingsController::class, 'updateWelcome'])       ->name('settings.welcome');
+            Route::patch('/settings/login-branding',    [SettingsController::class, 'updateLoginBranding'])->name('settings.login-branding');
+            Route::post('/settings/login-landmark',     [SettingsController::class, 'uploadLoginLandmark'])->name('settings.login-landmark');
+            Route::delete('/settings/login-landmark',   [SettingsController::class, 'deleteLoginLandmark'])->name('settings.login-landmark.delete');
             Route::post('/settings/leader-photo', [SettingsController::class, 'uploadLeaderPhoto'])->name('settings.leader-photo');
             Route::post('/settings/map-image',    [SettingsController::class, 'uploadMapImage'])   ->name('settings.map-image');
             Route::delete('/settings/map-image',  [SettingsController::class, 'deleteMapImage'])   ->name('settings.map-image.delete');

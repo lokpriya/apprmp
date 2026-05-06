@@ -104,6 +104,7 @@ class SettingsController extends Controller
             'lockedByName'   => $lockedByName,
             'isSuperAdmin'   => auth()->user()?->isSuperAdmin() ?? false,
             'welcomeConfig'  => $lg->welcome_config ?? [],
+            'loginBranding'  => $lg->welcome_config['login_branding'] ?? [],
             'representatives'    => $representatives,
             'surveyOptsForRep'   => $surveyOptsForRep,
             'employees'          => $employees,
@@ -383,6 +384,78 @@ class SettingsController extends Controller
 
         return redirect()->route('admin.settings.index', ['tab' => 'welcome'])
             ->with('success', 'नक्सा चित्र हटाइयो।');
+    }
+
+    // ── Login page branding ──────────────────────────────────────────────────
+
+    public function updateLoginBranding(Request $request): RedirectResponse
+    {
+        $this->abortIfLocked();
+        $data = $request->validate([
+            'headline_line1' => 'nullable|string|max:80',
+            'headline_line2' => 'nullable|string|max:80',
+            'highlight_word' => 'nullable|string|max:40',
+            'subtitle'       => 'nullable|string|max:300',
+            'stats'          => 'nullable|array|max:3',
+            'stats.*.value'  => 'nullable|string|max:20',
+            'stats.*.label'  => 'nullable|string|max:40',
+        ]);
+
+        $lg       = $this->lg();
+        $existing = $lg->welcome_config ?? [];
+        $existing['login_branding'] = array_merge(
+            $existing['login_branding'] ?? [],
+            [
+                'headline_line1' => $data['headline_line1'] ?? null,
+                'headline_line2' => $data['headline_line2'] ?? null,
+                'highlight_word' => $data['highlight_word'] ?? null,
+                'subtitle'       => $data['subtitle']       ?? null,
+                'stats'          => $data['stats']          ?? null,
+            ]
+        );
+        $lg->update(['welcome_config' => $existing]);
+
+        return redirect()->route('admin.settings.index', ['tab' => 'welcome'])
+            ->with('success', 'लगइन पृष्ठ ब्रान्डिङ सुरक्षित भयो।');
+    }
+
+    public function uploadLoginLandmark(Request $request): RedirectResponse
+    {
+        $this->abortIfLocked();
+        $request->validate(['landmark' => 'required|image|mimes:jpeg,png,jpg,webp|max:4096']);
+
+        $lg       = $this->lg();
+        $existing = $lg->welcome_config ?? [];
+        $oldPath  = $existing['login_branding']['landmark'] ?? null;
+
+        if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        $path = $request->file('landmark')->store('lg-profile', 'public');
+        $existing['login_branding'] = array_merge($existing['login_branding'] ?? [], ['landmark' => $path]);
+        $lg->update(['welcome_config' => $existing]);
+
+        return redirect()->route('admin.settings.index', ['tab' => 'welcome'])
+            ->with('success', 'ल्यान्डमार्क फोटो अपलोड भयो।');
+    }
+
+    public function deleteLoginLandmark(): RedirectResponse
+    {
+        $this->abortIfLocked();
+        $lg       = $this->lg();
+        $existing = $lg->welcome_config ?? [];
+        $oldPath  = $existing['login_branding']['landmark'] ?? null;
+
+        if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        unset($existing['login_branding']['landmark']);
+        $lg->update(['welcome_config' => $existing]);
+
+        return redirect()->route('admin.settings.index', ['tab' => 'welcome'])
+            ->with('success', 'ल्यान्डमार्क फोटो हटाइयो।');
     }
 
     public function uploadLeaderPhoto(Request $request): RedirectResponse
@@ -1026,6 +1099,7 @@ class SettingsController extends Controller
 
     public function uploadMaintenanceBg(Request $request): RedirectResponse
     {
+        $this->abortIfLocked();
         $request->validate([
             'bg_image' => 'required|image|mimes:jpeg,png,jpg,webp|max:4096',
         ]);
@@ -1052,6 +1126,7 @@ class SettingsController extends Controller
 
     public function deleteMaintenanceBg(): RedirectResponse
     {
+        $this->abortIfLocked();
         $lg       = $this->lg();
         $existing = $lg->maintenance_config ?? [];
         $oldPath  = $existing['bg_image'] ?? null;

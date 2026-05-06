@@ -775,6 +775,16 @@
               <i :class="actionLoading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-paper-plane'"></i>
               पेस गर्नुस्
             </button>
+            <button v-if="canApprove" @click="approveInstitution" :disabled="actionLoading"
+              class="flex items-center justify-center gap-2 w-full rounded-md bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-60">
+              <i :class="actionLoading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-circle-check'"></i>
+              स्वीकृत गर्नुस्
+            </button>
+            <button v-if="canReject" @click="showInstRejectModal = true" :disabled="actionLoading"
+              class="flex items-center justify-center gap-2 w-full rounded-md bg-red-600 hover:bg-red-700 px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-60">
+              <i class="fa-solid fa-circle-xmark"></i>
+              अस्वीकार गर्नुस्
+            </button>
             <button v-if="canPublish" @click="publishInstitution" :disabled="actionLoading"
               class="flex items-center justify-center gap-2 w-full rounded-md bg-green-600 hover:bg-green-700 px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-60">
               <i :class="actionLoading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-globe'"></i>
@@ -930,6 +940,43 @@
       </div>
     </div>
   </Teleport>
+
+  <!-- Reject modal -->
+  <Teleport to="body">
+    <div v-if="showInstRejectModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      @click.self="showInstRejectModal = false">
+      <div class="bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-md mx-4 p-6">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-circle-xmark text-red-500"></i>
+          </div>
+          <div>
+            <h3 class="text-[15px] font-semibold text-gray-900">अस्वीकार गर्नुस्</h3>
+            <p class="text-[12px] text-gray-400">संस्था: <span class="font-mono">{{ institution.unique_code }}</span></p>
+          </div>
+        </div>
+        <p class="text-sm text-gray-600 mb-3">अस्वीकार गर्नुको कारण उल्लेख गर्नुहोस् (अनिवार्य):</p>
+        <textarea
+          v-model="instRejectComment"
+          rows="3"
+          placeholder="उदाहरण: विवरण अपूर्ण छ / कर्मचारी संख्या गलत छ..."
+          class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-300 resize-none"
+        ></textarea>
+        <div class="flex gap-3 mt-4">
+          <button @click="showInstRejectModal = false"
+            class="flex-1 rounded-md border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+            रद्द गर्नुस्
+          </button>
+          <button @click="submitInstReject" :disabled="instRejectLoading || !instRejectComment.trim()"
+            class="flex-1 rounded-md bg-red-600 hover:bg-red-700 px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-60">
+            <i :class="instRejectLoading ? 'fa-solid fa-spinner fa-spin mr-1' : 'fa-solid fa-circle-xmark mr-1'"></i>
+            अस्वीकार गर्नुस्
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -945,6 +992,8 @@ const props = defineProps({
   surveyOpts:             { type: Object,  default: () => ({}) },
   canEdit:                { type: Boolean, default: false },
   canSubmit:              { type: Boolean, default: false },
+  canApprove:             { type: Boolean, default: false },
+  canReject:              { type: Boolean, default: false },
   canPublish:             { type: Boolean, default: false },
   canRequestEdit:         { type: Boolean, default: false },
   hasPendingEditRequest:  { type: Boolean, default: false },
@@ -1098,11 +1147,30 @@ function sumField(field) {
 
 // ── Actions ───────────────────────────────────────────────────────────────
 
-const actionLoading = ref(false)
+const actionLoading      = ref(false)
+const showInstRejectModal = ref(false)
+const instRejectComment   = ref('')
+const instRejectLoading   = ref(false)
+
 function submitInstitution() {
   if (!confirm('के तपाईं यो संस्था पेस गर्न निश्चित हुनुहुन्छ?')) return
   actionLoading.value = true
   router.post(`/institutions/${props.institution.id}/submit`, {}, { onFinish: () => { actionLoading.value = false } })
+}
+
+function approveInstitution() {
+  if (!confirm('के तपाईं यो संस्था स्वीकृत गर्न निश्चित हुनुहुन्छ?')) return
+  actionLoading.value = true
+  router.patch(`/review/institutions/${props.institution.id}/approve`, {}, { onFinish: () => { actionLoading.value = false } })
+}
+
+function submitInstReject() {
+  if (!instRejectComment.value.trim()) return
+  instRejectLoading.value = true
+  router.patch(`/review/institutions/${props.institution.id}/reject`, { comment: instRejectComment.value }, {
+    onSuccess: () => { showInstRejectModal.value = false; instRejectComment.value = '' },
+    onFinish:  () => { instRejectLoading.value = false },
+  })
 }
 function publishInstitution() {
   if (!confirm('के तपाईं यो संस्था प्रकाशित गर्न निश्चित हुनुहुन्छ?')) return

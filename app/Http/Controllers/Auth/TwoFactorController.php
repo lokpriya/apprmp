@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -28,10 +29,16 @@ class TwoFactorController extends Controller
     public function showSetupPage(Request $request): Response
     {
         $user = $request->user();
+        $lg = \App\Models\LocalGovernment::getFirstCached();
         return Inertia::render('Auth/TwoFactorSetup', [
             'twoFactorEnabled'  => $user->hasTwoFactorEnabled(),
             'twoFactorRequired' => $user->twoFactorRequiredForRole(),
-            'lg' => \App\Models\LocalGovernment::getFirstCached(),
+            'lg' => $lg ? [
+                'name_np'        => $lg->name_np,
+                'name_en'        => $lg->name_en,
+                'logo'           => $lg->logo,
+                'login_branding' => $lg->welcome_config['login_branding'] ?? null,
+            ] : null,
         ]);
     }
 
@@ -124,8 +131,14 @@ class TwoFactorController extends Controller
             return redirect()->route('login');
         }
 
+        $lg = \App\Models\LocalGovernment::getFirstCached();
         return Inertia::render('Auth/TwoFactorChallenge', [
-            'lg' => \App\Models\LocalGovernment::getFirstCached(),
+            'lg' => $lg ? [
+                'name_np'        => $lg->name_np,
+                'name_en'        => $lg->name_en,
+                'logo'           => $lg->logo,
+                'login_branding' => $lg->welcome_config['login_branding'] ?? null,
+            ] : null,
         ]);
     }
 
@@ -137,6 +150,20 @@ class TwoFactorController extends Controller
         $userId = $request->session()->get('login.id');
         if (!$userId) {
             return redirect()->route('login')->withErrors(['code' => 'सत्र समाप्त भयो।']);
+        }
+
+        // Expire the 2FA window after 10 minutes
+        $parkedAt = $request->session()->get('login.parked_at', 0);
+        if (now()->timestamp - $parkedAt > 600) {
+            $request->session()->forget(['login.id', 'login.remember', 'login.parked_at']);
+            return redirect()->route('login')->withErrors(['code' => 'सत्र समाप्त भयो। पुनः लगइन गर्नुहोस्।']);
+        }
+
+        // Brute-force protection: max 5 attempts per 10 minutes per user
+        $throttleKey = '2fa.' . $userId;
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+            return back()->withErrors(['code' => "धेरै प्रयास भयो। {$seconds} सेकेन्डपछि पुनः प्रयास गर्नुहोस्।"]);
         }
 
         $user = \App\Models\User::find($userId);
@@ -151,7 +178,7 @@ class TwoFactorController extends Controller
             try {
                 $secret = decrypt($user->two_factor_secret);
                 if ($this->google2fa->verifyKey($secret, $code, 4)) {
-                    return $this->completeLogin($request, $user);
+                    return $this->completeLogin($request, $user, $throttleKey);
                 }
             } catch (\Exception $e) {
                 return redirect()->route('login')
@@ -169,19 +196,21 @@ class TwoFactorController extends Controller
                 $user->update([
                     'two_factor_recovery_codes' => encrypt(json_encode(array_values($recoveryCodes))),
                 ]);
-                return $this->completeLogin($request, $user);
+                return $this->completeLogin($request, $user, $throttleKey);
             }
         }
 
+        RateLimiter::hit($throttleKey, 600);
         return back()->withErrors(['code' => 'कोड अमान्य छ। पुनः प्रयास गर्नुहोस्।']);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private function completeLogin(Request $request, \App\Models\User $user): RedirectResponse
+    private function completeLogin(Request $request, \App\Models\User $user, string $throttleKey): RedirectResponse
     {
+        RateLimiter::clear($throttleKey);
         $remember = $request->session()->pull('login.remember', false);
-        $request->session()->forget('login.id');
+        $request->session()->forget(['login.id', 'login.parked_at']);
         $request->session()->regenerate();
 
         \Illuminate\Support\Facades\Auth::login($user, $remember);

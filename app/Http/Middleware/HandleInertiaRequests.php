@@ -47,12 +47,22 @@ class HandleInertiaRequests extends Middleware
                 )
                 : false,
 
-            // rememberForever — busted by EditRequest::booted() on created/updated/deleted
+            // rememberForever for admin (busted by EditRequest::booted()); 60 s per ward_admin
             'editRequestsCount' => fn () => $request->user()?->isAdmin()
                 ? Cache::rememberForever('edit_requests_pending', fn () =>
                     EditRequest::where('status', 'pending')->count()
                   )
-                : 0,
+                : ($request->user()?->isWardAdmin()
+                    ? Cache::remember('edit_requests_pending_wa_' . $request->user()->id, 60, function () use ($request) {
+                        $wardIds = $request->user()->assignedWards()->pluck('wards.id');
+                        return EditRequest::where('status', 'pending')
+                            ->where(fn($q) => $q
+                                ->whereHasMorph('requestable', [\App\Models\Household::class],        fn($r) => $r->whereIn('ward_id', $wardIds))
+                                ->orWhereHasMorph('requestable', [\App\Models\Institution::class],    fn($r) => $r->whereIn('ward_id', $wardIds))
+                                ->orWhereHasMorph('requestable', [\App\Models\MemberBusiness::class], fn($r) => $r->whereIn('ward_id', $wardIds))
+                            )->count();
+                    })
+                    : 0),
 
             // Cached 60 s per user — badge doesn't need to be instant
             'notificationsCount' => fn () => $request->user()

@@ -64,7 +64,7 @@ class UserController extends Controller
             'name'       => 'required|string|max:200',
             'email'      => 'required|email|unique:users,email',
             'password'   => ['required', Password::min(8)],
-            'role'       => 'required|in:enumerator,ward_reviewer,municipal_admin',
+            'role'       => 'required|in:enumerator,ward_reviewer,ward_admin,municipal_admin',
             'phone'      => 'nullable|string|max:15',
             'ward_ids'   => 'nullable|array',
             'ward_ids.*' => 'integer|exists:wards,id',
@@ -123,7 +123,7 @@ class UserController extends Controller
         $data = $request->validate([
             'name'       => 'required|string|max:200',
             'email'      => "required|email|unique:users,email,{$user->id}",
-            'role'       => 'required|in:enumerator,ward_reviewer,municipal_admin',
+            'role'       => 'required|in:enumerator,ward_reviewer,ward_admin,municipal_admin',
             'phone'      => 'nullable|string|max:15',
             'ward_ids'   => 'nullable|array',
             'ward_ids.*' => 'integer|exists:wards,id',
@@ -187,7 +187,7 @@ class UserController extends Controller
 
         $users = User::with('assignedWards')
             ->where('local_government_id', $lgId)
-            ->whereIn('role', ['enumerator', 'ward_reviewer'])
+            ->whereIn('role', ['enumerator', 'ward_reviewer', 'ward_admin'])
             ->orderBy('role')
             ->orderBy('name')
             ->get()
@@ -210,7 +210,7 @@ class UserController extends Controller
     public function assignWards(Request $request, User $user): JsonResponse
     {
         abort_unless($user->local_government_id === auth()->user()->local_government_id, 403);
-        abort_unless(in_array($user->role, ['enumerator', 'ward_reviewer']), 422);
+        abort_unless(in_array($user->role, ['enumerator', 'ward_reviewer', 'ward_admin']), 422);
 
         $data = $request->validate([
             'ward_ids'   => 'present|array',

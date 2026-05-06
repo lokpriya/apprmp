@@ -208,10 +208,21 @@ class BusinessController extends Controller
                 'id'          => $business->member->household->id,
                 'unique_code' => $business->member->household->unique_code,
             ] : null,
-            'canEdit'        => auth()->user()->isAdmin()
-                                 || in_array($business->status, ['draft', 'rejected']),
-            'canSubmit'      => in_array($business->status, ['draft', 'rejected']),
-            'canPublish'     => auth()->user()->isAdmin() && in_array($business->status, ['ward_approved', 'escalated']),
+            'canEdit'        => auth()->user()->hasPermission('businesses.edit')
+                                 && (auth()->user()->isAdmin()
+                                     || (auth()->user()->isWardAdmin() && in_array($business->ward_id, auth()->user()->getAssignedWardIds()))
+                                     || in_array($business->status, ['draft', 'rejected', 'submitted'])),
+            'canSubmit'      => auth()->user()->hasPermission('businesses.submit') && in_array($business->status, ['draft', 'rejected'])
+                                 && (auth()->user()->isAdmin() || auth()->user()->isWardAdmin() || auth()->user()->isReviewer() || $business->enumerator_id === auth()->id()),
+            'canPublish'     => auth()->user()->hasPermission('businesses.publish') && in_array($business->status, ['ward_approved', 'escalated'])
+                                 && (auth()->user()->isAdmin() || (auth()->user()->isWardAdmin() && in_array($business->ward_id, auth()->user()->getAssignedWardIds()))),
+            'canApprove'     => auth()->user()->hasPermission('businesses.approve')
+                                 && ((auth()->user()->isAdmin() && $business->status === 'ward_approved')
+                                     || ((auth()->user()->isWardAdmin() || auth()->user()->isReviewer()) && $business->status === 'submitted' && in_array($business->ward_id, auth()->user()->getAssignedWardIds()))),
+            'canReject'      => auth()->user()->hasPermission('businesses.reject')
+                                 && (auth()->user()->isAdmin()
+                                     ? in_array($business->status, ['ward_approved', 'escalated', 'published'])
+                                     : in_array($business->status, ['submitted', 'ward_approved']) && in_array($business->ward_id, auth()->user()->getAssignedWardIds())),
             'canRequestEdit' => auth()->user()->isReviewer() && $business->status === 'published'
                                  && !EditRequest::where('requestable_type', MemberBusiness::class)
                                                 ->where('requestable_id', $business->id)
@@ -221,7 +232,7 @@ class BusinessController extends Controller
                                                 ->where('requestable_id', $business->id)
                                                 ->where('status', 'pending')
                                                 ->exists(),
-            'canVerify'      => (auth()->user()->isReviewer() || auth()->user()->isAdmin()) && $business->status !== 'draft',
+            'canVerify'      => (auth()->user()->isReviewer() || auth()->user()->isWardAdmin() || auth()->user()->isAdmin()) && $business->status !== 'draft',
             'fieldVerification' => ($fv = $business->fieldVerification) ? [
                 'visited_at'  => $fv->visited_at?->format('Y-m-d'),
                 'is_verified' => $fv->is_verified,

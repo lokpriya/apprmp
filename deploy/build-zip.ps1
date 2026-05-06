@@ -64,7 +64,8 @@ $storageClearDirs = @(
     'storage\framework\sessions',
     'storage\framework\views',
     'storage\app\private\bulk-imports',        # Uploaded import files (~4.5 MB)
-    'storage\app\private\livewire-tmp'         # Livewire temp uploads (~0.4 MB)
+    'storage\app\private\livewire-tmp',        # Livewire temp uploads (~0.4 MB)
+    'storage\app\public'                       # Uploaded photos/logos — not deployed; re-upload on server
 )
 
 foreach ($rel in $storageClearDirs) {
@@ -149,12 +150,8 @@ if (Test-Path $installSrc) {
     Write-Host '    WARNING: public/install.php not found!' -ForegroundColor Red
 }
 
-# Copy run.php deploy helper (post-install artisan runner)
-$runSrc = Join-Path $ProjectRoot 'deploy\run.php'
-if (Test-Path $runSrc) {
-    Copy-Item $runSrc (Join-Path $webrootDir 'run.php') -Force
-    Write-Host '    OK webroot/run.php copied' -ForegroundColor Green
-}
+# run.php is NOT auto-bundled — upload deploy\run.php to webroot manually when needed
+# and DELETE it immediately after use (token is in source; do not leave it on the server)
 
 Write-Host '    webroot/ bundle ready — upload its contents to public_html/apprmp/' -ForegroundColor Green
 
@@ -201,6 +198,8 @@ Write-Host '  4. Upload apprmp-deploy.zip to /home2/prayasne/ via File Manager'
 Write-Host '  5. Extract zip, rename extracted folder to: apprmp'
 Write-Host '  6. Upload ALL files inside webroot/ to public_html/apprmp/'
 Write-Host '     (index.php has LARAVEL_ROOT pre-set, no editing needed)'
+Write-Host '  6b. OPTIONAL: upload deploy\run.php manually if needed for post-install artisan'
+Write-Host '      DELETE run.php via its own button immediately after use'
 Write-Host ''
 Write-Host '  --- INSTALL -------------------------------------------------' -ForegroundColor DarkGray
 Write-Host '  7. Visit: https://apprmp.prayasnepal.com/install.php'

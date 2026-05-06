@@ -236,6 +236,12 @@ $errors  = [];
 $notices = [];
 $completed = !empty($lock['completed']);
 
+// Permanent guard — survives temp-dir wipe on shared hosting server restarts
+if (!$completed && $root && file_exists($root . '/.install_lock')) {
+    $completed = true;
+    $lock['completed'] = true;
+}
+
 // Auto-detect APP_URL
 $proto   = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 $autoUrl = rtrim($proto . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . dirname($_SERVER['REQUEST_URI'] ?? '/'), '/');
@@ -419,6 +425,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$completed) {
                     $lock['step'] = 6; $lock['completed'] = true;
                     $lock['admin_email'] = $adminEmail;
                     $lock['app_url'] = $lock['app']['app_url'] ?? '';
+                    // Write permanent lock so re-opening installer after temp-dir wipe is blocked
+                    @file_put_contents($root . '/.install_lock', date('Y-m-d H:i:s') . ' installed by ' . $adminEmail . "\n");
                     ins_lockSave($lock); header('Location: '.$_SERVER['PHP_SELF']); exit;
                 }
             }

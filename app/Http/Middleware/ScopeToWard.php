@@ -13,7 +13,7 @@ class ScopeToWard
     {
         $user = $request->user();
 
-        if ($user && in_array($user->role, ['enumerator', 'ward_reviewer'])) {
+        if ($user && in_array($user->role, ['enumerator', 'ward_reviewer', 'ward_admin'])) {
             $wardIds = $user->assignedWards()->pluck('wards.id')->toArray();
             $request->merge(['_ward_scope' => $wardIds]);
             View::share('scopedWardIds', $wardIds);

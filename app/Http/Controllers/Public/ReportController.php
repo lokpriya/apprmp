@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
 use App\Models\Household;
+use App\Models\HouseholdAgriculture;
 use App\Models\HouseholdEconomic;
 use App\Models\HouseholdHousing;
+use App\Models\HouseholdLivestock;
 use App\Models\HouseholdMember;
 use App\Models\HouseholdUtility;
 use App\Models\Institution;
@@ -152,7 +154,8 @@ class ReportController extends Controller
 
     public function demographics(Request $request)
     {
-        $lg      = $this->defaultLg();
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
         $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
         $mq      = $this->memberQuery($wardIds, $request);
         $ck      = CrossTabService::cacheKey('demo', $lg->id, $request->only(['ward_id','settlement_id']));
@@ -259,7 +262,8 @@ class ReportController extends Controller
 
     public function education(Request $request)
     {
-        $lg      = $this->defaultLg();
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
         $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
         $mq      = $this->memberQuery($wardIds, $request);
         $ck      = CrossTabService::cacheKey('edu', $lg->id, $request->only(['ward_id','settlement_id','gender']));
@@ -373,7 +377,8 @@ class ReportController extends Controller
 
     public function health(Request $request)
     {
-        $lg      = $this->defaultLg();
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
         $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
         $mq      = $this->memberQuery($wardIds, $request);
         $ck      = CrossTabService::cacheKey('health', $lg->id, $request->only(['ward_id','settlement_id','gender']));
@@ -436,6 +441,19 @@ class ReportController extends Controller
             $ck . '_childlaborxgender'
         );
 
+        $maritalByGender = CrossTabService::tab(
+            clone $mq,
+            'marital_status',
+            'gender',
+            CrossTabService::optionLabels('marital_status'),
+            CrossTabService::genderLabels(),
+            $ck . '_maritalxgender'
+        );
+
+        $bloodGroupFreq = CrossTabService::freq(
+            clone $mq, 'blood_group', CrossTabService::optionLabels('blood_group'), $ck . '_blood_group'
+        );
+
         return Inertia::render('Public/Reports/Show', [
             'lg'          => $this->lgProps($lg),
             'category'    => 'health',
@@ -454,6 +472,12 @@ class ReportController extends Controller
                     'title'   => 'दीर्घ रोग अनुसार लिङ्ग',
                     'title_en'=> 'Chronic Illness by Gender',
                     'data'    => $chronicByGender,
+                ],
+                [
+                    'id'      => 'marital_by_gender',
+                    'title'   => 'वैवाहिक अवस्था अनुसार लिङ्ग',
+                    'title_en'=> 'Marital Status by Gender',
+                    'data'    => $maritalByGender,
                 ],
                 [
                     'id'      => 'smoking_by_gender',
@@ -482,6 +506,12 @@ class ReportController extends Controller
                     'data'    => $ssAllowanceFreq,
                 ],
                 [
+                    'id'      => 'blood_group',
+                    'title'   => 'रक्त समूह',
+                    'title_en'=> 'Blood Group',
+                    'data'    => $bloodGroupFreq,
+                ],
+                [
                     'id'      => 'vaccine',
                     'title'   => 'खोप स्थिति (उमेर ०–३)',
                     'title_en'=> 'Vaccination Status (age 0–3)',
@@ -503,7 +533,8 @@ class ReportController extends Controller
 
     public function employment(Request $request)
     {
-        $lg      = $this->defaultLg();
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
         $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
         $mq      = $this->memberQuery($wardIds, $request);
         $ck      = CrossTabService::cacheKey('emp', $lg->id, $request->only(['ward_id','settlement_id','gender']));
@@ -539,6 +570,13 @@ class ReportController extends Controller
             clone $mq, 'occupation_type', CrossTabService::optionLabels('occupation_type'), $ck . '_occ'
         );
 
+        $vtSubjectFreq = CrossTabService::freq(
+            (clone $mq)->where('vocational_training', 'yes'),
+            'vt_subject',
+            CrossTabService::optionLabels('vt_subject'),
+            $ck . '_vt_subject'
+        );
+
         return Inertia::render('Public/Reports/Show', [
             'lg'          => $this->lgProps($lg),
             'category'    => 'employment',
@@ -572,6 +610,12 @@ class ReportController extends Controller
                     'title_en'=> 'Occupation Distribution',
                     'data'    => $occupationFreq,
                 ],
+                [
+                    'id'      => 'vt_subject',
+                    'title'   => 'व्यावसायिक तालिमको विषय',
+                    'title_en'=> 'Vocational Training Subject',
+                    'data'    => $vtSubjectFreq,
+                ],
             ],
         ]);
     }
@@ -582,7 +626,8 @@ class ReportController extends Controller
 
     public function housing(Request $request)
     {
-        $lg      = $this->defaultLg();
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
         $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
         $ck      = CrossTabService::cacheKey('housing', $lg->id, $request->only(['ward_id']));
 
@@ -591,12 +636,14 @@ class ReportController extends Controller
             $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
         );
 
-        $roofFreq        = CrossTabService::freq($hq(), 'roof_type',       CrossTabService::optionLabels('roof_type'),       $ck . '_roof');
-        $wallFreq        = CrossTabService::freq($hq(), 'wall_type',       CrossTabService::optionLabels('wall_type'),       $ck . '_wall');
-        $foundationFreq  = CrossTabService::freq($hq(), 'foundation_type', CrossTabService::optionLabels('foundation_type'), $ck . '_foundation');
-        $ownershipFreq   = CrossTabService::freq($hq(), 'ownership_type',  CrossTabService::optionLabels('ownership_type'),  $ck . '_ownership');
-        $conditionFreq   = CrossTabService::freq($hq(), 'house_condition', CrossTabService::optionLabels('house_condition'), $ck . '_condition');
-        $houseTypeFreq   = CrossTabService::freq($hq(), 'house_type',      CrossTabService::optionLabels('house_type'),      $ck . '_house_type');
+        $roofFreq        = CrossTabService::freq($hq(), 'roof_type',           CrossTabService::optionLabels('roof_type'),           $ck . '_roof');
+        $wallFreq        = CrossTabService::freq($hq(), 'wall_type',           CrossTabService::optionLabels('wall_type'),           $ck . '_wall');
+        $foundationFreq  = CrossTabService::freq($hq(), 'foundation_type',     CrossTabService::optionLabels('foundation_type'),     $ck . '_foundation');
+        $ownershipFreq   = CrossTabService::freq($hq(), 'ownership_type',      CrossTabService::optionLabels('ownership_type'),      $ck . '_ownership');
+        $conditionFreq   = CrossTabService::freq($hq(), 'house_condition',     CrossTabService::optionLabels('house_condition'),     $ck . '_condition');
+        $houseTypeFreq   = CrossTabService::freq($hq(), 'house_type',          CrossTabService::optionLabels('house_type'),          $ck . '_house_type');
+        $buildPermitFreq = CrossTabService::freq($hq(), 'has_building_permit', CrossTabService::optionLabels('has_building_permit'), $ck . '_permit');
+        $riskFreq        = CrossTabService::freq($hq(), 'is_at_risk',          CrossTabService::optionLabels('is_at_risk'),          $ck . '_risk');
 
         $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
         $wardColDef = CrossTabService::wardColDef($wards);
@@ -628,12 +675,14 @@ class ReportController extends Controller
                 ],
             ],
             'frequencies' => [
-                ['id' => 'roof',        'title' => 'छानाको प्रकार',    'title_en' => 'Roof Type',        'data' => $roofFreq],
-                ['id' => 'wall',        'title' => 'गारोको प्रकार',    'title_en' => 'Wall Type',        'data' => $wallFreq],
-                ['id' => 'foundation',  'title' => 'जगको प्रकार',      'title_en' => 'Foundation Type',  'data' => $foundationFreq],
-                ['id' => 'ownership',   'title' => 'घर स्वामित्व',     'title_en' => 'Ownership Type',   'data' => $ownershipFreq],
-                ['id' => 'condition',   'title' => 'घरको अवस्था',      'title_en' => 'House Condition',  'data' => $conditionFreq],
-                ['id' => 'house_type',  'title' => 'घरको किसिम',       'title_en' => 'House Type',       'data' => $houseTypeFreq],
+                ['id' => 'roof',         'title' => 'छानाको प्रकार',    'title_en' => 'Roof Type',           'data' => $roofFreq],
+                ['id' => 'wall',         'title' => 'गारोको प्रकार',    'title_en' => 'Wall Type',           'data' => $wallFreq],
+                ['id' => 'foundation',   'title' => 'जगको प्रकार',      'title_en' => 'Foundation Type',     'data' => $foundationFreq],
+                ['id' => 'ownership',    'title' => 'घर स्वामित्व',     'title_en' => 'Ownership Type',      'data' => $ownershipFreq],
+                ['id' => 'condition',    'title' => 'घरको अवस्था',      'title_en' => 'House Condition',     'data' => $conditionFreq],
+                ['id' => 'house_type',   'title' => 'घरको किसिम',       'title_en' => 'House Type',          'data' => $houseTypeFreq],
+                ['id' => 'build_permit', 'title' => 'नक्शा पास',        'title_en' => 'Building Permit',     'data' => $buildPermitFreq],
+                ['id' => 'risk',         'title' => 'जोखिम अवस्था',     'title_en' => 'Disaster Risk',       'data' => $riskFreq],
             ],
         ]);
     }
@@ -644,7 +693,8 @@ class ReportController extends Controller
 
     public function utilities(Request $request)
     {
-        $lg      = $this->defaultLg();
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
         $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
         $ck      = CrossTabService::cacheKey('util', $lg->id, $request->only(['ward_id']));
 
@@ -652,12 +702,15 @@ class ReportController extends Controller
             $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
         );
 
-        $waterFreq    = CrossTabService::freq($uq(), 'water_source',           CrossTabService::optionLabels('water_source'),            $ck . '_water');
-        $toiletFreq   = CrossTabService::freq($uq(), 'toilet_type',            CrossTabService::optionLabels('toilet_type'),             $ck . '_toilet');
-        $electricFreq = CrossTabService::freq($uq(), 'electricity_source',     CrossTabService::optionLabels('electricity_source'),      $ck . '_electric');
-        $fuelFreq     = CrossTabService::freq($uq(), 'cooking_fuel',           CrossTabService::optionLabels('cooking_fuel'),            $ck . '_fuel');
-        $wasteFreq    = CrossTabService::freq($uq(), 'solid_waste_management', CrossTabService::optionLabels('solid_waste_management'),  $ck . '_waste');
-        $internetFreq = CrossTabService::freq($uq(), 'internet_type',          CrossTabService::optionLabels('internet_type'),           $ck . '_internet');
+        $waterFreq      = CrossTabService::freq($uq(), 'water_source',           CrossTabService::optionLabels('water_source'),            $ck . '_water');
+        $toiletFreq     = CrossTabService::freq($uq(), 'toilet_type',            CrossTabService::optionLabels('toilet_type'),             $ck . '_toilet');
+        $sanitationFreq = CrossTabService::freq($uq(), 'sanitation_type',        CrossTabService::optionLabels('sanitation_type'),         $ck . '_sanitation');
+        $electricFreq   = CrossTabService::freq($uq(), 'electricity_source',     CrossTabService::optionLabels('electricity_source'),      $ck . '_electric');
+        $fuelFreq       = CrossTabService::freq($uq(), 'cooking_fuel',           CrossTabService::optionLabels('cooking_fuel'),            $ck . '_fuel');
+        $wasteFreq      = CrossTabService::freq($uq(), 'solid_waste_management', CrossTabService::optionLabels('solid_waste_management'),  $ck . '_waste');
+        $internetFreq   = CrossTabService::freq($uq(), 'internet_type',          CrossTabService::optionLabels('internet_type'),           $ck . '_internet');
+        $vehicleFreq    = CrossTabService::freq($uq(), 'vehicle',                CrossTabService::optionLabels('vehicle'),                 $ck . '_vehicle');
+        $handwashFreq   = CrossTabService::freq($uq(), 'handwashing',            CrossTabService::optionLabels('handwashing'),             $ck . '_handwash');
 
         $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
         $wardColDef = CrossTabService::wardColDef($wards);
@@ -689,12 +742,15 @@ class ReportController extends Controller
                 ],
             ],
             'frequencies' => [
-                ['id' => 'water',    'title' => 'खानेपानीको स्रोत',    'title_en' => 'Water Source',         'data' => $waterFreq],
-                ['id' => 'toilet',   'title' => 'शौचालयको प्रकार',     'title_en' => 'Toilet Type',          'data' => $toiletFreq],
-                ['id' => 'electric', 'title' => 'विद्युत स्रोत',        'title_en' => 'Electricity Source',   'data' => $electricFreq],
-                ['id' => 'fuel',     'title' => 'खाना पकाउने इन्धन',   'title_en' => 'Cooking Fuel',         'data' => $fuelFreq],
-                ['id' => 'waste',    'title' => 'फोहर व्यवस्थापन',      'title_en' => 'Solid Waste Mgmt',     'data' => $wasteFreq],
-                ['id' => 'internet', 'title' => 'इन्टरनेट सेवा',        'title_en' => 'Internet Type',        'data' => $internetFreq],
+                ['id' => 'water',      'title' => 'खानेपानीको स्रोत',    'title_en' => 'Water Source',         'data' => $waterFreq],
+                ['id' => 'toilet',     'title' => 'शौचालयको प्रकार',     'title_en' => 'Toilet Type',          'data' => $toiletFreq],
+                ['id' => 'sanitation', 'title' => 'सरसफाइ व्यवस्था',     'title_en' => 'Sanitation Type',      'data' => $sanitationFreq],
+                ['id' => 'handwash',   'title' => 'हात धुने अभ्यास',     'title_en' => 'Handwashing Practice', 'data' => $handwashFreq],
+                ['id' => 'electric',   'title' => 'विद्युत स्रोत',        'title_en' => 'Electricity Source',   'data' => $electricFreq],
+                ['id' => 'fuel',       'title' => 'खाना पकाउने इन्धन',   'title_en' => 'Cooking Fuel',         'data' => $fuelFreq],
+                ['id' => 'waste',      'title' => 'फोहर व्यवस्थापन',      'title_en' => 'Solid Waste Mgmt',     'data' => $wasteFreq],
+                ['id' => 'internet',   'title' => 'इन्टरनेट सेवा',        'title_en' => 'Internet Type',        'data' => $internetFreq],
+                ['id' => 'vehicle',    'title' => 'सवारी साधन',           'title_en' => 'Vehicle Ownership',    'data' => $vehicleFreq],
             ],
         ]);
     }
@@ -705,7 +761,8 @@ class ReportController extends Controller
 
     public function economics(Request $request)
     {
-        $lg      = $this->defaultLg();
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
         $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
         $ck      = CrossTabService::cacheKey('econ', $lg->id, $request->only(['ward_id']));
 
@@ -713,11 +770,12 @@ class ReportController extends Controller
             $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
         );
 
-        $incomeFreq     = CrossTabService::freq($eq(), 'primary_income_source',   CrossTabService::optionLabels('primary_income_source'), $ck . '_income_src');
-        $incomeRangeFreq= CrossTabService::freq($eq(), 'annual_income_range',      CrossTabService::optionLabels('annual_income_range'),    $ck . '_income_range');
+        $incomeFreq     = CrossTabService::freq($eq(), 'primary_income_source',   CrossTabService::optionLabels('primary_income_source'),   $ck . '_income_src');
+        $incomeRangeFreq= CrossTabService::freq($eq(), 'annual_income_range',      CrossTabService::optionLabels('annual_income_range'),      $ck . '_income_range');
         $expendFreq     = CrossTabService::freq($eq(), 'annual_expenditure_range', CrossTabService::optionLabels('annual_expenditure_range'), $ck . '_expend');
-        $bankFreq       = CrossTabService::freq($eq(), 'has_bank_account',         ['1'=>'बैंक खाता छ','0'=>'बैंक खाता छैन'], $ck . '_bank');
-        $povertyFreq    = CrossTabService::freq($eq(), 'poverty_card',             ['1'=>'परिचयपत्र छ','0'=>'परिचयपत्र छैन'], $ck . '_poverty');
+        $bankFreq       = CrossTabService::freq($eq(), 'has_bank_account',         ['1'=>'बैंक खाता छ','0'=>'बैंक खाता छैन'],               $ck . '_bank');
+        $povertyFreq    = CrossTabService::freq($eq(), 'poverty_card',             ['1'=>'परिचयपत्र छ','0'=>'परिचयपत्र छैन'],                $ck . '_poverty');
+        $insuranceFreq  = CrossTabService::freq($eq(), 'has_insurance',            CrossTabService::optionLabels('has_insurance'),            $ck . '_insurance');
 
         $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
         $wardColDef = CrossTabService::wardColDef($wards);
@@ -753,6 +811,7 @@ class ReportController extends Controller
                 ['id' => 'income_range', 'title' => 'वार्षिक आय दायरा',      'title_en' => 'Annual Income Range',    'data' => $incomeRangeFreq],
                 ['id' => 'expend',       'title' => 'वार्षिक खर्च दायरा',    'title_en' => 'Annual Expenditure',     'data' => $expendFreq],
                 ['id' => 'bank',         'title' => 'बैंक खाता',              'title_en' => 'Bank Account',           'data' => $bankFreq],
+                ['id' => 'insurance',    'title' => 'बीमा',                   'title_en' => 'Insurance Coverage',     'data' => $insuranceFreq],
                 ['id' => 'poverty',      'title' => 'गरिबी परिचयपत्र',        'title_en' => 'Poverty Card',           'data' => $povertyFreq],
             ],
         ]);
@@ -764,7 +823,8 @@ class ReportController extends Controller
 
     public function ageGroups(Request $request)
     {
-        $lg      = $this->defaultLg();
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
         $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
         $mq      = $this->memberQuery($wardIds, $request);
         $ck      = CrossTabService::cacheKey('age', $lg->id, $request->only(['ward_id','settlement_id']));
@@ -831,6 +891,177 @@ class ReportController extends Controller
                 ],
             ],
             'frequencies' => [],
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 10. Agriculture & Livestock
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function agriculture(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
+        $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
+        $ck      = CrossTabService::cacheKey('agri', $lg->id, $request->only(['ward_id']));
+
+        $aq = fn () => HouseholdAgriculture::whereHas('household', fn ($q) =>
+            $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
+        );
+
+        $agriFreq     = CrossTabService::freq($aq(), 'agriculture',               CrossTabService::optionLabels('agriculture'),               $ck . '_agri');
+        $landFreq     = CrossTabService::freq($aq(), 'owns_land',                 CrossTabService::optionLabels('owns_land'),                 $ck . '_land');
+        $chemFertFreq = CrossTabService::freq($aq(), 'uses_chemical_fertilizer',  CrossTabService::optionLabels('uses_chemical_fertilizer'),  $ck . '_chem_fert');
+        $orgFertFreq  = CrossTabService::freq($aq(), 'uses_organic_fertilizer',   CrossTabService::optionLabels('uses_organic_fertilizer'),   $ck . '_org_fert');
+        $sellsFreq    = CrossTabService::freq($aq(), 'sells_produce',             CrossTabService::optionLabels('sells_produce'),             $ck . '_sells');
+        $agriLoanFreq = CrossTabService::freq($aq(), 'has_agri_loan',             CrossTabService::optionLabels('has_agri_loan'),             $ck . '_agri_loan');
+
+        $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
+        $wardColDef = CrossTabService::wardColDef($wards);
+
+        $agriByWard = CrossTabService::tab(
+            HouseholdAgriculture::whereHas('household', fn ($q) =>
+                $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
+            )->join('households', 'household_agriculture.household_id', '=', 'households.id')
+             ->join('wards', 'households.ward_id', '=', 'wards.id'),
+            'household_agriculture.agriculture',
+            'wards.ward_number',
+            CrossTabService::optionLabels('agriculture'),
+            $wardColDef,
+            $ck . '_agrixward'
+        );
+
+        // Livestock: count households with each livestock type
+        $lq = fn () => HouseholdLivestock::whereHas('household', fn ($q) =>
+            $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
+        );
+        $livestockFreq = CrossTabService::freq(
+            $lq(), 'livestock_type', CrossTabService::optionLabels('livestock_kind'), $ck . '_livestock'
+        );
+
+        return Inertia::render('Public/Reports/Show', [
+            'lg'          => $this->lgProps($lg),
+            'category'    => 'agriculture',
+            'title'       => 'कृषि तथा पशुपालन विवरण',
+            'title_en'    => 'Agriculture & Livestock',
+            ...$this->filterProps($lg, $request),
+            'tables'      => [
+                [
+                    'id'      => 'agri_by_ward',
+                    'title'   => 'कृषि अभ्यास अनुसार वडा',
+                    'title_en'=> 'Agriculture by Ward',
+                    'data'    => $agriByWard,
+                ],
+            ],
+            'frequencies' => [
+                ['id' => 'agri',      'title' => 'कृषि अभ्यास',           'title_en' => 'Agriculture Practice',    'data' => $agriFreq],
+                ['id' => 'land',      'title' => 'जमिन स्वामित्व',         'title_en' => 'Land Ownership',          'data' => $landFreq],
+                ['id' => 'chem_fert', 'title' => 'रासायनिक मल प्रयोग',    'title_en' => 'Chemical Fertilizer Use', 'data' => $chemFertFreq],
+                ['id' => 'org_fert',  'title' => 'जैविक मल प्रयोग',       'title_en' => 'Organic Fertilizer Use',  'data' => $orgFertFreq],
+                ['id' => 'sells',     'title' => 'उपज बिक्री',             'title_en' => 'Sells Produce',           'data' => $sellsFreq],
+                ['id' => 'agri_loan', 'title' => 'कृषि ऋण',                'title_en' => 'Agricultural Loan',       'data' => $agriLoanFreq],
+                ['id' => 'livestock', 'title' => 'पशुपालनको प्रकार',       'title_en' => 'Livestock Type',          'data' => $livestockFreq],
+            ],
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 11. Migration & Abroad Employment
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function migration(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
+        $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
+        $mq      = $this->memberQuery($wardIds, $request);
+        $ck      = CrossTabService::cacheKey('migr', $lg->id, $request->only(['ward_id', 'settlement_id', 'gender']));
+
+        $residenceFreq = CrossTabService::freq(
+            clone $mq, 'residence_status', CrossTabService::optionLabels('residence_status'), $ck . '_residence'
+        );
+
+        $residenceByGender = CrossTabService::tab(
+            clone $mq,
+            'residence_status',
+            'gender',
+            CrossTabService::optionLabels('residence_status'),
+            CrossTabService::genderLabels(),
+            $ck . '_resxgender'
+        );
+
+        $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
+        $wardColDef = CrossTabService::wardColDef($wards);
+
+        $residenceByWard = CrossTabService::tab(
+            (clone $mq)
+                ->join('households', 'household_members.household_id', '=', 'households.id')
+                ->join('wards', 'households.ward_id', '=', 'wards.id'),
+            'household_members.residence_status',
+            'wards.ward_number',
+            CrossTabService::optionLabels('residence_status'),
+            $wardColDef,
+            $ck . '_resxward'
+        );
+
+        // Abroad-specific members only
+        $abroadMq = (clone $mq)->where('residence_status', 'abroad');
+
+        $abroadJobFreq = CrossTabService::freq(
+            clone $abroadMq, 'typeofabroadjob', CrossTabService::optionLabels('typeofabroadjob'), $ck . '_abroad_job'
+        );
+
+        $abroadStatusFreq = CrossTabService::freq(
+            clone $abroadMq, 'abroadjobstatus', CrossTabService::optionLabels('abroadjobstatus'), $ck . '_abroad_status'
+        );
+
+        $abroadJobByGender = CrossTabService::tab(
+            clone $abroadMq,
+            'typeofabroadjob',
+            'gender',
+            CrossTabService::optionLabels('typeofabroadjob'),
+            CrossTabService::genderLabels(),
+            $ck . '_abroadxgender'
+        );
+
+        // Internal migration (district of residence)
+        $internalMq   = (clone $mq)->whereNotNull('addrslocation')->where('residence_status', '!=', 'abroad');
+        $districtFreq = CrossTabService::freq(
+            $internalMq, 'addrslocation', CrossTabService::optionLabels('addrslocation'), $ck . '_district'
+        );
+
+        return Inertia::render('Public/Reports/Show', [
+            'lg'          => $this->lgProps($lg),
+            'category'    => 'migration',
+            'title'       => 'बसाइँसराइ तथा वैदेशिक रोजगार',
+            'title_en'    => 'Migration & Abroad Employment',
+            ...$this->filterProps($lg, $request),
+            'tables'      => [
+                [
+                    'id'      => 'residence_by_gender',
+                    'title'   => 'बसोबास अवस्था अनुसार लिङ्ग',
+                    'title_en'=> 'Residence Status by Gender',
+                    'data'    => $residenceByGender,
+                ],
+                [
+                    'id'      => 'residence_by_ward',
+                    'title'   => 'बसोबास अवस्था अनुसार वडा',
+                    'title_en'=> 'Residence Status by Ward',
+                    'data'    => $residenceByWard,
+                ],
+                [
+                    'id'      => 'abroad_job_by_gender',
+                    'title'   => 'विदेशी रोजगार प्रकार अनुसार लिङ्ग',
+                    'title_en'=> 'Abroad Job Type by Gender',
+                    'data'    => $abroadJobByGender,
+                ],
+            ],
+            'frequencies' => [
+                ['id' => 'residence',     'title' => 'बसोबास अवस्था',         'title_en' => 'Residence Status',       'data' => $residenceFreq],
+                ['id' => 'abroad_job',    'title' => 'विदेशी रोजगारको प्रकार', 'title_en' => 'Type of Abroad Job',     'data' => $abroadJobFreq],
+                ['id' => 'abroad_status', 'title' => 'विदेशी रोजगार अवस्था',   'title_en' => 'Abroad Job Status',      'data' => $abroadStatusFreq],
+                ['id' => 'district',      'title' => 'देशभित्र बसोबासको जिल्ला','title_en' => 'Internal Residence District', 'data' => $districtFreq],
+            ],
         ]);
     }
 }

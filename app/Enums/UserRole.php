@@ -5,6 +5,7 @@ enum UserRole: string
 {
     case SuperAdmin      = 'super_admin';
     case MunicipalAdmin  = 'municipal_admin';
+    case WardAdmin       = 'ward_admin';
     case WardReviewer    = 'ward_reviewer';
     case Enumerator      = 'enumerator';
 
@@ -13,6 +14,7 @@ enum UserRole: string
         return match($this) {
             self::SuperAdmin     => 'सुपर प्रशासक',
             self::MunicipalAdmin => 'नगर प्रशासक',
+            self::WardAdmin      => 'वडा प्रशासक',
             self::WardReviewer   => 'वडा समीक्षक',
             self::Enumerator     => 'गणक',
         };

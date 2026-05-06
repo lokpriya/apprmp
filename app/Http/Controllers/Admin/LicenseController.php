@@ -15,7 +15,7 @@ class LicenseController extends Controller
 
         $request->validate(['days' => 'required|integer|min:1|max:3650']);
 
-        $lg     = LocalGovernment::find(auth()->user()->local_government_id) ?? LocalGovernment::first();
+        $lg     = LocalGovernment::getCached(auth()->user()->local_government_id) ?? LocalGovernment::getFirstCached();
         $days   = (int) $request->days;
         $expiry = now()->addDays($days)->format('Y-m-d');
         $payload = "{$lg->id}|{$expiry}";

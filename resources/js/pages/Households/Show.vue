@@ -499,6 +499,16 @@
               <i :class="actionLoading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-paper-plane'"></i>
               पेस गर्नुस्
             </button>
+            <button v-if="canApprove" @click="approveHousehold" :disabled="actionLoading"
+              class="flex items-center justify-center gap-2 w-full rounded-md bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-60">
+              <i :class="actionLoading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-circle-check'"></i>
+              स्वीकृत गर्नुस्
+            </button>
+            <button v-if="canReject" @click="showRejectModal = true" :disabled="actionLoading"
+              class="flex items-center justify-center gap-2 w-full rounded-md bg-red-600 hover:bg-red-700 px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-60">
+              <i class="fa-solid fa-circle-xmark"></i>
+              अस्वीकार गर्नुस्
+            </button>
             <button v-if="canPublish" @click="publishHousehold" :disabled="actionLoading"
               class="flex items-center justify-center gap-2 w-full rounded-md bg-green-600 hover:bg-green-700 px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-60">
               <i :class="actionLoading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-globe'"></i>
@@ -717,6 +727,43 @@
       </div>
     </div>
   </Teleport>
+
+  <!-- Reject modal -->
+  <Teleport to="body">
+    <div v-if="showRejectModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      @click.self="showRejectModal = false">
+      <div class="bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-md mx-4 p-6">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-circle-xmark text-red-500"></i>
+          </div>
+          <div>
+            <h3 class="text-[15px] font-semibold text-gray-900">अस्वीकार गर्नुस्</h3>
+            <p class="text-[12px] text-gray-400">घरधुरी: <span class="font-mono">{{ household.unique_code }}</span></p>
+          </div>
+        </div>
+        <p class="text-sm text-gray-600 mb-3">अस्वीकार गर्नुको कारण उल्लेख गर्नुहोस् (अनिवार्य):</p>
+        <textarea
+          v-model="rejectComment"
+          rows="3"
+          placeholder="उदाहरण: विवरण अपूर्ण छ / GPS गलत छ / सदस्य संख्या मेल खाँदैन..."
+          class="w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-300 resize-none"
+        ></textarea>
+        <div class="flex gap-3 mt-4">
+          <button @click="showRejectModal = false"
+            class="flex-1 rounded-md border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+            रद्द गर्नुस्
+          </button>
+          <button @click="submitReject" :disabled="rejectLoading || !rejectComment.trim()"
+            class="flex-1 rounded-md bg-red-600 hover:bg-red-700 px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-60">
+            <i :class="rejectLoading ? 'fa-solid fa-spinner fa-spin mr-1' : 'fa-solid fa-circle-xmark mr-1'"></i>
+            अस्वीकार गर्नुस्
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -732,6 +779,8 @@ const props = defineProps({
   household:              { type: Object,  required: true },
   canEdit:                { type: Boolean, default: false },
   canSubmit:              { type: Boolean, default: false },
+  canApprove:             { type: Boolean, default: false },
+  canReject:              { type: Boolean, default: false },
   canPublish:             { type: Boolean, default: false },
   canRequestEdit:         { type: Boolean, default: false },
   hasPendingEditRequest:  { type: Boolean, default: false },
@@ -916,6 +965,27 @@ function publishHousehold() {
   actionLoading.value = true
   router.patch(`/admin/households/${props.household.id}/publish`, {}, {
     onFinish: () => { actionLoading.value = false },
+  })
+}
+
+const showRejectModal = ref(false)
+const rejectComment   = ref('')
+const rejectLoading   = ref(false)
+
+function approveHousehold() {
+  if (!confirm('के तपाईं यो घरधुरी स्वीकृत गर्न निश्चित हुनुहुन्छ?')) return
+  actionLoading.value = true
+  router.patch(`/review/households/${props.household.id}/approve`, {}, {
+    onFinish: () => { actionLoading.value = false },
+  })
+}
+
+function submitReject() {
+  if (!rejectComment.value.trim()) return
+  rejectLoading.value = true
+  router.patch(`/review/households/${props.household.id}/reject`, { comment: rejectComment.value }, {
+    onSuccess: () => { showRejectModal.value = false; rejectComment.value = '' },
+    onFinish:  () => { rejectLoading.value = false },
   })
 }
 

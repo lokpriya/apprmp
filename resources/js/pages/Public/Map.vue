@@ -54,6 +54,15 @@ import { router }    from '@inertiajs/vue3'
 import { useLocale } from '@/i18n/index.js'
 import PublicLayout  from '@/layouts/PublicLayout.vue'
 
+function toRawGithubUrl(url) {
+  if (!url) return url
+  // Convert GitHub blob URL to raw content URL automatically
+  return url.replace(
+    /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/(.+)$/,
+    'https://raw.githubusercontent.com/$1/$2/$3'
+  )
+}
+
 defineOptions({ layout: PublicLayout })
 
 const { t } = useLocale()
@@ -143,7 +152,7 @@ async function initMap() {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
   }).addTo(map)
-  const geojsonUrl = cfg.geojson_url
+  const geojsonUrl = toRawGithubUrl(cfg.geojson_url)
   const wardProp   = cfg.ward_number_property ?? 'WARD_NO'
 
   if (geojsonUrl) {

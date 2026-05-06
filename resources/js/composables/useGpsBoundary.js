@@ -1,4 +1,3 @@
-import { ref } from 'vue'
 
 // ── Geometry helpers ──────────────────────────────────────────────────────────
 
@@ -47,10 +46,18 @@ function distToRingM(lat, lng, ring) {
 export function useGpsBoundary() {
   let geojsonCache = null
 
+  function toRawGithubUrl(url) {
+    if (!url) return url
+    return url.replace(
+      /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/(.+)$/,
+      'https://raw.githubusercontent.com/$1/$2/$3'
+    )
+  }
+
   async function loadGeojson(url) {
     if (geojsonCache) return geojsonCache
     try {
-      const res = await fetch(url)
+      const res = await fetch(toRawGithubUrl(url))
       if (res.ok) geojsonCache = await res.json()
     } catch {}
     return geojsonCache

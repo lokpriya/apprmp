@@ -270,10 +270,55 @@ class CrossTabService
             'solid_waste_management' => 'waste_management',
             'primary_income_source'  => 'income_source',
             'mother_tongue'          => 'language',
+            'vt_subject'             => 'vocational_training_subject',
+            'Farm_Challenges'        => 'farm_challenge',
+            'loan_sources'           => 'loan_source',
+            'type_of_vehicle'        => 'vehicle_type',
+            'addrslocation'          => 'addrslocation',
         ];
 
         // Static fallback labels for fields with no survey_options category
         $staticFallback = [
+            'agriculture' => [
+                'yes' => 'कृषि गर्नुहुन्छ',
+                'no'  => 'कृषि गर्दैन',
+            ],
+            'vehicle' => [
+                'yes' => 'सवारी साधन छ',
+                'no'  => 'सवारी साधन छैन',
+            ],
+            'owns_land' => [
+                '1' => 'जमिन स्वामित्व छ',
+                '0' => 'जमिन छैन',
+            ],
+            'uses_chemical_fertilizer' => [
+                '1' => 'रासायनिक मल प्रयोग',
+                '0' => 'प्रयोग गर्दैन',
+            ],
+            'uses_organic_fertilizer' => [
+                '1' => 'जैविक मल प्रयोग',
+                '0' => 'प्रयोग गर्दैन',
+            ],
+            'sells_produce' => [
+                '1' => 'उपज बिक्री गर्छ',
+                '0' => 'बिक्री गर्दैन',
+            ],
+            'has_agri_loan' => [
+                '1' => 'कृषि ऋण छ',
+                '0' => 'कृषि ऋण छैन',
+            ],
+            'has_building_permit' => [
+                '1' => 'नक्शा पास छ',
+                '0' => 'नक्शा पास छैन',
+            ],
+            'is_at_risk' => [
+                '1' => 'जोखिमग्रस्त',
+                '0' => 'सुरक्षित',
+            ],
+            'has_insurance' => [
+                '1' => 'बीमा छ',
+                '0' => 'बीमा छैन',
+            ],
             'annual_income_range' => [
                 'below_50000'    => 'रु ५०,००० भन्दा कम',
                 '50000_100000'   => 'रु ५०,०००–१,००,०००',

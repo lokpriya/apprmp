@@ -83,6 +83,7 @@
               :class="form.errors.role ? 'border-red-400' : 'border-[#e6e7e9]'">
               <option value="">भूमिका छान्नुहोस्</option>
               <option value="municipal_admin">Municipal Admin</option>
+              <option value="ward_admin">Ward Admin</option>
               <option value="ward_reviewer">Ward Reviewer</option>
               <option value="enumerator">Enumerator</option>
             </select>
@@ -106,7 +107,7 @@
       </div>
 
       <!-- Ward assignments -->
-      <div v-if="form.role === 'enumerator' || form.role === 'ward_reviewer'"
+      <div v-if="['enumerator', 'ward_reviewer', 'ward_admin'].includes(form.role)"
         class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
         <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-3">
           <i class="fa-solid fa-map-pin text-indigo-500 text-xs"></i>

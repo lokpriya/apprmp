@@ -15,7 +15,7 @@
     </div>
 
     <!-- Summary cards -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
       <div class="bg-white rounded-md border border-[#e6e7e9] px-4 py-3 flex items-center gap-3">
         <div class="w-8 h-8 rounded bg-amber-100 text-amber-600 flex items-center justify-center text-xs shrink-0">
           <i class="fa-solid fa-clipboard-user"></i>
@@ -23,6 +23,15 @@
         <div>
           <p class="text-xl font-semibold text-[#1d273b] leading-tight">{{ enumerators.length }}</p>
           <p class="text-[11px] text-[#9aa0ac]">गणकहरू</p>
+        </div>
+      </div>
+      <div class="bg-white rounded-md border border-[#e6e7e9] px-4 py-3 flex items-center gap-3">
+        <div class="w-8 h-8 rounded bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs shrink-0">
+          <i class="fa-solid fa-user-shield"></i>
+        </div>
+        <div>
+          <p class="text-xl font-semibold text-[#1d273b] leading-tight">{{ wardAdmins.length }}</p>
+          <p class="text-[11px] text-[#9aa0ac]">वडा प्रशासक</p>
         </div>
       </div>
       <div class="bg-white rounded-md border border-[#e6e7e9] px-4 py-3 flex items-center gap-3">
@@ -83,7 +92,7 @@
         <!-- User info -->
         <div class="flex items-start gap-3">
           <div :class="['w-10 h-10 rounded-md flex items-center justify-center text-[13px] font-bold shrink-0',
-            user.role === 'enumerator' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700']">
+            roleAvatar(user.role)]">
             {{ initials(user.name) }}
           </div>
           <div class="flex-1 min-w-0">
@@ -137,7 +146,7 @@
           <!-- Header -->
           <div class="flex items-center gap-3 px-5 py-4 border-b border-[#e6e7e9]">
             <div :class="['w-10 h-10 rounded-md flex items-center justify-center text-[13px] font-bold shrink-0',
-              modalUser.role === 'enumerator' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700']">
+              roleAvatar(modalUser.role)]">
               {{ initials(modalUser.name) }}
             </div>
             <div class="flex-1 min-w-0">
@@ -205,14 +214,11 @@
 
 <script setup>
 import { ref, computed, reactive } from 'vue'
-import { usePage } from '@inertiajs/vue3'
 
 const props = defineProps({
   users: { type: Array, required: true },
   wards: { type: Array, required: true },
 })
-
-const page = usePage()
 
 // ── Local reactive assignment state (updated optimistically on save) ──
 const localAssignments = reactive(
@@ -228,14 +234,16 @@ function wardLabel(wid) { return wardMap.value[wid] ?? wid }
 // ── Tabs ───────────────────────────────────────────────────────────
 const enumerators = computed(() => props.users.filter(u => u.role === 'enumerator'))
 const reviewers   = computed(() => props.users.filter(u => u.role === 'ward_reviewer'))
+const wardAdmins  = computed(() => props.users.filter(u => u.role === 'ward_admin'))
 const unassignedCount = computed(() =>
   props.users.filter(u => !localAssignments[u.id]?.length).length
 )
 
 const activeTab = ref('enumerator')
 const tabs = computed(() => [
-  { key: 'enumerator',    label: 'गणकहरू',   count: enumerators.value.length },
-  { key: 'ward_reviewer', label: 'समीक्षकहरू', count: reviewers.value.length },
+  { key: 'enumerator',    label: 'गणकहरू',       count: enumerators.value.length },
+  { key: 'ward_admin',    label: 'वडा प्रशासक',  count: wardAdmins.value.length },
+  { key: 'ward_reviewer', label: 'समीक्षकहरू',   count: reviewers.value.length },
 ])
 const activeUsers = computed(() =>
   props.users.filter(u => u.role === activeTab.value)
@@ -282,6 +290,13 @@ async function saveAssignment() {
 function initials(name) {
   return (name ?? '?').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
 }
-const ROLE_LABELS = { enumerator: 'गणक', ward_reviewer: 'वडा समीक्षक' }
+const ROLE_LABELS = { enumerator: 'गणक', ward_admin: 'वडा प्रशासक', ward_reviewer: 'वडा समीक्षक' }
 function roleLabel(role) { return ROLE_LABELS[role] ?? role }
+
+const ROLE_AVATAR = {
+  enumerator:   'bg-amber-100 text-amber-700',
+  ward_admin:   'bg-indigo-100 text-indigo-700',
+  ward_reviewer:'bg-blue-100 text-blue-700',
+}
+function roleAvatar(role) { return ROLE_AVATAR[role] ?? 'bg-gray-100 text-gray-600' }
 </script>

@@ -47,6 +47,14 @@ enum RecordStatus: string
                 self::WardApproved => $next === self::Rejected,
                 default            => false,
             },
+            'ward_admin' => match($this) {
+                self::Draft        => $next === self::Submitted,
+                self::Submitted    => in_array($next, [self::WardApproved, self::Rejected, self::Escalated]),
+                self::Rejected     => $next === self::Submitted,
+                self::WardApproved => in_array($next, [self::Published, self::Rejected]),
+                self::Escalated    => in_array($next, [self::Published, self::Rejected]),
+                default            => false,
+            },
             'municipal_admin', 'super_admin' => match($this) {
                 self::Draft        => in_array($next, [self::Submitted, self::Published]),
                 self::Submitted    => in_array($next, [self::WardApproved, self::Rejected, self::Escalated]),

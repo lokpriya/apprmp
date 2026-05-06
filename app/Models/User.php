@@ -56,6 +56,7 @@ class User extends Authenticatable
     // Role helpers
     public function isSuperAdmin(): bool  { return $this->role === 'super_admin'; }
     public function isAdmin(): bool       { return in_array($this->role, ['super_admin', 'municipal_admin']); }
+    public function isWardAdmin(): bool   { return $this->role === 'ward_admin'; }
     public function isReviewer(): bool    { return $this->role === 'ward_reviewer'; }
     public function isEnumerator(): bool  { return $this->role === 'enumerator'; }
 

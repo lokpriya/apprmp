@@ -41,6 +41,7 @@
         <option value="">सबै भूमिका</option>
         <option value="super_admin">Super Admin</option>
         <option value="municipal_admin">Municipal Admin</option>
+        <option value="ward_admin">Ward Admin</option>
         <option value="ward_reviewer">Ward Reviewer</option>
         <option value="enumerator">Enumerator</option>
       </select>
@@ -334,12 +335,12 @@ const stats = computed(() => {
   const all    = props.users.total ?? 0
   const data   = props.users.data ?? []
   const active = data.filter(u => u.is_active).length
-  const admins = data.filter(u => ['super_admin','municipal_admin'].includes(u.role)).length
+  const admins = data.filter(u => ['super_admin','municipal_admin','ward_admin'].includes(u.role)).length
   const enums  = data.filter(u => u.role === 'enumerator').length
   return [
-    { label: 'जम्मा',      count: all,    icon: 'fa-solid fa-users',       color: 'bg-[#206bc4]/10 text-[#206bc4]' },
-    { label: 'सक्रिय',    count: active,  icon: 'fa-solid fa-circle-check', color: 'bg-green-100 text-green-600' },
-    { label: 'प्रशासक',  count: admins,   icon: 'fa-solid fa-shield-halved', color: 'bg-purple-100 text-purple-600' },
+    { label: 'जम्मा',      count: all,    icon: 'fa-solid fa-users',          color: 'bg-[#206bc4]/10 text-[#206bc4]' },
+    { label: 'सक्रिय',    count: active,  icon: 'fa-solid fa-circle-check',   color: 'bg-green-100 text-green-600' },
+    { label: 'प्रशासक',  count: admins,   icon: 'fa-solid fa-shield-halved',  color: 'bg-purple-100 text-purple-600' },
     { label: 'गणक',       count: enums,   icon: 'fa-solid fa-clipboard-user', color: 'bg-amber-100 text-amber-600' },
   ]
 })
@@ -396,10 +397,11 @@ function initials(name) {
 }
 
 const ROLE_META = {
-  super_admin:     { badge: 'bg-purple-100 text-purple-700', avatar: 'bg-purple-100 text-purple-700', icon: 'fa-solid fa-crown' },
+  super_admin:     { badge: 'bg-purple-100 text-purple-700',  avatar: 'bg-purple-100 text-purple-700',  icon: 'fa-solid fa-crown' },
   municipal_admin: { badge: 'bg-[#206bc4]/10 text-[#206bc4]', avatar: 'bg-[#206bc4]/10 text-[#206bc4]', icon: 'fa-solid fa-shield-halved' },
-  ward_reviewer:   { badge: 'bg-blue-100 text-blue-700',    avatar: 'bg-blue-100 text-blue-700',    icon: 'fa-solid fa-eye' },
-  enumerator:      { badge: 'bg-amber-100 text-amber-700',  avatar: 'bg-amber-100 text-amber-700',  icon: 'fa-solid fa-clipboard-user' },
+  ward_admin:      { badge: 'bg-indigo-100 text-indigo-700',  avatar: 'bg-indigo-100 text-indigo-700',  icon: 'fa-solid fa-user-shield' },
+  ward_reviewer:   { badge: 'bg-blue-100 text-blue-700',      avatar: 'bg-blue-100 text-blue-700',      icon: 'fa-solid fa-eye' },
+  enumerator:      { badge: 'bg-amber-100 text-amber-700',    avatar: 'bg-amber-100 text-amber-700',    icon: 'fa-solid fa-clipboard-user' },
 }
 function roleColor(role) {
   return ROLE_META[role] ?? { badge: 'bg-gray-100 text-[#626976]', avatar: 'bg-gray-100 text-[#626976]', icon: 'fa-solid fa-user' }
@@ -407,7 +409,7 @@ function roleColor(role) {
 
 const ROLE_LABELS = {
   super_admin: 'Super Admin', municipal_admin: 'Municipal Admin',
-  ward_reviewer: 'Ward Reviewer', enumerator: 'Enumerator',
+  ward_admin: 'Ward Admin', ward_reviewer: 'Ward Reviewer', enumerator: 'Enumerator',
 }
 function roleLabel(role) { return ROLE_LABELS[role] ?? role }
 </script>

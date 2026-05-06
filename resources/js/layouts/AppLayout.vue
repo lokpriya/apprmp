@@ -54,7 +54,7 @@
         </template>
 
         <!-- ── Data Entry ── -->
-        <template v-if="['enumerator','municipal_admin','super_admin'].includes(userRole)">
+        <template v-if="['enumerator','ward_admin','municipal_admin','super_admin'].includes(userRole)">
           <div class="mb-1 mt-2">
             <p v-if="!collapsed" class="text-[10px] font-semibold text-white/35 uppercase tracking-[0.15em] px-2 mb-1">
               Data Entry
@@ -91,7 +91,7 @@
         </template>
 
         <!-- ── Review and Publish ── -->
-        <template v-if="['ward_reviewer','municipal_admin','super_admin'].includes(userRole)">
+        <template v-if="['ward_reviewer','ward_admin','municipal_admin','super_admin'].includes(userRole)">
           <div class="mb-1 mt-3">
             <p v-if="!collapsed" class="text-[10px] font-semibold text-white/35 uppercase tracking-[0.15em] px-2 mb-1">
               Review and Publish
@@ -99,7 +99,7 @@
             <div class="h-px bg-white/10 mb-2"></div>
           </div>
           <NavItem href="/review" icon="fa-solid fa-magnifying-glass-chart" label="समीक्षा अवस्था" :collapsed="collapsed" />
-          <template v-if="['municipal_admin','super_admin'].includes(userRole)">
+          <template v-if="['ward_admin','municipal_admin','super_admin'].includes(userRole)">
             <NavItem href="/admin/publish-queue" icon="fa-solid fa-paper-plane" label="प्रकाशन अवस्था" :collapsed="collapsed" />
           </template>
         </template>
@@ -202,9 +202,9 @@
           </h1>
         </div>
 
-        <!-- Notification bell (admin only — edit requests from ward reviewers) -->
+        <!-- Notification bell (admin + ward_admin — edit requests from ward reviewers) -->
         <div
-          v-if="['municipal_admin','super_admin'].includes(userRole)"
+          v-if="['ward_admin','municipal_admin','super_admin'].includes(userRole)"
           class="relative shrink-0"
         >
           <a
@@ -361,7 +361,7 @@
                 <i class="fa-solid fa-map-pin w-4 text-[#9aa0ac] text-center text-xs"></i>
                 वडा तोकाई
               </a>
-              <a href="/admin/role-permissions"
+              <a v-if="userRole === 'super_admin'" href="/admin/role-permissions"
                 class="flex items-center gap-3 px-4 py-2.5 text-[13px] text-[#626976] hover:bg-gray-50 transition-colors">
                 <i class="fa-solid fa-lock w-4 text-[#9aa0ac] text-center text-xs"></i>
                 भूमिका अनुमति
@@ -529,7 +529,7 @@
             </template>
 
             <!-- Data entry -->
-            <template v-if="['enumerator','municipal_admin','super_admin'].includes(userRole)">
+            <template v-if="['enumerator','ward_admin','municipal_admin','super_admin'].includes(userRole)">
               <p class="text-[10px] font-semibold text-white/30 uppercase tracking-widest px-3 py-1">Data Entry</p>
               <a href="/households" @click="mobileNavOpen = false"
                 :class="['flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-medium transition no-underline',
@@ -550,14 +550,14 @@
             </template>
 
             <!-- Review -->
-            <template v-if="['ward_reviewer','municipal_admin','super_admin'].includes(userRole)">
+            <template v-if="['ward_reviewer','ward_admin','municipal_admin','super_admin'].includes(userRole)">
               <p class="text-[10px] font-semibold text-white/30 uppercase tracking-widest px-3 py-1">Review</p>
               <a href="/review" @click="mobileNavOpen = false"
                 :class="['flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-medium transition no-underline',
                   page.url.startsWith('/review') ? 'bg-white/12 text-white' : 'text-white/65 hover:bg-white/8 hover:text-white']">
                 <i class="fa-solid fa-magnifying-glass-chart w-4 text-center"></i> समीक्षा अवस्था
               </a>
-              <a v-if="['municipal_admin','super_admin'].includes(userRole)" href="/admin/publish-queue" @click="mobileNavOpen = false"
+              <a v-if="['ward_admin','municipal_admin','super_admin'].includes(userRole)" href="/admin/publish-queue" @click="mobileNavOpen = false"
                 :class="['flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-medium transition no-underline',
                   page.url.startsWith('/admin/publish-queue') ? 'bg-white/12 text-white' : 'text-white/65 hover:bg-white/8 hover:text-white']">
                 <i class="fa-solid fa-paper-plane w-4 text-center"></i> प्रकाशन अवस्था
@@ -610,7 +610,7 @@
     <!-- ═══════════════════════════════════════════════════════════════
          FLOATING ACTION BUTTON — enumerators, mobile only
     ═══════════════════════════════════════════════════════════════ -->
-    <div v-if="['enumerator','municipal_admin','super_admin'].includes(userRole)"
+    <div v-if="['enumerator','ward_admin','municipal_admin','super_admin'].includes(userRole)"
          class="fixed bottom-6 right-5 z-40 lg:hidden flex flex-col items-end gap-2">
 
       <!-- Speed-dial options (shown when fabOpen) -->

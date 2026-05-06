@@ -18,7 +18,9 @@ class PublishQueueController extends Controller
     public function index(Request $request)
     {
         $user    = auth()->user();
-        $wardIds = Ward::where('local_government_id', $user->local_government_id)->pluck('id');
+        $wardIds = $user->isAdmin()
+            ? Ward::where('local_government_id', $user->local_government_id)->pluck('id')
+            : $user->assignedWards()->pluck('wards.id');
 
         $households = Household::with(['ward', 'settlement', 'enumerator', 'wardReviewer'])
             ->whereIn('ward_id', $wardIds)
@@ -98,7 +100,7 @@ class PublishQueueController extends Controller
 
     public function publishHousehold(Request $request, Household $household)
     {
-        abort_unless(in_array($household->status, ['ward_approved', 'escalated']), 422, 'Cannot publish this record.');
+        $this->authorize('publish', $household);
 
         $this->workflow->publish($household, auth()->user());
         return back()->with('success', "घरधुरी {$household->unique_code} प्रकाशित गरियो।");
@@ -106,7 +108,7 @@ class PublishQueueController extends Controller
 
     public function rejectHousehold(Request $request, Household $household)
     {
-        abort_unless($household->status === 'escalated', 422, 'Only escalated records can be rejected here.');
+        $this->authorize('reject', $household);
         $request->validate(['comment' => 'required|string|max:500']);
 
         $this->workflow->reject($household, auth()->user(), $request->comment);
@@ -115,7 +117,7 @@ class PublishQueueController extends Controller
 
     public function publishInstitution(Request $request, Institution $institution)
     {
-        abort_unless(in_array($institution->status, ['ward_approved', 'escalated']), 422, 'Cannot publish this record.');
+        $this->authorize('publish', $institution);
 
         $this->workflow->publish($institution, auth()->user());
         return back()->with('success', "संस्था {$institution->unique_code} प्रकाशित गरियो।");
@@ -123,7 +125,7 @@ class PublishQueueController extends Controller
 
     public function rejectInstitution(Request $request, Institution $institution)
     {
-        abort_unless($institution->status === 'escalated', 422, 'Only escalated records can be rejected here.');
+        $this->authorize('reject', $institution);
         $request->validate(['comment' => 'required|string|max:500']);
 
         $this->workflow->reject($institution, auth()->user(), $request->comment);
@@ -132,7 +134,7 @@ class PublishQueueController extends Controller
 
     public function publishBusiness(Request $request, MemberBusiness $business)
     {
-        abort_unless(in_array($business->status, ['ward_approved', 'escalated']), 422, 'Cannot publish this record.');
+        $this->authorize('publish', $business);
 
         $this->workflow->publish($business, auth()->user());
         return back()->with('success', "व्यवसाय {$business->unique_code} प्रकाशित गरियो।");
@@ -140,7 +142,7 @@ class PublishQueueController extends Controller
 
     public function rejectBusiness(Request $request, MemberBusiness $business)
     {
-        abort_unless(in_array($business->status, ['ward_approved', 'escalated']), 422, 'Cannot reject this record.');
+        $this->authorize('reject', $business);
         $request->validate(['comment' => 'required|string|max:500']);
 
         $this->workflow->reject($business, auth()->user(), $request->comment);

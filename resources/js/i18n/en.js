@@ -144,7 +144,9 @@ export default {
       employment:   'Occupation types, employment status and economic activity by gender and age group.',
       housing:      'Roof, wall, foundation, ownership type and house condition across wards.',
       utilities:    'Water source, toilet type, electricity, cooking fuel, waste management and internet.',
-      economics:    'Household income sources, expenditure ranges, bank access and poverty card status.',
+      economics:    'Household income sources, expenditure ranges, bank account, insurance and poverty card status.',
+      agriculture:  'Land ownership, crop cultivation, fertilizer use, produce sales, loans and livestock types.',
+      migration:    'Residence status, internal migration districts, abroad employment types and job status.',
     },
     cat: {
       overview:     'Overview',
@@ -156,6 +158,8 @@ export default {
       housing:      'Housing',
       utilities:    'Utilities & Facilities',
       economics:    'Economics',
+      agriculture:  'Agriculture & Livestock',
+      migration:    'Migration & Abroad',
     },
   },
   instReports: {

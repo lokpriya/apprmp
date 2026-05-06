@@ -1029,6 +1029,191 @@
 
         </div>
       </form>
+
+      <!-- ── Login Page Branding ──────────────────────────────────── -->
+      <div class="mt-10 pt-8 border-t border-gray-100">
+
+        <!-- Main branding card -->
+        <form @submit.prevent="saveLoginBranding">
+          <div class="bg-[#f5f7ff] rounded-2xl border border-[#e0e5f5] p-6 space-y-6">
+
+            <!-- Card header -->
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-lg bg-[#206bc4] flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-bars text-white text-sm"></i>
+              </div>
+              <div>
+                <p class="text-xs font-bold tracking-[0.12em] uppercase text-[#206bc4]">लगइन पृष्ठ ब्रान्डिङ</p>
+                <p class="text-[11px] text-gray-400 mt-0.5">बाँया प्यानलको हेडलाइन, सब-टाइटल र तथ्याङ्क अनुकूलन</p>
+              </div>
+            </div>
+
+            <!-- 2×2 floating-label fields -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+              <!-- Headline line 1 -->
+              <div class="relative">
+                <label class="absolute -top-2 left-3 px-1 bg-[#f5f7ff] text-[10px] font-semibold uppercase tracking-widest text-gray-400 pointer-events-none">
+                  हेडलाइन — लाइन १
+                </label>
+                <input v-model="loginBrandForm.headline_line1" type="text" maxlength="80"
+                  class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm text-gray-800 outline-none focus:border-[#206bc4] focus:ring-2 focus:ring-[#206bc4]/20 transition"
+                  placeholder="Data tells the" />
+              </div>
+
+              <!-- Headline line 2 -->
+              <div class="relative">
+                <label class="absolute -top-2 left-3 px-1 bg-[#f5f7ff] text-[10px] font-semibold uppercase tracking-widest text-gray-400 pointer-events-none">
+                  हेडलाइन — लाइन २
+                </label>
+                <input v-model="loginBrandForm.headline_line2" type="text" maxlength="80"
+                  class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm text-gray-800 outline-none focus:border-[#206bc4] focus:ring-2 focus:ring-[#206bc4]/20 transition"
+                  placeholder="story of the development" />
+              </div>
+
+              <!-- Highlight word -->
+              <div class="relative">
+                <label class="absolute -top-2 left-3 px-1 bg-[#f5f7ff] text-[10px] font-semibold uppercase tracking-widest text-gray-400 pointer-events-none">
+                  हाइलाइट शब्द
+                </label>
+                <div class="flex items-center gap-2">
+                  <input v-model="loginBrandForm.highlight_word" type="text" maxlength="40"
+                    class="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm text-gray-800 outline-none focus:border-[#206bc4] focus:ring-2 focus:ring-[#206bc4]/20 transition"
+                    placeholder="story" />
+                  <span v-if="loginBrandForm.highlight_word"
+                    class="shrink-0 px-2.5 py-1 rounded-full bg-orange-100 text-orange-500 text-xs font-bold border border-orange-200">
+                    {{ loginBrandForm.highlight_word }}
+                  </span>
+                </div>
+                <!-- Validation hint -->
+                <p v-if="loginBrandForm.highlight_word &&
+                    !loginBrandForm.headline_line1.toLowerCase().includes(loginBrandForm.highlight_word.toLowerCase()) &&
+                    !loginBrandForm.headline_line2.toLowerCase().includes(loginBrandForm.highlight_word.toLowerCase())"
+                  class="mt-1.5 text-[11px] text-amber-600 flex items-center gap-1">
+                  <i class="fa-solid fa-triangle-exclamation text-[10px]"></i>
+                  यो शब्द हेडलाइनमा छैन — सुन्तला रङ देखिँदैन। हेडलाइन लाइनमा यो शब्द राख्नुहोस्।
+                </p>
+              </div>
+
+              <!-- Subtitle -->
+              <div class="relative">
+                <label class="absolute -top-2 left-3 px-1 bg-[#f5f7ff] text-[10px] font-semibold uppercase tracking-widest text-gray-400 pointer-events-none">
+                  सब-टाइटल (एक लाइन)
+                </label>
+                <input v-model="loginBrandForm.subtitle" type="text" maxlength="300"
+                  class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm text-gray-800 outline-none focus:border-[#206bc4] focus:ring-2 focus:ring-[#206bc4]/20 transition"
+                  placeholder="Transforming municipal data into actionable insights..." />
+              </div>
+            </div>
+
+            <!-- Stats cards row -->
+            <div class="space-y-3">
+              <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                स्ट्याट्स कार्डहरू (३ वटा)
+              </p>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div v-for="(stat, i) in loginBrandForm.stats" :key="i"
+                  class="flex items-stretch rounded-xl border border-gray-200 bg-white overflow-hidden">
+                  <!-- Value badge -->
+                  <div class="flex items-center justify-center px-3 bg-[#1d273b] min-w-[64px]">
+                    <input v-model="stat.value" type="text" maxlength="12"
+                      class="w-full bg-transparent text-white font-extrabold text-base text-center outline-none placeholder:text-white/40"
+                      :placeholder="defaultStats[i].value" />
+                  </div>
+                  <!-- Label field -->
+                  <input v-model="stat.label" type="text" maxlength="40"
+                    class="flex-1 px-3 py-3 text-xs text-gray-600 outline-none placeholder:text-gray-300 border-l border-gray-200"
+                    :placeholder="defaultStats[i].label" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Save button -->
+            <div class="flex justify-end pt-1">
+              <button type="submit" :disabled="loginBrandForm.processing || locked"
+                class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#206bc4] hover:bg-[#1a5ba8] text-white text-sm font-semibold transition-colors disabled:opacity-60 shadow-sm">
+                <i v-if="loginBrandForm.processing" class="fa-solid fa-spinner fa-spin text-xs"></i>
+                <i v-else class="fa-solid fa-check text-xs"></i>
+                Save Changes
+              </button>
+            </div>
+
+          </div>
+        </form>
+
+        <!-- Landmark photo card -->
+        <div class="mt-4 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+
+          <!-- Header strip -->
+          <div class="flex items-center gap-3 px-6 py-4 border-b border-gray-100 bg-gray-50">
+            <div class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-image text-emerald-600 text-sm"></i>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-gray-800">ल्यान्डमार्क फोटो</p>
+              <p class="text-[11px] text-gray-400">हेडलाइन र स्ट्याट्स कार्डको बीचमा देखिने नगरपालिकाको प्रतिनिधि फोटो</p>
+            </div>
+          </div>
+
+          <div class="p-6 flex items-start gap-6">
+
+            <!-- Preview -->
+            <div class="w-52 h-36 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 overflow-hidden shrink-0 flex items-center justify-center relative group">
+              <img v-if="currentLandmark" :src="`/storage/${currentLandmark}`"
+                class="w-full h-full object-cover" />
+              <div v-else class="flex flex-col items-center gap-2 text-gray-300">
+                <i class="fa-solid fa-mountain-sun text-4xl"></i>
+                <span class="text-[10px] tracking-wide">फोटो छैन</span>
+              </div>
+              <!-- Overlay badge when set -->
+              <div v-if="currentLandmark"
+                class="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-bold uppercase tracking-wide">
+                SET
+              </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex-1 space-y-4">
+              <p class="text-[12px] text-gray-500 leading-relaxed">
+                <span class="font-medium text-gray-700">JPEG, PNG वा WebP</span> — अधिकतम 4 MB<br>
+                Landscape अभिमुखीकरण, न्यूनतम 800×400 px
+              </p>
+
+              <input ref="landmarkInput" type="file" accept="image/jpeg,image/png,image/jpg,image/webp"
+                class="hidden" @change="onLandmarkPicked" />
+
+              <div class="flex flex-wrap gap-2">
+                <button type="button" @click="landmarkInput?.click()" :disabled="locked"
+                  class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-sm text-gray-700 font-medium transition disabled:opacity-50">
+                  <i class="fa-solid fa-upload text-xs text-[#206bc4]"></i>
+                  {{ currentLandmark ? 'बदल्नुहोस्' : 'अपलोड गर्नुहोस्' }}
+                </button>
+                <button v-if="currentLandmark" type="button" @click="deleteLandmark" :disabled="locked"
+                  class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-red-100 bg-red-50 hover:bg-red-100 text-sm text-red-600 font-medium transition disabled:opacity-50">
+                  <i class="fa-solid fa-trash text-xs"></i>
+                  हटाउनुहोस्
+                </button>
+              </div>
+
+              <!-- File picked — pending upload -->
+              <form v-if="landmarkFile" @submit.prevent="uploadLandmark"
+                class="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+                <i class="fa-solid fa-file-image text-blue-400 shrink-0"></i>
+                <span class="text-[12px] text-blue-700 truncate flex-1 font-medium">{{ landmarkFile.name }}</span>
+                <button type="submit" :disabled="landmarkUploading"
+                  class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-[#206bc4] hover:bg-[#1a5ba8] text-white text-xs font-semibold transition shrink-0 disabled:opacity-60">
+                  <i v-if="landmarkUploading" class="fa-solid fa-spinner fa-spin"></i>
+                  <i v-else class="fa-solid fa-floppy-disk"></i>
+                  सेभ
+                </button>
+              </form>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
     </div>
 
     <!-- ── Representatives Tab ──────────────────────────────────────── -->
@@ -3001,6 +3186,7 @@ const props = defineProps({
   lockedByName:      { type: String,  default: null },
   isSuperAdmin:      { type: Boolean, default: false },
   welcomeConfig:     { type: Object,  default: () => ({}) },
+  loginBranding:     { type: Object,  default: () => ({}) },
   representatives:   { type: Array,   default: () => [] },
   surveyOptsForRep:  { type: Object,  default: () => ({}) },
   employees:         { type: Array,   default: () => [] },
@@ -3273,6 +3459,57 @@ function onMapImageChange(e) {
 function deleteMapImage() {
   if (locked.value) return
   router.delete('/admin/settings/map-image')
+}
+
+// ── Login page branding ────────────────────────────────────────────────────
+const defaultStats = [
+  { value: '753+', label: 'Municipalities' },
+  { value: '2M+',  label: 'Data Points'   },
+  { value: '98%',  label: 'Accuracy'      },
+]
+
+const lb = props.loginBranding ?? {}
+const loginBrandForm = useForm({
+  headline_line1: lb.headline_line1 ?? '',
+  headline_line2: lb.headline_line2 ?? '',
+  highlight_word: lb.highlight_word ?? '',
+  subtitle:       lb.subtitle       ?? '',
+  stats: (lb.stats && lb.stats.length)
+    ? lb.stats.map(s => ({ value: s.value ?? '', label: s.label ?? '' }))
+    : defaultStats.map(s => ({ ...s })),
+})
+function saveLoginBranding() {
+  if (locked.value) return
+  loginBrandForm.patch('/admin/settings/login-branding')
+}
+
+const currentLandmark  = ref(lb.landmark ?? null)
+const landmarkInput    = ref(null)
+const landmarkFile     = ref(null)
+const landmarkUploading = ref(false)
+function onLandmarkPicked(e) {
+  landmarkFile.value = e.target.files[0] ?? null
+}
+function uploadLandmark() {
+  if (!landmarkFile.value || locked.value) return
+  landmarkUploading.value = true
+  const fd = new FormData()
+  fd.append('landmark', landmarkFile.value)
+  router.post('/admin/settings/login-landmark', fd, {
+    forceFormData: true,
+    onSuccess: (page) => {
+      currentLandmark.value = page.props.loginBranding?.landmark ?? currentLandmark.value
+      landmarkUploading.value = false
+      landmarkFile.value = null
+    },
+    onError: () => { landmarkUploading.value = false },
+  })
+}
+function deleteLandmark() {
+  if (locked.value) return
+  router.delete('/admin/settings/login-landmark', {
+    onSuccess: () => { currentLandmark.value = null },
+  })
 }
 
 // ── Wards ──────────────────────────────────────────────────────────────────

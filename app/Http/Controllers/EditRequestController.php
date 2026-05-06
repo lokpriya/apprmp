@@ -58,11 +58,16 @@ class EditRequestController extends Controller
         return back()->with('success', 'सम्पादन अनुरोध पेस गरियो। प्रशासकले समीक्षा गर्नेछन्।');
     }
 
-    /** Admin approves an edit request */
+    /** Admin or ward_admin approves an edit request */
     public function approve(Request $request, EditRequest $editRequest)
     {
-        abort_unless(auth()->user()->isAdmin(), 403);
+        $user = auth()->user();
+        abort_unless($user->isAdmin() || $user->isWardAdmin(), 403);
         abort_unless($editRequest->isPending(), 422);
+        if ($user->isWardAdmin()) {
+            $record = $editRequest->requestable;
+            abort_unless($record && in_array($record->ward_id, $user->getAssignedWardIds()), 403);
+        }
 
         $data = $request->validate([
             'admin_note' => 'nullable|string|max:500',
@@ -70,18 +75,23 @@ class EditRequestController extends Controller
 
         $editRequest->update([
             'status'      => 'approved',
-            'reviewed_by' => auth()->id(),
+            'reviewed_by' => $user->id,
             'admin_note'  => $data['admin_note'] ?? null,
         ]);
 
         return back()->with('success', 'अनुरोध स्वीकृत गरियो।');
     }
 
-    /** Admin rejects an edit request */
+    /** Admin or ward_admin rejects an edit request */
     public function reject(Request $request, EditRequest $editRequest)
     {
-        abort_unless(auth()->user()->isAdmin(), 403);
+        $user = auth()->user();
+        abort_unless($user->isAdmin() || $user->isWardAdmin(), 403);
         abort_unless($editRequest->isPending(), 422);
+        if ($user->isWardAdmin()) {
+            $record = $editRequest->requestable;
+            abort_unless($record && in_array($record->ward_id, $user->getAssignedWardIds()), 403);
+        }
 
         $data = $request->validate([
             'admin_note' => 'nullable|string|max:500',
@@ -89,23 +99,36 @@ class EditRequestController extends Controller
 
         $editRequest->update([
             'status'      => 'rejected',
-            'reviewed_by' => auth()->id(),
+            'reviewed_by' => $user->id,
             'admin_note'  => $data['admin_note'] ?? null,
         ]);
 
         return back()->with('success', 'अनुरोध अस्वीकार गरियो।');
     }
 
-    /** Admin view — list all edit requests */
+    /** Admin / ward_admin view — list edit requests */
     public function index(Request $request)
     {
-        abort_unless(auth()->user()->isAdmin(), 403);
+        $user = auth()->user();
+        abort_unless($user->isAdmin() || $user->isWardAdmin(), 403);
 
-        $status = $request->get('status', 'pending');
+        $status  = $request->get('status', 'pending');
+        $wardIds = $user->isAdmin()
+            ? null
+            : $user->assignedWards()->pluck('wards.id');
 
-        $requests = EditRequest::with(['requester:id,name,role', 'reviewer:id,name'])
-            ->when($status !== 'all', fn($q) => $q->where('status', $status))
-            ->orderByDesc('created_at')
+        $query = EditRequest::with(['requester:id,name,role', 'reviewer:id,name'])
+            ->when($status !== 'all', fn($q) => $q->where('status', $status));
+
+        if ($wardIds !== null) {
+            $query->where(fn($q) => $q
+                ->whereHasMorph('requestable', [Household::class],      fn($r) => $r->whereIn('ward_id', $wardIds))
+                ->orWhereHasMorph('requestable', [Institution::class],  fn($r) => $r->whereIn('ward_id', $wardIds))
+                ->orWhereHasMorph('requestable', [MemberBusiness::class], fn($r) => $r->whereIn('ward_id', $wardIds))
+            );
+        }
+
+        $requests = $query->orderByDesc('created_at')
             ->paginate(30)
             ->through(function (EditRequest $er) {
                 $record = $er->requestable;
@@ -126,10 +149,18 @@ class EditRequestController extends Controller
                 ];
             });
 
+        $countQuery = fn($s) => $wardIds === null
+            ? EditRequest::where('status', $s)->count()
+            : EditRequest::where('status', $s)->where(fn($q) => $q
+                ->whereHasMorph('requestable', [Household::class],        fn($r) => $r->whereIn('ward_id', $wardIds))
+                ->orWhereHasMorph('requestable', [Institution::class],    fn($r) => $r->whereIn('ward_id', $wardIds))
+                ->orWhereHasMorph('requestable', [MemberBusiness::class], fn($r) => $r->whereIn('ward_id', $wardIds))
+              )->count();
+
         $counts = [
-            'pending'  => EditRequest::where('status', 'pending')->count(),
-            'approved' => EditRequest::where('status', 'approved')->count(),
-            'rejected' => EditRequest::where('status', 'rejected')->count(),
+            'pending'  => $countQuery('pending'),
+            'approved' => $countQuery('approved'),
+            'rejected' => $countQuery('rejected'),
         ];
 
         return Inertia::render('Admin/EditRequests', [

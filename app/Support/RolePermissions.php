@@ -161,6 +161,25 @@ class RolePermissions
                 'settings.downloads','settings.content','settings.lock_unlock',
             ],
 
+            'ward_admin' => [
+                // Households
+                'households.view','households.create','households.edit','households.delete',
+                'households.submit','households.approve','households.reject','households.publish',
+                'households.mark_deceased',
+                // Institutions
+                'institutions.view','institutions.create','institutions.edit','institutions.delete',
+                'institutions.submit','institutions.approve','institutions.reject','institutions.publish',
+                // Businesses
+                'businesses.view','businesses.create','businesses.edit','businesses.delete',
+                'businesses.submit','businesses.approve','businesses.reject','businesses.publish',
+                // Review queue
+                'review.view','review.approve','review.reject','review.escalate',
+                // Edit requests
+                'edit_requests.view','edit_requests.approve','edit_requests.reject',
+                // Reports
+                'reports.view','reports.export',
+            ],
+
             'ward_reviewer' => [
                 // Households
                 'households.view','households.approve','households.reject','households.mark_deceased',
@@ -204,6 +223,7 @@ class RolePermissions
         return [
             ['name' => 'super_admin',     'label' => 'Super Admin',     'icon' => 'fa-solid fa-crown'],
             ['name' => 'municipal_admin', 'label' => 'Municipal Admin', 'icon' => 'fa-solid fa-shield-halved'],
+            ['name' => 'ward_admin',      'label' => 'Ward Admin',      'icon' => 'fa-solid fa-user-shield'],
             ['name' => 'ward_reviewer',   'label' => 'Ward Reviewer',   'icon' => 'fa-solid fa-eye'],
             ['name' => 'enumerator',      'label' => 'Enumerator',      'icon' => 'fa-solid fa-clipboard-user'],
         ];

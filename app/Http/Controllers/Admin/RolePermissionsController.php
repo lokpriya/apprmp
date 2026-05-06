@@ -18,6 +18,7 @@ class RolePermissionsController extends Controller
 
     public function index()
     {
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
         $lg      = $this->lg();
         $saved   = $lg->role_permissions ?? [];
         $defaults = RolePermissions::defaults();
@@ -38,6 +39,7 @@ class RolePermissionsController extends Controller
 
     public function update(Request $request): RedirectResponse
     {
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
         $request->validate([
             'role'        => 'required|in:super_admin,municipal_admin,ward_reviewer,enumerator',
             'permissions' => 'present|array',

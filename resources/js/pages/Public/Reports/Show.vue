@@ -247,6 +247,8 @@ const ALL_CATEGORIES = [
   { route: 'housing',      href: '/public/reports/housing',       icon: '🏠', labelKey: 'reports.cat.housing'      },
   { route: 'utilities',    href: '/public/reports/utilities',     icon: '💧', labelKey: 'reports.cat.utilities'    },
   { route: 'economics',    href: '/public/reports/economics',     icon: '💰', labelKey: 'reports.cat.economics'    },
+  { route: 'agriculture',  href: '/public/reports/agriculture',   icon: '🌾', labelKey: 'reports.cat.agriculture'  },
+  { route: 'migration',    href: '/public/reports/migration',     icon: '✈️',  labelKey: 'reports.cat.migration'    },
 ]
 
 const otherCategories = computed(() =>

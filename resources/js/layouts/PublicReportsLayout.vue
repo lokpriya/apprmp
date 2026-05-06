@@ -293,6 +293,8 @@ const reportCategories = [
   { route: 'public.reports.housing',      href: '/public/reports/housing',     icon: '🏠', labelKey: 'reports.cat.housing'      },
   { route: 'public.reports.utilities',    href: '/public/reports/utilities',   icon: '💧', labelKey: 'reports.cat.utilities'    },
   { route: 'public.reports.economics',    href: '/public/reports/economics',   icon: '💰', labelKey: 'reports.cat.economics'    },
+  { route: 'public.reports.agriculture', href: '/public/reports/agriculture', icon: '🌾', labelKey: 'reports.cat.agriculture'  },
+  { route: 'public.reports.migration',   href: '/public/reports/migration',   icon: '✈️',  labelKey: 'reports.cat.migration'    },
 ]
 
 function isActive(cat) {

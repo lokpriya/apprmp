@@ -341,8 +341,17 @@ class AnalyticsController extends Controller
     }
 
     // ── Utility breakdown helper ──────────────────────────────────────────
+    private static array $allowedUtilityColumns = [
+        'water_source', 'toilet_type', 'sanitation_type', 'electricity_source',
+        'cooking_fuel', 'solid_waste_management', 'internet_type', 'vehicle', 'handwashing',
+    ];
+
     private function utilityBreakdown(array $wardIds, ?int $settlementId, string $column): array
     {
+        if (!in_array($column, self::$allowedUtilityColumns, true)) {
+            return [];
+        }
+
         return DB::table('household_utilities')
             ->join('households', 'household_utilities.household_id', '=', 'households.id')
             ->whereIn('households.ward_id', $wardIds)
@@ -441,20 +450,346 @@ class AnalyticsController extends Controller
             ->whereIn('ward_id', $allWardIds)->where('status', 'published')
             ->select('ward_id', DB::raw('count(*) as cnt'))->groupBy('ward_id')->pluck('cnt', 'ward_id');
 
-        $wardSummary = $wards->map(fn($ward) => [
-            'ward_id'      => $ward->id,
-            'ward_number'  => $ward->ward_number,
-            'households'   => $wardHouseholds->get($ward->id, 0),
-            'male'         => $wardGender->get($ward->id, collect())->firstWhere('gender', 'male')?->cnt  ?? 0,
-            'female'       => $wardGender->get($ward->id, collect())->firstWhere('gender', 'female')?->cnt ?? 0,
-            'other'        => $wardGender->get($ward->id, collect())->firstWhere('gender', 'other')?->cnt  ?? 0,
-            'total'        => $wardGender->get($ward->id, collect())->sum('cnt'),
-            'institutions' => $wardInstitutions->get($ward->id, 0),
-        ])->values();
+        $wardBusinesses = DB::table('member_businesses')
+            ->whereIn('ward_id', $allWardIds)->where('status', 'published')
+            ->select('ward_id', DB::raw('count(*) as cnt'))->groupBy('ward_id')->pluck('cnt', 'ward_id');
+
+        $wardLiteracy = DB::table('household_members')
+            ->join('households', 'household_members.household_id', '=', 'households.id')
+            ->whereIn('households.ward_id', $allWardIds)->where('households.status', 'published')
+            ->where('household_members.is_deceased', false)
+            ->select('households.ward_id',
+                DB::raw('SUM(CASE WHEN household_members.is_literate = 1 THEN 1 ELSE 0 END) as literate'),
+                DB::raw('count(*) as total'))
+            ->groupBy('households.ward_id')->get()->keyBy('ward_id');
+
+        $wardSummary = $wards->map(function ($ward) use (
+            $wardHouseholds, $wardGender, $wardInstitutions, $wardBusinesses, $wardLiteracy
+        ) {
+            $lit = $wardLiteracy->get($ward->id);
+            return [
+                'ward_id'        => $ward->id,
+                'ward_number'    => $ward->ward_number,
+                'households'     => $wardHouseholds->get($ward->id, 0),
+                'male'           => $wardGender->get($ward->id, collect())->firstWhere('gender', 'male')?->cnt  ?? 0,
+                'female'         => $wardGender->get($ward->id, collect())->firstWhere('gender', 'female')?->cnt ?? 0,
+                'other'          => $wardGender->get($ward->id, collect())->firstWhere('gender', 'other')?->cnt  ?? 0,
+                'total'          => $wardGender->get($ward->id, collect())->sum('cnt'),
+                'institutions'   => $wardInstitutions->get($ward->id, 0),
+                'businesses'     => $wardBusinesses->get($ward->id, 0),
+                'literate'       => (int) ($lit?->literate ?? 0),
+                'literate_total' => (int) ($lit?->total    ?? 0),
+            ];
+        })->values();
 
         return Inertia::render('Public/Reports/WardSummary', [
             'lg'          => $this->lgProps($lg),
             'wardSummary' => $wardSummary,
+        ]);
+    }
+
+    // ── Ward Profile page (comprehensive per-ward printable report) ───────────
+    public function wardProfile(Request $request, $wardId)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) return redirect()->route('public.dashboard');
+
+        $ward = Ward::findOrFail($wardId);
+        if ($ward->local_government_id !== $lg->id) abort(404);
+
+        $wid    = [$ward->id];
+        $hhBase = fn($q) => $q->whereIn('ward_id', $wid)->where('status', 'published');
+
+        // ── 1. Overview ─────────────────────────────────────────────────────
+        $hhCount = DB::table('households')->whereIn('ward_id', $wid)->where('status', 'published')->count();
+
+        $genderCounts = DB::table('household_members')
+            ->join('households', 'household_members.household_id', '=', 'households.id')
+            ->whereIn('households.ward_id', $wid)->where('households.status', 'published')
+            ->where('household_members.is_deceased', false)
+            ->select('household_members.gender', DB::raw('count(*) as cnt'))
+            ->groupBy('household_members.gender')->pluck('cnt', 'gender');
+
+        $totalPop  = $genderCounts->sum();
+        $maleCount = (int) ($genderCounts->get('male', 0));
+        $femaleCount = (int) ($genderCounts->get('female', 0));
+
+        $litRow = HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->select(DB::raw('SUM(CASE WHEN is_literate=1 THEN 1 ELSE 0 END) as lit'), DB::raw('count(*) as tot'))
+            ->first();
+        $litRate = ($litRow && $litRow->tot > 0) ? round($litRow->lit / $litRow->tot * 100, 1) : 0;
+
+        $elderlyCount   = HouseholdMember::alive()->whereHas('household', $hhBase)->where('age', '>=', 60)->count();
+        $disabledCount  = HouseholdMember::alive()->whereHas('household', $hhBase)->where('disability_status', true)->count();
+        $abroadCount    = DB::table('member_migration')
+            ->join('household_members', 'member_migration.member_id', '=', 'household_members.id')
+            ->join('households', 'household_members.household_id', '=', 'households.id')
+            ->whereIn('households.ward_id', $wid)->where('households.status', 'published')
+            ->where('household_members.is_deceased', false)
+            ->where('member_migration.migration_status', 'abroad')->count();
+        $institutionCount = DB::table('institutions')->whereIn('ward_id', $wid)->where('status', 'published')->count();
+        $businessCount    = DB::table('member_businesses')->whereIn('ward_id', $wid)->where('status', 'published')->count();
+
+        $overview = [
+            'households'   => $hhCount,
+            'population'   => (int) $totalPop,
+            'male'         => $maleCount,
+            'female'       => $femaleCount,
+            'other'        => (int) ($genderCounts->get('other', 0)),
+            'avg_hh_size'  => $hhCount > 0 ? round($totalPop / $hhCount, 1) : 0,
+            'literacy_pct' => $litRate,
+            'elderly'      => $elderlyCount,
+            'disabled'     => $disabledCount,
+            'abroad'       => $abroadCount,
+            'institutions' => $institutionCount,
+            'businesses'   => $businessCount,
+            'sex_ratio'    => $femaleCount > 0 ? round($maleCount / $femaleCount * 100) : 0,
+        ];
+
+        // ── 2. Age groups ────────────────────────────────────────────────────
+        $ageGroups = HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->whereNotNull('age')
+            ->select(DB::raw("
+                CASE
+                    WHEN age < 5  THEN '0-4'
+                    WHEN age < 15 THEN '5-14'
+                    WHEN age < 25 THEN '15-24'
+                    WHEN age < 40 THEN '25-39'
+                    WHEN age < 60 THEN '40-59'
+                    ELSE '60+'
+                END as grp"), DB::raw('count(*) as cnt'))
+            ->groupBy('grp')->orderBy('grp')->pluck('cnt', 'grp')->toArray();
+
+        // ── 3. Ethnicity + Religion + Mother tongue ──────────────────────────
+        $ethnicityData = HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->whereNotNull('ethnicity')->where('ethnicity', '!=', '')
+            ->select('ethnicity as val', DB::raw('count(*) as cnt'))
+            ->groupBy('ethnicity')->orderByDesc('cnt')->get()
+            ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray();
+
+        $religionData = HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->whereNotNull('religion')->where('religion', '!=', '')
+            ->select('religion as val', DB::raw('count(*) as cnt'))
+            ->groupBy('religion')->orderByDesc('cnt')->get()
+            ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray();
+
+        $motherTongueData = HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->whereNotNull('mother_tongue')->where('mother_tongue', '!=', '')
+            ->select('mother_tongue as val', DB::raw('count(*) as cnt'))
+            ->groupBy('mother_tongue')->orderByDesc('cnt')->limit(10)->get()
+            ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray();
+
+        // ── 4. Housing ───────────────────────────────────────────────────────
+        $housingBase = fn() => DB::table('household_housing')
+            ->join('households', 'household_housing.household_id', '=', 'households.id')
+            ->whereIn('households.ward_id', $wid)->where('households.status', 'published');
+
+        $housingBreakdown = function (string $col) use ($housingBase): array {
+            return $housingBase()->whereNotNull("household_housing.{$col}")->where("household_housing.{$col}", '!=', '')
+                ->select("household_housing.{$col} as val", DB::raw('count(*) as cnt'))
+                ->groupBy("household_housing.{$col}")->orderByDesc('cnt')->get()
+                ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray();
+        };
+
+        $permitRow = $housingBase()->select(
+            DB::raw('SUM(CASE WHEN has_building_permit=1 THEN 1 ELSE 0 END) as has_permit'),
+            DB::raw('count(*) as tot'))->first();
+
+        $housing = [
+            'ownership'     => $housingBreakdown('ownership_type'),
+            'wall'          => $housingBreakdown('wall_type'),
+            'roof'          => $housingBreakdown('roof_type'),
+            'foundation'    => $housingBreakdown('foundation_type'),
+            'permit_pct'    => ($permitRow && $permitRow->tot > 0) ? round($permitRow->has_permit / $permitRow->tot * 100, 1) : 0,
+            'permit_count'  => (int) ($permitRow?->has_permit ?? 0),
+            'total_hh'      => (int) ($permitRow?->tot ?? 0),
+        ];
+
+        // ── 5. Utilities ─────────────────────────────────────────────────────
+        $utilBase = fn() => DB::table('household_utilities')
+            ->join('households', 'household_utilities.household_id', '=', 'households.id')
+            ->whereIn('households.ward_id', $wid)->where('households.status', 'published');
+
+        $utilBreakdown = function (string $col) use ($utilBase): array {
+            return $utilBase()->whereNotNull("household_utilities.{$col}")->where("household_utilities.{$col}", '!=', '')
+                ->select("household_utilities.{$col} as val", DB::raw('count(*) as cnt'))
+                ->groupBy("household_utilities.{$col}")->orderByDesc('cnt')->get()
+                ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray();
+        };
+
+        $handwashRow = $utilBase()
+            ->select(DB::raw("SUM(CASE WHEN handwashing IS NOT NULL AND handwashing != '' THEN 1 ELSE 0 END) as hw"), DB::raw('count(*) as tot'))
+            ->first();
+
+        $utilities = [
+            'water'         => $utilBreakdown('water_source'),
+            'electricity'   => $utilBreakdown('electricity_source'),
+            'cooking'       => $utilBreakdown('cooking_fuel'),
+            'toilet'        => $utilBreakdown('toilet_type'),
+            'waste'         => $utilBreakdown('solid_waste_management'),
+            'internet'      => $utilBreakdown('internet_type'),
+            'handwash_pct'  => ($handwashRow && $handwashRow->tot > 0) ? round($handwashRow->hw / $handwashRow->tot * 100, 1) : 0,
+        ];
+
+        // ── 6. Education & Occupation ─────────────────────────────────────────
+        $eduLevel = HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->whereNotNull('education_level')->where('education_level', '!=', '')
+            ->select('education_level as val', DB::raw('count(*) as cnt'))
+            ->groupBy('education_level')->orderByDesc('cnt')->get()
+            ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray();
+
+        $occupationData = HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->whereNotNull('occupation_type')->where('occupation_type', '!=', '')
+            ->select('occupation_type as val', DB::raw('count(*) as cnt'))
+            ->groupBy('occupation_type')->orderByDesc('cnt')->get()
+            ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray();
+
+        $litByGender = HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->whereNotNull('gender')
+            ->select('gender',
+                DB::raw('SUM(CASE WHEN is_literate=1 THEN 1 ELSE 0 END) as lit'),
+                DB::raw('count(*) as tot'))
+            ->groupBy('gender')->get()
+            ->map(fn($r) => ['gender' => $r->gender, 'lit' => (int)$r->lit, 'tot' => (int)$r->tot])->toArray();
+
+        $education = ['edu_level' => $eduLevel, 'occupation' => $occupationData, 'lit_by_gender' => $litByGender, 'literacy_pct' => $litRate];
+
+        // ── 7. Economic ──────────────────────────────────────────────────────
+        $econBase = fn() => DB::table('household_economic')
+            ->join('households', 'household_economic.household_id', '=', 'households.id')
+            ->whereIn('households.ward_id', $wid)->where('households.status', 'published');
+
+        $econBreakdown = function (string $col) use ($econBase): array {
+            return $econBase()->whereNotNull("household_economic.{$col}")->where("household_economic.{$col}", '!=', '')
+                ->select("household_economic.{$col} as val", DB::raw('count(*) as cnt'))
+                ->groupBy("household_economic.{$col}")->orderByDesc('cnt')->get()
+                ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray();
+        };
+
+        $econRow = $econBase()->select(
+            DB::raw('SUM(CASE WHEN has_bank_account=1 THEN 1 ELSE 0 END) as bank'),
+            DB::raw('SUM(CASE WHEN has_insurance=1 THEN 1 ELSE 0 END) as insurance'),
+            DB::raw('SUM(CASE WHEN poverty_card=1 THEN 1 ELSE 0 END) as poverty'),
+            DB::raw('SUM(CASE WHEN social_security_allowance=1 THEN 1 ELSE 0 END) as ssa'),
+            DB::raw('count(*) as tot'))->first();
+
+        $pct = fn($v, $tot) => ($tot > 0) ? round($v / $tot * 100, 1) : 0;
+
+        $economic = [
+            'income_source' => $econBreakdown('primary_income_source'),
+            'income_range'  => $econBreakdown('annual_income_range'),
+            'bank_pct'      => $pct($econRow?->bank ?? 0, $econRow?->tot ?? 0),
+            'insurance_pct' => $pct($econRow?->insurance ?? 0, $econRow?->tot ?? 0),
+            'poverty_count' => (int) ($econRow?->poverty ?? 0),
+            'ssa_count'     => (int) ($econRow?->ssa ?? 0),
+            'total_hh'      => (int) ($econRow?->tot ?? 0),
+        ];
+
+        // ── 8. Agriculture ───────────────────────────────────────────────────
+        $agriBase = fn() => DB::table('household_agriculture')
+            ->join('households', 'household_agriculture.household_id', '=', 'households.id')
+            ->whereIn('households.ward_id', $wid)->where('households.status', 'published');
+
+        $agriRow = $agriBase()->select(
+            DB::raw('SUM(CASE WHEN owns_land=1 THEN 1 ELSE 0 END) as owns'),
+            DB::raw('SUM(CASE WHEN uses_chemical_fertilizer=1 THEN 1 ELSE 0 END) as chem_fert'),
+            DB::raw('SUM(CASE WHEN uses_organic_fertilizer=1 THEN 1 ELSE 0 END) as org_fert'),
+            DB::raw('SUM(CASE WHEN sells_produce=1 THEN 1 ELSE 0 END) as sells'),
+            DB::raw('SUM(CASE WHEN has_agri_loan=1 THEN 1 ELSE 0 END) as agri_loan'),
+            DB::raw('count(*) as tot'))->first();
+
+        $agriculture = [
+            'owns_land_pct'     => $pct($agriRow?->owns ?? 0, $agriRow?->tot ?? 0),
+            'chem_fert_pct'     => $pct($agriRow?->chem_fert ?? 0, $agriRow?->owns ?? 1),
+            'org_fert_pct'      => $pct($agriRow?->org_fert ?? 0, $agriRow?->owns ?? 1),
+            'sells_pct'         => $pct($agriRow?->sells ?? 0, $agriRow?->owns ?? 1),
+            'agri_loan_pct'     => $pct($agriRow?->agri_loan ?? 0, $agriRow?->owns ?? 1),
+            'owns_count'        => (int) ($agriRow?->owns ?? 0),
+            'total_hh'          => (int) ($agriRow?->tot ?? 0),
+        ];
+
+        // ── 9. Migration ─────────────────────────────────────────────────────
+        $migBase = fn() => DB::table('member_migration')
+            ->join('household_members', 'member_migration.member_id', '=', 'household_members.id')
+            ->join('households', 'household_members.household_id', '=', 'households.id')
+            ->whereIn('households.ward_id', $wid)->where('households.status', 'published')
+            ->where('household_members.is_deceased', false);
+
+        $migCounts = $migBase()->where('member_migration.migration_status', '!=', 'not_migrated')
+            ->select('member_migration.migration_status', DB::raw('count(*) as cnt'))
+            ->groupBy('member_migration.migration_status')->pluck('cnt', 'migration_status');
+
+        $destCountries = $migBase()->where('member_migration.migration_status', 'abroad')
+            ->whereNotNull('member_migration.destination_country')->where('member_migration.destination_country', '!=', '')
+            ->select('member_migration.destination_country as country', DB::raw('count(*) as cnt'))
+            ->groupBy('member_migration.destination_country')->orderByDesc('cnt')->limit(8)->get()
+            ->map(fn($r) => ['country' => $r->country, 'cnt' => (int)$r->cnt])->toArray();
+
+        $migration = [
+            'abroad'          => (int) ($migCounts->get('abroad', 0)),
+            'internal'        => (int) ($migCounts->get('internal', 0)),
+            'dest_countries'  => $destCountries,
+        ];
+
+        // ── 10. Health & Disability ───────────────────────────────────────────
+        $disabilityTypes = HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->where('disability_status', true)
+            ->whereNotNull('disability_type')->where('disability_type', '!=', '')
+            ->select('disability_type as val', DB::raw('count(*) as cnt'))
+            ->groupBy('disability_type')->orderByDesc('cnt')->get()
+            ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray();
+
+        $chronicCount = HouseholdMember::alive()->whereHas('household', $hhBase)->where('chronic_illness', true)->count();
+
+        $health = [
+            'disabled_count'  => $disabledCount,
+            'disability_types'=> $disabilityTypes,
+            'chronic_count'   => $chronicCount,
+            'elderly_count'   => $elderlyCount,
+        ];
+
+        // ── 11. Disaster ──────────────────────────────────────────────────────
+        $disBase = fn() => DB::table('household_disaster')
+            ->join('households', 'household_disaster.household_id', '=', 'households.id')
+            ->whereIn('households.ward_id', $wid)->where('households.status', 'published');
+
+        $disRow = $disBase()->select(
+            DB::raw('SUM(CASE WHEN is_flood_zone=1 THEN 1 ELSE 0 END) as flood'),
+            DB::raw('SUM(CASE WHEN is_landslide_zone=1 THEN 1 ELSE 0 END) as landslide'),
+            DB::raw('SUM(CASE WHEN is_drought_zone=1 THEN 1 ELSE 0 END) as drought'),
+            DB::raw('SUM(CASE WHEN has_evacuation_plan=1 THEN 1 ELSE 0 END) as evac'),
+            DB::raw('SUM(CASE WHEN disaster_training=1 THEN 1 ELSE 0 END) as training'),
+            DB::raw('count(*) as tot'))->first();
+
+        $disaster = [
+            'flood_count'     => (int) ($disRow?->flood ?? 0),
+            'landslide_count' => (int) ($disRow?->landslide ?? 0),
+            'drought_count'   => (int) ($disRow?->drought ?? 0),
+            'evac_count'      => (int) ($disRow?->evac ?? 0),
+            'training_count'  => (int) ($disRow?->training ?? 0),
+            'total_hh'        => (int) ($disRow?->tot ?? 0),
+        ];
+
+        // ── Other wards for navigation ────────────────────────────────────────
+        $allWards = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get(['id', 'ward_number']);
+
+        return Inertia::render('Public/Reports/WardProfile', [
+            'lg'            => $this->lgProps($lg),
+            'ward'          => ['id' => $ward->id, 'ward_number' => $ward->ward_number],
+            'allWards'      => $allWards->map(fn($w) => ['id' => $w->id, 'ward_number' => $w->ward_number])->values(),
+            'overview'      => $overview,
+            'ageGroups'     => $ageGroups,
+            'ethnicityData' => $ethnicityData,
+            'religionData'  => $religionData,
+            'motherTongue'  => $motherTongueData,
+            'housing'       => $housing,
+            'utilities'     => $utilities,
+            'education'     => $education,
+            'economic'      => $economic,
+            'agriculture'   => $agriculture,
+            'migration'     => $migration,
+            'health'        => $health,
+            'disaster'      => $disaster,
         ]);
     }
 
@@ -606,7 +941,8 @@ class AnalyticsController extends Controller
 
     public function population(Request $request)
     {
-        $lg      = $this->defaultLg();
+        $lg = $this->defaultLg();
+        if (!$lg) return response()->json([]);
         $wardIds = Ward::where('local_government_id', $lg->id)->pluck('id')->toArray();
 
         $data = HouseholdMember::alive()->whereHas('household', fn($q) => $q->whereIn('ward_id', $wardIds)->where('status', 'published'))
@@ -620,7 +956,8 @@ class AnalyticsController extends Controller
 
     public function institutions(Request $request)
     {
-        $lg      = $this->defaultLg();
+        $lg = $this->defaultLg();
+        if (!$lg) return response()->json([]);
         $wardIds = Ward::where('local_government_id', $lg->id)->pluck('id')->toArray();
 
         $data = Institution::whereIn('ward_id', $wardIds)
