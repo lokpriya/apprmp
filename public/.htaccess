@@ -1,5 +1,12 @@
-# Service Worker must not be cached — browsers check for updates on every navigation
+# Security headers
 <IfModule mod_headers.c>
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "geolocation=(self), camera=(), microphone=()"
+
+    # Service Worker must not be cached
     <FilesMatch "^(sw\.js|workbox-[^.]+\.js)$">
         Header set Cache-Control "no-cache, no-store, must-revalidate"
         Header set Pragma "no-cache"

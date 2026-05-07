@@ -46,10 +46,7 @@ class PdfController extends Controller
 
     public function business(MemberBusiness $business)
     {
-        $user = auth()->user();
-        if (! $user->isAdmin()) {
-            abort_unless(in_array($business->ward_id, $user->getAssignedWardIds()), 403);
-        }
+        $this->authorize('view', $business);
 
         $business->load(['ward.localGovernment', 'settlement', 'member', 'household']);
         $lg   = $business->ward?->localGovernment ?? LocalGovernment::find($user->local_government_id);

@@ -394,7 +394,9 @@ class HouseholdController extends Controller
         foreach ($request->ids as $id) {
             $hh = Household::find($id);
             if (!$hh || $hh->status !== 'draft') { $skipped++; continue; }
-            if (!$user->isAdmin()) {
+            if ($user->isWardAdmin()) {
+                if (!in_array($hh->ward_id, $wardIds)) { $skipped++; continue; }
+            } elseif (!$user->isAdmin()) {
                 if ($hh->enumerator_id !== $user->id || !in_array($hh->ward_id, $wardIds)) { $skipped++; continue; }
             }
             try { $this->workflow->submit($hh, $user); $count++; }
@@ -406,7 +408,7 @@ class HouseholdController extends Controller
 
     public function bulkApprove(Request $request)
     {
-        abort_unless(auth()->user()->isReviewer() || auth()->user()->isAdmin(), 403);
+        abort_unless(auth()->user()->isReviewer() || auth()->user()->isWardAdmin() || auth()->user()->isAdmin(), 403);
         $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer']);
         $user    = auth()->user();
         $wardIds = $user->isAdmin() ? null : $user->assignedWards()->pluck('wards.id')->toArray();
@@ -425,7 +427,7 @@ class HouseholdController extends Controller
 
     public function bulkReject(Request $request)
     {
-        abort_unless(auth()->user()->isReviewer() || auth()->user()->isAdmin(), 403);
+        abort_unless(auth()->user()->isReviewer() || auth()->user()->isWardAdmin() || auth()->user()->isAdmin(), 403);
         $request->validate([
             'ids'    => 'required|array|min:1',
             'ids.*'  => 'integer',
@@ -448,7 +450,7 @@ class HouseholdController extends Controller
 
     public function publish(Request $request, Household $household)
     {
-        abort_unless(auth()->user()->isAdmin(), 403);
+        $this->authorize('publish', $household);
 
         try {
             $this->workflow->publish($household, auth()->user());
