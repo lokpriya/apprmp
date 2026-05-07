@@ -299,6 +299,11 @@ class InstitutionController extends Controller
     {
         $this->authorize('update', $institution);
 
+        $missing = $this->validateForSubmission($institution);
+        if ($missing) {
+            return back()->with('error', 'पेस गर्न सकिएन — आवश्यक विवरण खाली छ: ' . $missing);
+        }
+
         try {
             $this->workflow->submit($institution, auth()->user());
             return redirect()->route('institutions.show', $institution)
@@ -306,6 +311,22 @@ class InstitutionController extends Controller
         } catch (\RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
+    }
+
+    private function validateForSubmission(Institution $institution): ?string
+    {
+        $errors = [];
+
+        if (!$institution->institution_type_id)                       $errors[] = 'संस्थाको प्रकार';
+        if (!$institution->name_np && !$institution->name_en)         $errors[] = 'संस्थाको नाम';
+        if (!$institution->ward_id)                                   $errors[] = 'वडा नं.';
+        if (!$institution->respondent_name)                           $errors[] = 'उत्तरदाताको नाम';
+        if (!$institution->survey_date)                               $errors[] = 'सर्वेक्षण मिति';
+        if (!$institution->gps_lat || !$institution->gps_lng)        $errors[] = 'GPS स्थान';
+
+        if (empty($errors)) return null;
+        return implode(', ', array_slice($errors, 0, 4))
+            . (count($errors) > 4 ? ' र अन्य ' . (count($errors) - 4) . ' विवरण' : '');
     }
 
     public function publish(Request $request, Institution $institution)

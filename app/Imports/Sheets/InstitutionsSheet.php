@@ -162,6 +162,8 @@ class InstitutionsSheet implements ToCollection, WithChunkReading, WithHeadingRo
             return;
         }
 
+        [$gpsLat, $gpsLng] = $this->parseGps($row, $rowNum);
+
         $institution = Institution::create([
             'unique_code'          => $code,
             'ward_id'              => $wardId,
@@ -175,8 +177,8 @@ class InstitutionsSheet implements ToCollection, WithChunkReading, WithHeadingRo
             'enumerator_id'        => $this->enumeratorId,
             'respondent_name'      => trim($row['respondent_name'] ?? '') ?: null,
             'respondent_contact'   => trim($row['respondent_contact'] ?? '') ?: null,
-            'gps_lat'              => is_numeric($row['gps_lat'] ?? '') ? $row['gps_lat'] : null,
-            'gps_lng'              => is_numeric($row['gps_lng'] ?? '') ? $row['gps_lng'] : null,
+            'gps_lat'              => $gpsLat,
+            'gps_lng'              => $gpsLng,
             'photo_number'         => trim($row['photo_number'] ?? '') ?: null,
             'survey_date'          => $this->parseDate($row['survey_date'] ?? null),
             'remarks'              => trim($row['remarks'] ?? '') ?: null,
@@ -186,6 +188,31 @@ class InstitutionsSheet implements ToCollection, WithChunkReading, WithHeadingRo
         $this->existingCodes[$code] = true;
         $this->codeToId[$code] = $institution->id;
         $this->imported++;
+    }
+
+    private function parseGps(array $row, int $rowNum): array
+    {
+        $lat = $row['gps_lat'] ?? null;
+        $lng = $row['gps_lng'] ?? null;
+
+        if ($lat === null && $lng === null) {
+            return [null, null];
+        }
+
+        if (!is_numeric($lat) || !is_numeric($lng)) {
+            $this->errors[] = "Row {$rowNum}: Invalid GPS (non-numeric) — coordinates cleared.";
+            return [null, null];
+        }
+
+        $lat = (float) $lat;
+        $lng = (float) $lng;
+
+        if ($lat < 26.0 || $lat > 30.5 || $lng < 80.0 || $lng > 88.5) {
+            $this->errors[] = "Row {$rowNum}: GPS out of Nepal bounds (lat={$lat}, lng={$lng}) — coordinates cleared.";
+            return [null, null];
+        }
+
+        return [$lat, $lng];
     }
 
     private function parseDate(mixed $val): ?string

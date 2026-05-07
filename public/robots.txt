@@ -1,2 +1,16 @@
 User-agent: *
-Disallow:
+Disallow: /admin/
+Disallow: /households/
+Disallow: /institutions/
+Disallow: /businesses/
+Disallow: /review/
+Disallow: /edit-requests/
+Disallow: /settings/
+Disallow: /login
+Disallow: /two-factor/
+Disallow: /api/
+
+Allow: /public/
+Allow: /
+
+Sitemap: https://apprmp.prayasnepal.com/sitemap.xml

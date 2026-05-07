@@ -22,12 +22,20 @@
     <div class="flex items-center gap-2 bg-white border border-[#e6e7e9] rounded-md px-4 py-3 shadow-sm">
       <template v-for="(s, i) in steps" :key="i">
         <div class="flex items-center gap-1.5">
-          <div :class="[
-            'w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 transition-colors',
-            currentStep > i ? 'bg-amber-600 text-white' :
-            currentStep === i ? 'bg-amber-100 text-amber-700 ring-2 ring-amber-400' :
-            'bg-gray-100 text-gray-400'
-          ]">{{ i + 1 }}</div>
+          <div class="relative shrink-0">
+            <div :class="[
+              'w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition-colors',
+              currentStep > i
+                ? (stepsWithErrors.has(i + 1) ? 'bg-red-500 text-white' : 'bg-amber-600 text-white')
+                : currentStep === i ? 'bg-amber-100 text-amber-700 ring-2 ring-amber-400'
+                : 'bg-gray-100 text-gray-400'
+            ]">
+              <i v-if="currentStep > i && stepsWithErrors.has(i + 1)" class="fa-solid fa-exclamation text-[9px]"></i>
+              <span v-else>{{ i + 1 }}</span>
+            </div>
+            <span v-if="stepsWithErrors.has(i + 1) && currentStep > i"
+              class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 border border-white"></span>
+          </div>
           <span v-if="!collapsed_steps" :class="[
             'text-xs font-medium hidden sm:block',
             currentStep === i ? 'text-amber-700' : currentStep > i ? 'text-amber-600' : 'text-gray-400'
@@ -354,6 +362,30 @@
         <i class="fa-solid fa-file-contract text-amber-500"></i>
         दर्ता तथा कर
       </h3>
+
+      <!-- Validation summary -->
+      <div v-if="hasValidationErrors" class="bg-red-50 border border-red-200 rounded-md px-4 py-3 space-y-2">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-circle-exclamation text-red-500 text-sm"></i>
+          <p class="text-[13px] font-semibold text-red-700">
+            {{ validationErrorCount }} वटा आवश्यक विवरण खाली छन् — मस्यौदा सुरक्षित गर्न मिल्छ, तर पेस गर्न अगाडि भर्नुहोस्।
+          </p>
+        </div>
+        <div class="space-y-1 pl-5">
+          <div v-for="(errs, stepNum) in stepValidationErrors" :key="stepNum"
+            class="flex items-start gap-2 text-[12px] text-red-600 leading-relaxed">
+            <button type="button" @click="currentStep = Number(stepNum)"
+              class="shrink-0 font-bold underline hover:text-red-800 transition whitespace-nowrap">
+              चरण {{ stepNum }}
+            </button>
+            <span>— {{ errs.join(' · ') }}</span>
+          </div>
+        </div>
+      </div>
+      <div v-else class="bg-green-50 border border-green-200 rounded-md px-4 py-3 flex items-center gap-2">
+        <i class="fa-solid fa-circle-check text-green-500 text-sm"></i>
+        <p class="text-[13px] font-semibold text-green-700">सबै आवश्यक विवरण भरिएको छ — पेस गर्न तयार छ।</p>
+      </div>
 
       <!-- Is Registered -->
       <div>
@@ -748,6 +780,36 @@ const fieldLabel = computed(() => {
   const f = props.surveyOptions.business_field?.find(o => o.value === form.value.business_field)
   return f?.label ?? ''
 })
+
+// ── Validation ─────────────────────────────────────────────────────────────
+const stepValidationErrors = computed(() => {
+  const f    = form.value
+  const errs = {}
+
+  // Step 1 — पहिचान
+  const s1 = []
+  if (!f.business_name?.trim()) s1.push('व्यवसायको नाम आवश्यक छ')
+  if (!f.business_type)         s1.push('व्यवसायको प्रकार आवश्यक छ')
+  if (s1.length) errs[1] = s1
+
+  // Step 2 — क्षेत्र
+  const s2 = []
+  if (!f.business_field) s2.push('व्यवसायको क्षेत्र आवश्यक छ')
+  if (s2.length) errs[2] = s2
+
+  // Step 3 — दर्ता/कर
+  const s3 = []
+  if (f.is_registered === null || f.is_registered === '') s3.push('दर्ता अवस्था (छ/छैन) आवश्यक छ')
+  if (s3.length) errs[3] = s3
+
+  return errs
+})
+
+const stepsWithErrors      = computed(() => new Set(Object.keys(stepValidationErrors.value).map(Number)))
+const hasValidationErrors  = computed(() => stepsWithErrors.value.size > 0)
+const validationErrorCount = computed(() =>
+  Object.values(stepValidationErrors.value).reduce((t, arr) => t + arr.length, 0)
+)
 
 // ── Step navigation ────────────────────────────────────────────────────────
 const canProceed = computed(() => {

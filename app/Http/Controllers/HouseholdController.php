@@ -304,6 +304,13 @@ class HouseholdController extends Controller
     {
         $this->authorize('update', $household);
 
+        $errors = $this->validateForSubmission($household);
+        if (!empty($errors)) {
+            $preview = implode(', ', array_slice($errors, 0, 4));
+            $more    = count($errors) > 4 ? ' र ' . (count($errors) - 4) . ' थप' : '';
+            return back()->with('error', 'फारम अपूर्ण छ — पेस गर्नु अघि भर्नुहोस्: ' . $preview . $more . '।');
+        }
+
         try {
             $this->workflow->submit($household, auth()->user());
             return redirect()->route('households.show', $household)
@@ -311,6 +318,70 @@ class HouseholdController extends Controller
         } catch (\RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
+    }
+
+    private function validateForSubmission(Household $household): array
+    {
+        $errors = [];
+
+        // Step 1 — Basic info
+        if (!$household->respondent_name)        $errors[] = 'उत्तरदाताको नाम';
+        if (!$household->survey_date)            $errors[] = 'सर्वेक्षण मिति';
+        if (!$household->gps_lat || !$household->gps_lng) $errors[] = 'GPS स्थान';
+
+        $h = $household->housing;
+        if (!$h?->house_type)       $errors[] = 'घरको प्रकार';
+        if (!$h?->roof_type)        $errors[] = 'छानाको प्रकार';
+        if (!$h?->wall_type)        $errors[] = 'पर्खालको प्रकार';
+        if (!$h?->foundation_type)  $errors[] = 'जगको प्रकार';
+        if (!$h?->ownership_type)   $errors[] = 'स्वामित्वको प्रकार';
+        if (!$h?->house_condition)  $errors[] = 'घरको अवस्था';
+
+        // Step 2 — Social
+        $social = $household->survey_data['social'] ?? [];
+        if (empty($social['family_head']))             $errors[] = 'घरमूलीको नाम';
+        if (!($social['male_num'] ?? '') && !($social['female_num'] ?? '') && !($social['other_num'] ?? ''))
+                                                       $errors[] = 'परिवार सदस्य संख्या';
+        if (empty($social['family_type']))             $errors[] = 'परिवारको प्रकार';
+        if (empty($social['ethnicity']))               $errors[] = 'जाति/जनजाति';
+        if (empty($social['religion']))                $errors[] = 'धर्म';
+        if (empty($social['mother_tongue']))           $errors[] = 'मातृभाषा';
+        if (empty($social['major_family_occupation'])) $errors[] = 'मुख्य पेशा';
+        if (!isset($social['migration_status']) || $social['migration_status'] === '') $errors[] = 'बसाइँसराइ अवस्था';
+        if (!isset($social['have_land'])        || $social['have_land'] === '')        $errors[] = 'जग्गा स्वामित्व';
+        if (!isset($social['health_insurance']) || $social['health_insurance'] === '') $errors[] = 'स्वास्थ्य बीमा';
+        if (!isset($social['bankloan'])         || $social['bankloan'] === '')         $errors[] = 'ऋण विवरण';
+
+        // Step 3 — Utilities
+        $u = $household->utilities;
+        if (!$u?->water_source)             $errors[] = 'पानीको स्रोत';
+        if (!$u?->electricity_source)       $errors[] = 'बिजुलीको स्रोत';
+        if (!$u?->solid_waste_management)   $errors[] = 'फोहोर व्यवस्थापन';
+
+        // Step 12 — Economic
+        $e = $household->economic;
+        if (!$e?->primary_income_source)    $errors[] = 'मुख्य आम्दानीको स्रोत';
+        if (!$e?->annual_income_range)      $errors[] = 'वार्षिक आम्दानी दायरा';
+        if (!$e?->annual_expenditure_range) $errors[] = 'वार्षिक खर्च दायरा';
+
+        // Step 13 — Disaster
+        $d = $household->disaster;
+        $affectedSet = isset($d?->affected_last_3years) && $d->affected_last_3years !== '';
+        if (!$affectedSet) $errors[] = 'प्राकृतिक प्रकोप प्रभाव';
+
+        // Step 14 — Members
+        if ($household->members()->count() === 0) {
+            $errors[] = 'कम्तीमा एक परिवार सदस्य';
+        } else {
+            foreach ($household->members as $i => $m) {
+                if (!$m->full_name)        $errors[] = 'सदस्य ' . ($i + 1) . ': नाम';
+                if (!$m->relation_to_head) $errors[] = 'सदस्य ' . ($i + 1) . ': नाता';
+                if ($m->age === null || $m->age === '') $errors[] = 'सदस्य ' . ($i + 1) . ': उमेर';
+                if (!$m->gender)           $errors[] = 'सदस्य ' . ($i + 1) . ': लिङ्ग';
+            }
+        }
+
+        return $errors;
     }
 
     public function bulkSubmit(Request $request)

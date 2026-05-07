@@ -116,16 +116,21 @@
             @click="goToStep(idx + 1)"
             class="flex items-center gap-1.5 shrink-0 cursor-pointer"
           >
-            <div :class="[
-              'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all',
-              idx + 1 === step
-                ? 'bg-[#206bc4] text-white shadow-md shadow-[#206bc4]/20'
-                : idx + 1 < step
-                  ? 'bg-[#206bc4]/10 text-[#206bc4]'
-                  : 'bg-gray-100 text-gray-400',
-            ]">
-              <i v-if="idx + 1 < step" class="fa-solid fa-check text-[10px]"></i>
-              <span v-else>{{ idx + 1 }}</span>
+            <div class="relative">
+              <div :class="[
+                'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all',
+                idx + 1 === step
+                  ? 'bg-[#206bc4] text-white shadow-md shadow-[#206bc4]/20'
+                  : idx + 1 < step
+                    ? (stepsWithErrors.has(idx + 1) ? 'bg-red-100 text-red-600' : 'bg-[#206bc4]/10 text-[#206bc4]')
+                    : 'bg-gray-100 text-gray-400',
+              ]">
+                <i v-if="idx + 1 < step && !stepsWithErrors.has(idx + 1)" class="fa-solid fa-check text-[10px]"></i>
+                <i v-else-if="idx + 1 < step && stepsWithErrors.has(idx + 1)" class="fa-solid fa-exclamation text-[10px]"></i>
+                <span v-else>{{ idx + 1 }}</span>
+              </div>
+              <span v-if="stepsWithErrors.has(idx + 1)"
+                class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 border border-white"></span>
             </div>
             <span :class="[
               'text-xs font-medium hidden sm:block',
@@ -1641,6 +1646,30 @@
         <i class="fa-solid fa-circle-check text-[#206bc4]"></i> समीक्षा गर्नुहोस्
       </h3>
 
+      <!-- Validation summary -->
+      <div v-if="hasValidationErrors" class="bg-red-50 border border-red-200 rounded-md px-4 py-3 space-y-2">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-circle-exclamation text-red-500 text-sm"></i>
+          <p class="text-[13px] font-semibold text-red-700">
+            {{ validationErrorCount }} वटा आवश्यक विवरण खाली छन् — मस्यौदा सुरक्षित गर्न मिल्छ, तर पेस गर्न अगाडि भर्नुहोस्।
+          </p>
+        </div>
+        <div class="space-y-1 pl-5">
+          <div v-for="(errs, stepNum) in stepValidationErrors" :key="stepNum"
+            class="flex items-start gap-2 text-[12px] text-red-600 leading-relaxed">
+            <button type="button" @click="goToStep(Number(stepNum))"
+              class="shrink-0 font-bold underline hover:text-red-800 transition whitespace-nowrap">
+              चरण {{ stepNum }}
+            </button>
+            <span>— {{ errs.join(' · ') }}</span>
+          </div>
+        </div>
+      </div>
+      <div v-else class="bg-green-50 border border-green-200 rounded-md px-4 py-3 flex items-center gap-2">
+        <i class="fa-solid fa-circle-check text-green-500 text-sm"></i>
+        <p class="text-[13px] font-semibold text-green-700">सबै आवश्यक विवरण भरिएको छ — पेस गर्न तयार छ।</p>
+      </div>
+
       <!-- ── Review sections ──────────────────────────────────────── -->
       <div class="space-y-4">
 
@@ -2307,6 +2336,34 @@ const props = defineProps({
 // ── Steps ──────────────────────────────────────────────────────────
 const totalSteps = 7
 const step = ref(1)
+
+// ── Validation ─────────────────────────────────────────────────────
+const stepValidationErrors = computed(() => {
+  const f    = form
+  const errs = {}
+
+  // Step 1 — संस्था विवरण
+  const s1 = []
+  if (!f.institution_type_id)                      s1.push('संस्थाको प्रकार आवश्यक छ')
+  if (!f.name_np?.trim() && !f.name_en?.trim())    s1.push('संस्थाको नाम आवश्यक छ')
+  if (!f.ward_id)                                   s1.push('वडा नं. आवश्यक छ')
+  if (s1.length) errs[1] = s1
+
+  // Step 2 — सम्पर्क
+  const s2 = []
+  if (!f.respondent_name?.trim())  s2.push('उत्तरदाताको नाम आवश्यक छ')
+  if (!f.survey_date)              s2.push('सर्वेक्षण मिति आवश्यक छ')
+  if (!f.gps_lat || !f.gps_lng)   s2.push('GPS स्थान आवश्यक छ')
+  if (s2.length) errs[2] = s2
+
+  return errs
+})
+
+const stepsWithErrors      = computed(() => new Set(Object.keys(stepValidationErrors.value).map(Number)))
+const hasValidationErrors  = computed(() => stepsWithErrors.value.size > 0)
+const validationErrorCount = computed(() =>
+  Object.values(stepValidationErrors.value).reduce((t, arr) => t + arr.length, 0)
+)
 
 const typespecificLabel = computed(() => {
   const labels = {

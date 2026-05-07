@@ -297,15 +297,39 @@ class GoogleSheetsSyncService
         return hash('sha256', json_encode($clean, JSON_UNESCAPED_UNICODE));
     }
 
+    private function parseGps(array $row): array
+    {
+        $lat = $row['gps_lat'] ?? null;
+        $lng = $row['gps_lng'] ?? null;
+
+        if ($lat === null && $lng === null) {
+            return [null, null];
+        }
+
+        if (!is_numeric($lat) || !is_numeric($lng)) {
+            return [null, null];
+        }
+
+        $lat = (float) $lat;
+        $lng = (float) $lng;
+
+        if ($lat < 26.0 || $lat > 30.5 || $lng < 80.0 || $lng > 88.5) {
+            return [null, null];
+        }
+
+        return [$lat, $lng];
+    }
+
     private function rowToHouseholdData(array $row, int $wardId, int $lgId): array
     {
+        [$gpsLat, $gpsLng] = $this->parseGps($row);
         return [
             'unique_code'        => $row['unique_code']        ?? null,
             'respondent_name'    => $row['respondent_name']    ?? null,
             'respondent_contact' => $row['respondent_contact'] ?? null,
             'total_members'      => $row['total_members']      ?? null,
-            'gps_lat'            => $row['gps_lat']            ?? null,
-            'gps_lng'            => $row['gps_lng']            ?? null,
+            'gps_lat'            => $gpsLat,
+            'gps_lng'            => $gpsLng,
             'gps_altitude'       => $row['gps_altitude']       ?? null,
             'survey_date'        => $row['survey_date']        ?? null,
             'remarks'            => $row['remarks']            ?? null,
@@ -314,13 +338,14 @@ class GoogleSheetsSyncService
 
     private function rowToInstitutionData(array $row, int $wardId, int $lgId): array
     {
+        [$gpsLat, $gpsLng] = $this->parseGps($row);
         return [
             'unique_code'         => $row['unique_code']         ?? null,
             'name_en'             => $row['name_en']             ?? null,
             'name_np'             => $row['name_np']             ?? null,
             'registration_number' => $row['registration_number'] ?? null,
-            'gps_lat'             => $row['gps_lat']             ?? null,
-            'gps_lng'             => $row['gps_lng']             ?? null,
+            'gps_lat'             => $gpsLat,
+            'gps_lng'             => $gpsLng,
             'respondent_name'     => $row['respondent_name']     ?? null,
             'respondent_contact'  => $row['respondent_contact']  ?? null,
             'survey_date'         => $row['survey_date']         ?? null,

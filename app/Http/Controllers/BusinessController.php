@@ -313,9 +313,28 @@ class BusinessController extends Controller
         $this->authorizeWard($business->ward_id);
         abort_unless(in_array($business->status, ['draft', 'rejected']), 422, 'केवल मस्यौदा वा अस्वीकृत रेकर्ड पेस गर्न सकिन्छ।');
 
+        $missing = $this->validateForSubmission($business);
+        if ($missing) {
+            return back()->with('error', 'पेस गर्न सकिएन — आवश्यक विवरण खाली छ: ' . $missing);
+        }
+
         $this->workflow->submit($business, auth()->user());
 
         return back()->with('success', "व्यवसाय {$business->unique_code} पेस गरियो।");
+    }
+
+    private function validateForSubmission(MemberBusiness $business): ?string
+    {
+        $errors = [];
+
+        if (!$business->business_name)  $errors[] = 'व्यवसायको नाम';
+        if (!$business->business_type)  $errors[] = 'व्यवसायको प्रकार';
+        if (!$business->business_field) $errors[] = 'व्यवसायको क्षेत्र';
+        if ($business->is_registered === null) $errors[] = 'दर्ता अवस्था';
+
+        if (empty($errors)) return null;
+        return implode(', ', array_slice($errors, 0, 4))
+            . (count($errors) > 4 ? ' र अन्य ' . (count($errors) - 4) . ' विवरण' : '');
     }
 
     /* ── AJAX: households for a ward ─────────────────────────────────────── */

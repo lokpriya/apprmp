@@ -118,18 +118,24 @@
               isEdit || idx + 1 <= step ? 'cursor-pointer' : 'cursor-default opacity-50',
             ]"
           >
-            <div :class="[
-              'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all',
-              idx + 1 === step
-                ? 'bg-[#206bc4] text-white shadow-md shadow-[#206bc4]/20'
-                : idx + 1 < step
-                  ? 'bg-[#206bc4]/10 text-[#206bc4]'
-                  : isEdit
-                    ? 'bg-gray-100 text-gray-500 group-hover:bg-[#206bc4]/10 group-hover:text-[#206bc4]'
-                    : 'bg-gray-100 text-gray-400',
-            ]">
-              <i v-if="idx + 1 < step" class="fa-solid fa-check text-[10px]"></i>
-              <span v-else>{{ idx + 1 }}</span>
+            <div class="relative">
+              <div :class="[
+                'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all',
+                idx + 1 === step
+                  ? 'bg-[#206bc4] text-white shadow-md shadow-[#206bc4]/20'
+                  : idx + 1 < step
+                    ? 'bg-[#206bc4]/10 text-[#206bc4]'
+                    : isEdit
+                      ? 'bg-gray-100 text-gray-500 group-hover:bg-[#206bc4]/10 group-hover:text-[#206bc4]'
+                      : 'bg-gray-100 text-gray-400',
+              ]">
+                <i v-if="idx + 1 < step && !stepsWithErrors.has(idx + 1)" class="fa-solid fa-check text-[10px]"></i>
+                <i v-else-if="idx + 1 < step && stepsWithErrors.has(idx + 1)" class="fa-solid fa-exclamation text-[10px]"></i>
+                <span v-else>{{ idx + 1 }}</span>
+              </div>
+              <span v-if="stepsWithErrors.has(idx + 1)"
+                class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white">
+              </span>
             </div>
             <span :class="[
               'text-xs font-medium hidden sm:block transition-colors',
@@ -4029,6 +4035,30 @@
         </div>
       </div>
 
+      <!-- Validation summary -->
+      <div v-if="hasValidationErrors" class="bg-red-50 border border-red-200 rounded-md px-4 py-3 space-y-2">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-circle-exclamation text-red-500 text-sm"></i>
+          <p class="text-[13px] font-semibold text-red-700">
+            {{ validationErrorCount }} वटा आवश्यक विवरण खाली छन् — मस्यौदा सुरक्षित गर्न मिल्छ, तर पेस गर्न अगाडि भर्नुहोस्।
+          </p>
+        </div>
+        <div class="space-y-1 pl-5">
+          <div v-for="(errs, stepNum) in stepValidationErrors" :key="stepNum"
+            class="flex items-start gap-2 text-[12px] text-red-600 leading-relaxed">
+            <button type="button" @click="goToStep(Number(stepNum))"
+              class="shrink-0 font-bold underline hover:text-red-800 transition whitespace-nowrap">
+              चरण {{ stepNum }}
+            </button>
+            <span>— {{ errs.join(' · ') }}</span>
+          </div>
+        </div>
+      </div>
+      <div v-else class="bg-green-50 border border-green-200 rounded-md px-4 py-3 flex items-center gap-2">
+        <i class="fa-solid fa-circle-check text-green-500 text-sm"></i>
+        <p class="text-[13px] font-semibold text-green-700">सबै आवश्यक विवरण भरिएको छ — पेस गर्न तयार छ।</p>
+      </div>
+
       <!-- ╔══ PRINTABLE AREA ══════════════════════════════════════════ -->
       <div id="review-print-area">
 
@@ -4486,10 +4516,14 @@
           type="button"
           @click="submitForm"
           :disabled="form.processing"
-          class="flex items-center gap-2 bg-[#206bc4] text-white rounded-md px-6 py-2 text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-60"
+          class="relative flex items-center gap-2 bg-[#206bc4] text-white rounded-md px-6 py-2 text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-60"
         >
           <i :class="['fa-solid text-xs', form.processing && !form.save_draft ? 'fa-spinner fa-spin' : 'fa-floppy-disk']"></i>
           {{ isEdit ? 'अद्यावधिक गर्नुहोस्' : 'सुरक्षित गर्नुहोस्' }}
+          <span v-if="hasValidationErrors"
+            class="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 bg-amber-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+            {{ Math.min(validationErrorCount, 99) }}
+          </span>
         </button>
       </div>
     </div>
@@ -5757,6 +5791,127 @@ function dismissDuplicate() {
   form.clearErrors('duplicate_warning')
   form.duplicate_confirmed = false
 }
+
+// ── Submission validation ───────────────────────────────────────────
+const stepValidationErrors = computed(() => {
+  const f    = form
+  const errs = {}
+
+  // Step 1 — घर विवरण
+  const s1 = []
+  if (!f.ward_id)                             s1.push('वडा नं. आवश्यक छ')
+  if (!f.respondent_name?.trim())             s1.push('उत्तरदाताको नाम आवश्यक छ')
+  if (!f.survey_date)                         s1.push('सर्वेक्षण मिति आवश्यक छ')
+  if (!f.gps_lat || !f.gps_lng)              s1.push('GPS स्थान आवश्यक छ')
+  if (!f.housing.house_type)                  s1.push('घरको प्रकार आवश्यक छ')
+  if (!f.housing.roof_type)                   s1.push('छानाको प्रकार आवश्यक छ')
+  if (!f.housing.wall_type)                   s1.push('पर्खालको प्रकार आवश्यक छ')
+  if (!f.housing.foundation_type)             s1.push('जगको प्रकार आवश्यक छ')
+  if (!f.housing.ownership_type)              s1.push('स्वामित्वको प्रकार आवश्यक छ')
+  if (!f.housing.house_condition)             s1.push('घरको अवस्था आवश्यक छ')
+  if (s1.length) errs[1] = s1
+
+  // Step 2 — परिवार तथा सामाजिक
+  const s2 = []
+  if (!f.social.family_head?.trim())          s2.push('घरमूलीको नाम आवश्यक छ')
+  if (!f.social.male_num && !f.social.female_num && !f.social.other_num)
+                                              s2.push('परिवार सदस्य संख्या आवश्यक छ')
+  if (!f.social.family_type)                  s2.push('परिवारको प्रकार आवश्यक छ')
+  if (!f.social.ethnicity)                    s2.push('जाति/जनजाति आवश्यक छ')
+  if (!f.social.religion)                     s2.push('धर्म आवश्यक छ')
+  if (!f.social.mother_tongue)                s2.push('मातृभाषा आवश्यक छ')
+  if (!f.social.major_family_occupation)      s2.push('मुख्य पेशा आवश्यक छ')
+  if (f.social.migration_status === '')       s2.push('बसाइँसराइ अवस्था आवश्यक छ')
+  if (f.social.have_land === '')              s2.push('जग्गा स्वामित्व आवश्यक छ')
+  if (f.social.health_insurance === '')       s2.push('स्वास्थ्य बीमा आवश्यक छ')
+  if (f.social.bankloan === '')               s2.push('ऋण विवरण आवश्यक छ')
+  if (f.social.death === '')                  s2.push('मृत्यु विवरण आवश्यक छ')
+  if (s2.length) errs[2] = s2
+
+  // Step 3 — सरसफाई तथा ऊर्जा
+  const s3 = []
+  if (!f.utilities.water_source)              s3.push('पानीको स्रोत आवश्यक छ')
+  if (!f.utilities.electricity_source)        s3.push('बिजुलीको स्रोत आवश्यक छ')
+  if (!f.utilities.cooking_stove)             s3.push('खाना पकाउने चुलो आवश्यक छ')
+  if (!f.utilities.solid_waste_management)    s3.push('फोहोर व्यवस्थापन आवश्यक छ')
+  if (f.utilities.uses_firewood === '')       s3.push('दाउराको प्रयोग (छ/छैन) आवश्यक छ')
+  if (f.utilities.has_alt_electricity === '') s3.push('बैकल्पिक बिजुली जानकारी आवश्यक छ')
+  if (f.utilities.handwashing === '')         s3.push('हात धुने सुविधा आवश्यक छ')
+  if (f.utilities.vehicle === '')             s3.push('सवारी साधन आवश्यक छ')
+  if (s3.length) errs[3] = s3
+
+  // Step 4 — घरपरिवारको निर्णय
+  const s4 = []
+  if (!f.decisions.decisioninHHWork)          s4.push('घरायसी काम निर्णय आवश्यक छ')
+  if (!f.decisions.decisioninProperty)        s4.push('सम्पत्ति निर्णय आवश्यक छ')
+  if (!f.decisions.decisioninBusiness)        s4.push('व्यवसाय निर्णय आवश्यक छ')
+  if (f.decisions.has_bank_account === '')    s4.push('बैंक खाता जानकारी आवश्यक छ')
+  if (s4.length) errs[4] = s4
+
+  // Step 6 — खुसी र मेलमिलाप
+  const s6 = []
+  if (!f.wellbeing.happy_with_location)       s6.push('स्थानप्रति सन्तुष्टि आवश्यक छ')
+  if (!f.wellbeing.residence_perception)      s6.push('बसाइको अनुभूति आवश्यक छ')
+  if (!f.wellbeing.family_gathering_freq)     s6.push('परिवार भेटघाट आवश्यक छ')
+  if (!f.wellbeing.neighbors_nice)            s6.push('छिमेकी सम्बन्ध आवश्यक छ')
+  if (s6.length) errs[6] = s6
+
+  // Step 7 — परिवारको पेशा
+  const s7 = []
+  if (!f.occupation.occupation_rows?.length)  s7.push('कम्तीमा एक पेशा विवरण आवश्यक छ')
+  if (f.occupation.skill_training === '')     s7.push('सीप तालिम जानकारी आवश्यक छ')
+  if (s7.length) errs[7] = s7
+
+  // Step 8 — खेतीपाती
+  const s8 = []
+  if (f.agriculture.agriculture === '')       s8.push('कृषि गर्नु हुन्छ/हुन्न आवश्यक छ')
+  if (s8.length) errs[8] = s8
+
+  // Step 10 — पशुपालन
+  const s10 = []
+  if (f.livestockDetail.has_livestock === '') s10.push('पशुपालन जानकारी (छ/छैन) आवश्यक छ')
+  if (s10.length) errs[10] = s10
+
+  // Step 11 — मौरी/माछा/रेशम
+  const s11 = []
+  if (f.beeFishSilk.has_bee_fish_silk === '') s11.push('मौरी/माछा/रेशम जानकारी (छ/छैन) आवश्यक छ')
+  if (s11.length) errs[11] = s11
+
+  // Step 12 — आम्दानी र खर्च
+  const s12 = []
+  if (!f.economic.primary_income_source)      s12.push('मुख्य आम्दानीको स्रोत आवश्यक छ')
+  if (!f.economic.annual_income_range)        s12.push('वार्षिक आम्दानी दायरा आवश्यक छ')
+  if (!f.economic.annual_expenditure_range)   s12.push('वार्षिक खर्च दायरा आवश्यक छ')
+  if (s12.length) errs[12] = s12
+
+  // Step 13 — प्राकृतिक प्रकोप
+  const s13 = []
+  if (f.disaster.affected_last_3years === '') s13.push('प्राकृतिक प्रकोप प्रभाव आवश्यक छ')
+  if (!f.disaster.risk_reduction_plan)        s13.push('जोखिम न्यूनीकरण योजना आवश्यक छ')
+  if (s13.length) errs[13] = s13
+
+  // Step 14 — परिवार सदस्य
+  const s14 = []
+  if (!f.members.length) {
+    s14.push('कम्तीमा एक परिवार सदस्य आवश्यक छ')
+  } else {
+    f.members.forEach((m, i) => {
+      if (!m.full_name?.trim()) s14.push(`सदस्य ${i + 1}: पूरा नाम आवश्यक छ`)
+      if (!m.relation_to_head)  s14.push(`सदस्य ${i + 1}: नाता आवश्यक छ`)
+      if (m.age === '' || m.age === null) s14.push(`सदस्य ${i + 1}: उमेर आवश्यक छ`)
+      if (!m.gender)            s14.push(`सदस्य ${i + 1}: लिङ्ग आवश्यक छ`)
+    })
+  }
+  if (s14.length) errs[14] = s14
+
+  return errs
+})
+
+const stepsWithErrors      = computed(() => new Set(Object.keys(stepValidationErrors.value).map(Number)))
+const hasValidationErrors  = computed(() => stepsWithErrors.value.size > 0)
+const validationErrorCount = computed(() =>
+  Object.values(stepValidationErrors.value).reduce((t, arr) => t + arr.length, 0)
+)
 
 // ── Submit ─────────────────────────────────────────────────────────
 async function submitForm() {

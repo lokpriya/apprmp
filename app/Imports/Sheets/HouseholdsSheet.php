@@ -144,6 +144,8 @@ class HouseholdsSheet implements ToCollection, WithChunkReading, WithHeadingRow,
             'head_gender' => trim($row['head_gender'] ?? '') ?: null,
         ]);
 
+        [$gpsLat, $gpsLng] = $this->parseGps($row, $rowNum);
+
         $household = Household::create([
             'unique_code'        => $code,
             'ward_id'            => $wardId,
@@ -152,8 +154,8 @@ class HouseholdsSheet implements ToCollection, WithChunkReading, WithHeadingRow,
             'respondent_name'    => trim($row['respondent_name'] ?? '') ?: null,
             'respondent_contact' => trim($row['respondent_contact'] ?? '') ?: null,
             'total_members'      => is_numeric($row['total_members'] ?? '') ? (int)$row['total_members'] : null,
-            'gps_lat'            => is_numeric($row['gps_lat'] ?? '') ? $row['gps_lat'] : null,
-            'gps_lng'            => is_numeric($row['gps_lng'] ?? '') ? $row['gps_lng'] : null,
+            'gps_lat'            => $gpsLat,
+            'gps_lng'            => $gpsLng,
             'gps_altitude'       => is_numeric($row['gps_altitude'] ?? '') ? $row['gps_altitude'] : null,
             'gps_accuracy'       => is_numeric($row['gps_accuracy'] ?? '') ? $row['gps_accuracy'] : null,
             'photo_number'       => trim($row['photo_number'] ?? '') ?: null,
@@ -167,6 +169,31 @@ class HouseholdsSheet implements ToCollection, WithChunkReading, WithHeadingRow,
         $this->existingCodes[$code] = true;
         $this->codeToId[$code] = $household->id;
         $this->imported++;
+    }
+
+    private function parseGps(array $row, int $rowNum): array
+    {
+        $lat = $row['gps_lat'] ?? null;
+        $lng = $row['gps_lng'] ?? null;
+
+        if ($lat === null && $lng === null) {
+            return [null, null];
+        }
+
+        if (!is_numeric($lat) || !is_numeric($lng)) {
+            $this->errors[] = "Row {$rowNum}: Invalid GPS (non-numeric) — coordinates cleared.";
+            return [null, null];
+        }
+
+        $lat = (float) $lat;
+        $lng = (float) $lng;
+
+        if ($lat < 26.0 || $lat > 30.5 || $lng < 80.0 || $lng > 88.5) {
+            $this->errors[] = "Row {$rowNum}: GPS out of Nepal bounds (lat={$lat}, lng={$lng}) — coordinates cleared.";
+            return [null, null];
+        }
+
+        return [$lat, $lng];
     }
 
     private function parseDate(mixed $val): ?string
