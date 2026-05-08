@@ -39,11 +39,10 @@ define('LARAVEL_START', microtime(true));
 // Auto-create symlinks and copy public assets if missing.
 // __DIR__ is public_html/apprmp/ — the correct web-accessible location.
 (function () {
-    // storage symlink
-    $link   = __DIR__ . '/storage';
-    $target = LARAVEL_ROOT . '/storage/app/public';
-    if (!file_exists($link) && is_dir($target)) {
-        @symlink($target, $link);
+    // storage directory — physical dir so uploads are web-accessible without symlinks
+    $storageDir = __DIR__ . '/storage';
+    if (!is_dir($storageDir)) {
+        @mkdir($storageDir, 0755, true);
     }
 
     // build/ copy (symlinks outside public_html blocked on shared hosting)

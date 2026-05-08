@@ -153,8 +153,8 @@ function ins_writeEnv(string $root, array $d): bool {
     $env .= "FILESYSTEM_DISK=local\n";
     $webRoot = $d['webroot'] ?? '';
     if ($webRoot) {
-        $env .= "PUBLIC_DISK_ROOT={$webRoot}/uploads\n";
-        $env .= "PUBLIC_DISK_URL=" . rtrim($d['app_url'], '/') . "/uploads\n";
+        $env .= "PUBLIC_DISK_ROOT={$webRoot}/storage\n";
+        $env .= "PUBLIC_DISK_URL=" . rtrim($d['app_url'], '/') . "/storage\n";
     }
     return file_put_contents($root . '/.env', $env) !== false;
 }
