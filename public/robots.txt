@@ -12,5 +12,3 @@ Disallow: /api/
 
 Allow: /public/
 Allow: /
-
-Sitemap: https://apprmp.prayasnepal.com/sitemap.xml

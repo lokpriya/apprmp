@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Imports\RawRowCollector;
 use App\Models\Household;
 use App\Models\Institution;
+use App\Models\InstitutionType;
 use App\Models\MemberBusiness;
 use App\Models\Ward;
 use Illuminate\Support\Facades\Http;
@@ -94,9 +95,12 @@ class GoogleSheetsSyncService
             $existing = $existingMap->get($uniqueCode);
 
             if (!$existing) {
-                $validationErrors = $validator->checkFields($row, $rowNum);
-                if (!empty($validationErrors)) {
-                    $errors[] = ['row' => $row, 'reason' => 'अमान्य विकल्प मानहरू', 'validation_errors' => $validationErrors];
+                $allErrors = array_merge(
+                    $this->requiredHouseholdErrors($row, $rowNum),
+                    $validator->checkFields($row, $rowNum)
+                );
+                if (!empty($allErrors)) {
+                    $errors[] = ['row' => $row, 'reason' => 'आवश्यक/अमान्य विवरण', 'validation_errors' => $allErrors];
                 } else {
                     $new[] = array_merge($row, ['_hash' => $hash, '_action' => 'new']);
                 }
@@ -105,9 +109,12 @@ class GoogleSheetsSyncService
             } elseif ($existing->sync_hash === $hash) {
                 $upToDate[] = array_merge($row, ['_hash' => $hash, '_action' => 'up_to_date', '_id' => $existing->id]);
             } else {
-                $validationErrors = $validator->checkFields($row, $rowNum);
-                if (!empty($validationErrors)) {
-                    $errors[] = ['row' => $row, 'reason' => 'अमान्य विकल्प मानहरू', 'validation_errors' => $validationErrors];
+                $allErrors = array_merge(
+                    $this->requiredHouseholdErrors($row, $rowNum),
+                    $validator->checkFields($row, $rowNum)
+                );
+                if (!empty($allErrors)) {
+                    $errors[] = ['row' => $row, 'reason' => 'आवश्यक/अमान्य विवरण', 'validation_errors' => $allErrors];
                 } else {
                     $changed[] = array_merge($row, ['_hash' => $hash, '_action' => 'changed', '_id' => $existing->id, '_old_hash' => $existing->sync_hash]);
                 }
@@ -225,9 +232,12 @@ class GoogleSheetsSyncService
             $existing = $existingMap->get($uniqueCode);
 
             if (!$existing) {
-                $validationErrors = $validator->checkFields($row, $rowNum);
-                if (!empty($validationErrors)) {
-                    $errors[] = ['row' => $row, 'reason' => 'अमान्य विकल्प मानहरू', 'validation_errors' => $validationErrors];
+                $allErrors = array_merge(
+                    $this->requiredInstitutionErrors($row, $rowNum),
+                    $validator->checkFields($row, $rowNum)
+                );
+                if (!empty($allErrors)) {
+                    $errors[] = ['row' => $row, 'reason' => 'आवश्यक/अमान्य विवरण', 'validation_errors' => $allErrors];
                 } else {
                     $new[] = array_merge($row, ['_hash' => $hash, '_action' => 'new']);
                 }
@@ -236,9 +246,12 @@ class GoogleSheetsSyncService
             } elseif ($existing->sync_hash === $hash) {
                 $upToDate[] = array_merge($row, ['_hash' => $hash, '_action' => 'up_to_date', '_id' => $existing->id]);
             } else {
-                $validationErrors = $validator->checkFields($row, $rowNum);
-                if (!empty($validationErrors)) {
-                    $errors[] = ['row' => $row, 'reason' => 'अमान्य विकल्प मानहरू', 'validation_errors' => $validationErrors];
+                $allErrors = array_merge(
+                    $this->requiredInstitutionErrors($row, $rowNum),
+                    $validator->checkFields($row, $rowNum)
+                );
+                if (!empty($allErrors)) {
+                    $errors[] = ['row' => $row, 'reason' => 'आवश्यक/अमान्य विवरण', 'validation_errors' => $allErrors];
                 } else {
                     $changed[] = array_merge($row, ['_hash' => $hash, '_action' => 'changed', '_id' => $existing->id]);
                 }
@@ -320,19 +333,77 @@ class GoogleSheetsSyncService
         return [$lat, $lng];
     }
 
+    private function parseDate(mixed $val): ?string
+    {
+        if (!$val) return null;
+        if (is_numeric($val)) {
+            try {
+                return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float)$val)
+                    ->format('Y-m-d');
+            } catch (\Throwable) {}
+        }
+        $d = \DateTime::createFromFormat('Y-m-d', trim((string)$val));
+        return $d ? $d->format('Y-m-d') : null;
+    }
+
+    /** Returns error strings for missing required household fields */
+    private function requiredHouseholdErrors(array $row, int $rowNum): array
+    {
+        $errs = [];
+        if (!trim((string)($row['respondent_name'] ?? ''))) {
+            $errs[] = "Row {$rowNum}: respondent_name (उत्तरदाताको नाम) आवश्यक छ";
+        }
+        if (!trim((string)($row['survey_date'] ?? ''))) {
+            $errs[] = "Row {$rowNum}: survey_date (सर्वेक्षण मिति) आवश्यक छ";
+        }
+        return $errs;
+    }
+
+    /** Returns error strings for missing required institution fields */
+    private function requiredInstitutionErrors(array $row, int $rowNum): array
+    {
+        $errs = [];
+        $nameNp = trim((string)($row['name_np'] ?? ''));
+        $nameEn = trim((string)($row['name_en'] ?? ''));
+        if (!$nameNp && !$nameEn) {
+            $errs[] = "Row {$rowNum}: name_np वा name_en (संस्थाको नाम) आवश्यक छ";
+        }
+        if (!trim((string)($row['respondent_name'] ?? ''))) {
+            $errs[] = "Row {$rowNum}: respondent_name (उत्तरदाताको नाम) आवश्यक छ";
+        }
+        if (!trim((string)($row['survey_date'] ?? ''))) {
+            $errs[] = "Row {$rowNum}: survey_date (सर्वेक्षण मिति) आवश्यक छ";
+        }
+        return $errs;
+    }
+
+    /** Lazy-loaded institution type slug → id map */
+    private array $institutionTypeCache = [];
+
+    private function resolveInstitutionTypeId(?string $slug): ?int
+    {
+        if (!$slug) return null;
+        $slug = trim($slug);
+        if (!$slug) return null;
+        if (!array_key_exists($slug, $this->institutionTypeCache)) {
+            $this->institutionTypeCache[$slug] = InstitutionType::where('slug', $slug)->value('id');
+        }
+        return $this->institutionTypeCache[$slug];
+    }
+
     private function rowToHouseholdData(array $row, int $wardId, int $lgId): array
     {
         [$gpsLat, $gpsLng] = $this->parseGps($row);
         return [
-            'unique_code'        => $row['unique_code']        ?? null,
-            'respondent_name'    => $row['respondent_name']    ?? null,
-            'respondent_contact' => $row['respondent_contact'] ?? null,
-            'total_members'      => $row['total_members']      ?? null,
+            'unique_code'        => trim($row['unique_code']        ?? '') ?: null,
+            'respondent_name'    => trim($row['respondent_name']    ?? '') ?: null,
+            'respondent_contact' => trim($row['respondent_contact'] ?? '') ?: null,
+            'total_members'      => is_numeric($row['total_members'] ?? '') ? (int)$row['total_members'] : null,
             'gps_lat'            => $gpsLat,
             'gps_lng'            => $gpsLng,
-            'gps_altitude'       => $row['gps_altitude']       ?? null,
-            'survey_date'        => $row['survey_date']        ?? null,
-            'remarks'            => $row['remarks']            ?? null,
+            'gps_altitude'       => is_numeric($row['gps_altitude'] ?? '') ? (float)$row['gps_altitude'] : null,
+            'survey_date'        => $this->parseDate($row['survey_date'] ?? null),
+            'remarks'            => trim($row['remarks'] ?? '') ?: null,
         ];
     }
 
@@ -340,15 +411,17 @@ class GoogleSheetsSyncService
     {
         [$gpsLat, $gpsLng] = $this->parseGps($row);
         return [
-            'unique_code'         => $row['unique_code']         ?? null,
-            'name_en'             => $row['name_en']             ?? null,
-            'name_np'             => $row['name_np']             ?? null,
-            'registration_number' => $row['registration_number'] ?? null,
-            'gps_lat'             => $gpsLat,
-            'gps_lng'             => $gpsLng,
-            'respondent_name'     => $row['respondent_name']     ?? null,
-            'respondent_contact'  => $row['respondent_contact']  ?? null,
-            'survey_date'         => $row['survey_date']         ?? null,
+            'unique_code'          => trim($row['unique_code']         ?? '') ?: null,
+            'name_en'              => trim($row['name_en']             ?? '') ?: null,
+            'name_np'              => trim($row['name_np']             ?? '') ?: null,
+            'registration_number'  => trim($row['registration_number'] ?? '') ?: null,
+            'institution_type_id'  => $this->resolveInstitutionTypeId($row['institution_type'] ?? null),
+            'gps_lat'              => $gpsLat,
+            'gps_lng'              => $gpsLng,
+            'respondent_name'      => trim($row['respondent_name']     ?? '') ?: null,
+            'respondent_contact'   => trim($row['respondent_contact']  ?? '') ?: null,
+            'survey_date'          => $this->parseDate($row['survey_date']      ?? null),
+            'established_date'     => $this->parseDate($row['established_date'] ?? null),
         ];
     }
 }
