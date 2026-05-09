@@ -8,27 +8,62 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
+use Maatwebsite\Excel\Concerns\SkipsUnknownSheets;
 
-class SurveyOptionsImport implements ToCollection, WithHeadingRow
+class SurveyOptionsImport implements WithMultipleSheets, SkipsUnknownSheets
+{
+    /** @var SurveyOptionSheetImport[] */
+    private array $sheets;
+
+    public function __construct()
+    {
+        $validCategories = array_keys(SurveyOption::categories());
+        $this->sheets = [
+            new SurveyOptionSheetImport($validCategories),
+            new SurveyOptionSheetImport($validCategories),
+            new SurveyOptionSheetImport($validCategories),
+        ];
+    }
+
+    public function sheets(): array
+    {
+        // Sheets 0–2 are data (घरधुरी, संस्था, व्यवसाय).
+        // Sheet 3 (Categories reference) is skipped via SkipsUnknownSheets.
+        return [
+            0 => $this->sheets[0],
+            1 => $this->sheets[1],
+            2 => $this->sheets[2],
+        ];
+    }
+
+    public function __get(string $name): mixed
+    {
+        return match ($name) {
+            'inserted' => array_sum(array_map(fn($s) => $s->inserted, $this->sheets)),
+            'updated'  => array_sum(array_map(fn($s) => $s->updated,  $this->sheets)),
+            'skipped'  => array_sum(array_map(fn($s) => $s->skipped,  $this->sheets)),
+            'errors'   => array_merge(...array_map(fn($s) => $s->errors, $this->sheets)),
+            default    => null,
+        };
+    }
+}
+
+class SurveyOptionSheetImport implements ToCollection, WithHeadingRow
 {
     public int   $inserted = 0;
     public int   $updated  = 0;
     public int   $skipped  = 0;
     public array $errors   = [];
 
-    private array $validCategories;
-
-    public function __construct()
-    {
-        $this->validCategories = array_keys(SurveyOption::categories());
-    }
+    public function __construct(private array $validCategories) {}
 
     public function collection(Collection $rows): void
     {
         $affectedCategories = [];
 
         foreach ($rows as $index => $row) {
-            $rowNum = $index + 2; // heading is row 1, data starts at row 2
+            $rowNum = $index + 2;
 
             $data = [
                 'category'   => trim((string) ($row['category']   ?? '')),
@@ -41,7 +76,6 @@ class SurveyOptionsImport implements ToCollection, WithHeadingRow
                                     : 1,
             ];
 
-            // Skip fully empty rows
             if ($data['category'] === '' && $data['value'] === '') {
                 continue;
             }
@@ -89,7 +123,6 @@ class SurveyOptionsImport implements ToCollection, WithHeadingRow
             $affectedCategories[$data['category']] = true;
         }
 
-        // Clear caches for affected categories
         foreach (array_keys($affectedCategories) as $cat) {
             Cache::forget("survey_options.{$cat}.global");
             Cache::forget("survey_options.all.global");

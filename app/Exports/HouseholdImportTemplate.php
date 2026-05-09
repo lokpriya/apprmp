@@ -232,7 +232,7 @@ class UtilitiesTemplateSheet implements FromArray, WithTitle, WithStyles, Should
     protected function headerColor(): string { return 'FF0369A1'; }
     protected function lightColor(): string  { return 'FFF0F9FF'; }
     protected function sampleColor(): string { return 'FFE0F2FE'; }
-    protected function lastCol(): string     { return 'S'; }
+    protected function lastCol(): string     { return 'T'; }
 
     public function array(): array
     {
@@ -241,6 +241,7 @@ class UtilitiesTemplateSheet implements FromArray, WithTitle, WithStyles, Should
             ['household_code','water_source','water_distance_minutes','has_toilet',
              'toilet_type','sanitation_type','electricity_source','monthly_electricity_units',
              'cooking_fuel','has_biogas','solid_waste_management','has_internet','internet_type',
+             'handwashing',
              'vehicles_bike','vehicles_car','vehicles_tempo','vehicles_tractor','vehicles_other','has_own_vehicle'],
             ['Match Households sheet',
              hhOptHint($g,'water_source','tap_water / tube_well / river / spring / well / rainwater / other'),
@@ -255,10 +256,12 @@ class UtilitiesTemplateSheet implements FromArray, WithTitle, WithStyles, Should
              hhOptHint($g,'solid_waste_management','municipal / compost / burning / dumping / other'),
              '1=yes, 0=no',
              hhOptHint($g,'internet_type','broadband / mobile_data / fiber / none'),
+             hhOptHint($g,'handwashing','soap_water / ash / water_only / none'),
              'Motorcycles/scooters count','Cars/jeeps count','Tempo/van count',
              'Tractors count','Other vehicles count','1=yes, 0=no (owns any)'],
             ['HH-W01-00001','tap_water','0','1','flush','septic',
              'grid','50','lpg','0','municipal','1','fiber',
+             'soap_water',
              '1','0','0','0','0','1'],
         ];
     }
@@ -317,24 +320,25 @@ class AgricultureTemplateSheet implements FromArray, WithTitle, WithStyles, Shou
     protected function headerColor(): string { return 'FF166534'; }
     protected function lightColor(): string  { return 'FFF0FDF4'; }
     protected function sampleColor(): string { return 'FFBBF7D0'; }
-    protected function lastCol(): string     { return 'I'; }
+    protected function lastCol(): string     { return 'J'; }
 
     public function array(): array
     {
         $g = $this->grouped;
         return [
             // Column names match HouseholdAgriculture $fillable exactly
-            ['household_code','owns_land','land_area_ropani','irrigated_area_ropani',
+            ['household_code','agriculture','owns_land','land_area_ropani','irrigated_area_ropani',
              'agri_categories','use_of_chem_fertilizer','farm_challenges','annual_agri_income'],
             ['Match Households sheet',
-             '1=yes, 0=no',
+             '1=yes (practices agriculture), 0=no',
+             '1=yes (owns land), 0=no',
              'Total land area in ropani',
              'Irrigated area in ropani',
              hhOptHint($g, 'crop_type', 'food_crops / pulses / oil_crops / vegetables / cash_crops / fruits (comma-separated)'),
              '1=yes, 0=no',
              hhOptHint($g, 'farm_challenge', 'drought / flood / pest / disease / market / labour / credit / other (comma-separated)'),
              'Annual income NPR'],
-            ['HH-W01-00001','1','4.5','2.0','food_crops,vegetables','1','drought,market','85000'],
+            ['HH-W01-00001','1','1','4.5','2.0','food_crops,vegetables','1','drought,market','85000'],
         ];
     }
 }
@@ -393,7 +397,7 @@ class HhDynamicValidValuesSheet implements FromArray, WithTitle, WithStyles, Sho
         'Land & Agriculture'   => ['land_unit','crop_type','irrigation_source','farm_challenge'],
         'Utilities & Energy'   => ['water_source','toilet_type','sanitation_type',
                                    'electricity_source','cooking_fuel',
-                                   'solid_waste_management','internet_type'],
+                                   'solid_waste_management','internet_type','handwashing'],
         'Economic & Income'    => ['primary_income_source','annual_income_range',
                                    'annual_expenditure_range','loan_source'],
         'Livestock & Farming'  => ['livestock_type'],

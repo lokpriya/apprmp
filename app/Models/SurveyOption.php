@@ -466,10 +466,7 @@ class SurveyOption extends Model
             'frequency_smoking_drinking'=> 'घरधुरी: धुम्रपान/मद्यपानको आवृत्ति (Frequency of Smoking/Drinking)',
             'smoking_drinking_items'    => 'घरधुरी: धुम्रपान/मद्यपानका वस्तुहरू (Smoking/Drinking Items)',
             'drivers_license_category'  => '🔒 घरधुरी: सवारी चालक अनुमती वर्ग (Drivers License Category) — निश्चित',
-            'child_birth_place'       => 'घरधुरी: बच्चा जन्मिएको स्थान (Child Birth Place)',
-            'child_vaccine'           => 'घरधुरी: बालबालिका खोप (Child Vaccine)',
             'child_school_grade'      => 'घरधुरी: बालबालिका कक्षा/तह (Child School Grade)',
-            'child_development_level' => 'घरधुरी: बाल विकास स्तर (Child Development Level)',
             // ── Phase 2: Child Health & Development ─────────────────────────────
             'childbornplace'          => 'घरधुरी: बच्चा जन्मिएको ठाउँ (Place of Birth — 0-3)',
             'childvaccine'            => 'घरधुरी: बच्चाको खोप (Child Vaccines — 0-3)',

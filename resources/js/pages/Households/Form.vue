@@ -965,6 +965,14 @@
               <option v-for="opt in (surveyOptions.toilet_type ?? [])" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </select>
           </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[12px] font-semibold text-[#626976]">हात धुने सुविधा</label>
+            <span class="text-[11px] text-gray-400 -mt-0.5">Handwashing Facility</span>
+            <select v-model="form.utilities.handwashing" class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-[13px] bg-white focus:ring-2 focus:ring-[#206bc4]/20 focus:border-[#206bc4]">
+              <option value="">-- छान्नुहोस् --</option>
+              <option v-for="opt in (surveyOptions.handwashing ?? [])" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            </select>
+          </div>
         </div>
       </div>
 

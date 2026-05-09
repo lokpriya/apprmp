@@ -1068,6 +1068,7 @@ class SettingsController extends Controller
 
     public function updateMaintenance(Request $request): RedirectResponse
     {
+        $this->abortIfLocked();
         $lg = $this->lg();
 
         $data = $request->validate([

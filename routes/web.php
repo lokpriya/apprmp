@@ -256,6 +256,7 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
             Route::post('/survey-options',                       [SurveyOptionsController::class, 'store'])           ->name('survey-options.store');
             Route::get('/survey-options/template',               [SurveyOptionsController::class, 'downloadTemplate'])->name('survey-options.template');
             Route::post('/survey-options/import',                [SurveyOptionsController::class, 'import'])          ->name('survey-options.import');
+            Route::post('/survey-options/bulk-delete',           [SurveyOptionsController::class, 'bulkDestroy'])     ->name('survey-options.bulk-destroy');
             Route::put('/survey-options/{surveyOption}',         [SurveyOptionsController::class, 'update'])          ->name('survey-options.update');
             Route::patch('/survey-options/{surveyOption}/toggle',[SurveyOptionsController::class, 'toggle'])          ->name('survey-options.toggle');
             Route::delete('/survey-options/{surveyOption}',      [SurveyOptionsController::class, 'destroy'])         ->name('survey-options.destroy');

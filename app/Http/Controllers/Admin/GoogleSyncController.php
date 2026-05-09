@@ -35,6 +35,7 @@ class GoogleSyncController extends Controller
 
     public function preview(Request $request): JsonResponse
     {
+        set_time_limit(180);
         $request->validate([
             'type'    => ['required', 'in:households,institutions'],
             'ward_id' => ['required', 'integer', 'exists:wards,id'],
@@ -60,11 +61,19 @@ class GoogleSyncController extends Controller
             return response()->json(['error' => $e->getMessage()], 422);
         }
 
-        // Return preview rows capped at 200 to stay under memory limits
+        // Strip internal _related payload before sending to frontend
+        $stripInternal = fn(array $r) => array_diff_key($r, ['_related' => 1]);
+
         $previewRows = array_slice(
             array_merge($diff['new'], $diff['changed'], $diff['locked']),
             0, 200
         );
+
+        // Also strip _related from error rows (their nested 'row' key may carry it)
+        $cleanErrors = array_map(function (array $e) use ($stripInternal) {
+            if (isset($e['row'])) $e['row'] = $stripInternal($e['row']);
+            return $e;
+        }, array_slice($diff['errors'], 0, 50));
 
         return response()->json([
             'counts' => [
@@ -74,13 +83,15 @@ class GoogleSyncController extends Controller
                 'upToDate' => count($diff['upToDate']),
                 'errors'   => count($diff['errors']),
             ],
-            'rows'   => $previewRows,
-            'errors' => array_slice($diff['errors'], 0, 50),
+            'rows'   => array_map($stripInternal, $previewRows),
+            'errors' => $cleanErrors,
+            'debug'  => $diff['debug'] ?? null,
         ]);
     }
 
     public function apply(Request $request): JsonResponse
     {
+        set_time_limit(180);
         $request->validate([
             'type'         => ['required', 'in:households,institutions'],
             'ward_id'      => ['required', 'integer', 'exists:wards,id'],

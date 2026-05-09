@@ -196,12 +196,7 @@
           <label class="text-[13px] font-semibold text-[#626976] mb-1.5">स्वामित्व प्रकार</label>
           <select v-model="form.ownership_type" class="w-full rounded-md border border-[#e6e7e9] px-4 py-2.5 text-[14px] focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4]">
             <option value="">-- छान्नुहोस् --</option>
-            <option value="govt">सरकारी</option>
-            <option value="private">निजी</option>
-            <option value="community">सामुदायिक</option>
-            <option value="ngo">गैसस / NGO</option>
-            <option value="cooperative">सहकारी</option>
-            <option value="other">अन्य</option>
+            <option v-for="opt in (surveyOptions.inst_ownership_type ?? [])" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select>
         </div>
         <!-- Established date -->
@@ -384,11 +379,7 @@
           <label class="text-[13px] font-semibold text-[#626976] mb-1.5">भवनको अवस्था</label>
           <select v-model="form.infrastructure.condition" class="w-full rounded-md border border-[#e6e7e9] px-4 py-2.5 text-[14px] focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4]">
             <option value="">-- छान्नुहोस् --</option>
-            <option value="good">राम्रो</option>
-            <option value="average">मध्यम</option>
-            <option value="poor">जीर्ण</option>
-            <option value="damaged">क्षतिग्रस्त</option>
-            <option value="under_const">निर्माणाधीन</option>
+            <option v-for="opt in (surveyOptions.inst_building_condition ?? [])" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select>
         </div>
       </div>

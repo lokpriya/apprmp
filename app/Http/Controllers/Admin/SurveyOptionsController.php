@@ -134,6 +134,28 @@ class SurveyOptionsController extends Controller
             ->with('success', 'विकल्प मेटाइयो।');
     }
 
+    public function bulkDestroy(Request $request)
+    {
+        abort_unless(auth()->user()?->isSuperAdmin(), 403);
+
+        $data = $request->validate([
+            'ids'      => 'required|array|min:1|max:500',
+            'ids.*'    => 'integer',
+            'category' => 'required|string',
+        ]);
+
+        // Only delete options that actually belong to the specified category (safety check)
+        $deleted = SurveyOption::whereIn('id', $data['ids'])
+            ->where('category', $data['category'])
+            ->delete();
+
+        $this->clearCaches($data['category']);
+
+        return redirect()
+            ->route('admin.survey-options', ['category' => $data['category']])
+            ->with('success', "{$deleted} विकल्प मेटाइयो।");
+    }
+
     public function downloadTemplate()
     {
         abort_unless(auth()->user()?->isSuperAdmin(), 403);

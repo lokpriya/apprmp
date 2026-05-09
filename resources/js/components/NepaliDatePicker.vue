@@ -190,7 +190,7 @@ const yearRangeLabel = computed(() => {
 // We derive it by scanning BS months using toGreg (BS→AD, which works correctly).
 function adToBS(adStr) {
   if (!adStr) return null
-  const adDate = new Date(adStr + 'T00:00:00')
+  const adDate = new Date(adStr.substring(0, 10) + 'T00:00:00')
   if (isNaN(adDate)) return null
   const adYear = adDate.getFullYear()
 
@@ -230,7 +230,7 @@ const bsDisplay = computed(() => {
 
 const adDisplay = computed(() => {
   if (!props.modelValue) return ''
-  const d = new Date(props.modelValue + 'T00:00:00')
+  const d = new Date(props.modelValue.substring(0, 10) + 'T00:00:00')
   if (isNaN(d)) return ''
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 })

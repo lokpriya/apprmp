@@ -250,11 +250,35 @@
           </form>
         </div>
 
+        <!-- Bulk action bar -->
+        <div v-if="selectedIds.length > 0"
+          class="flex items-center justify-between px-4 py-2.5 bg-red-50 border-b border-red-200">
+          <div class="flex items-center gap-3">
+            <span class="text-sm font-semibold text-red-700">
+              {{ selectedIds.length }} विकल्प छनोट भयो
+            </span>
+            <button @click="toggleAll"
+              class="text-xs text-red-500 hover:text-red-700 underline">
+              {{ selectedIds.length === props.options.length ? 'सबै हटाउनुहोस्' : 'सबै छान्नुहोस्' }}
+            </button>
+          </div>
+          <button @click="bulkDeleteConfirm = true"
+            class="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded transition-colors">
+            <i class="fa-solid fa-trash text-[10px]"></i>
+            छनोट गरिएका मेटाउनुहोस् ({{ selectedIds.length }})
+          </button>
+        </div>
+
         <!-- Options table -->
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-[#e6e7e9]">
             <thead class="bg-gray-50">
               <tr>
+                <th class="px-3 py-3 w-10">
+                  <input type="checkbox" :checked="allSelected" :indeterminate="someSelected"
+                    @change="toggleAll"
+                    class="w-3.5 h-3.5 rounded border-gray-300 text-[#206bc4] focus:ring-[#206bc4]/30 cursor-pointer" />
+                </th>
                 <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase w-10">#</th>
                 <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Value</th>
                 <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">नेपाली लेबल</th>
@@ -265,7 +289,7 @@
             </thead>
             <tbody class="divide-y divide-[#e6e7e9]">
               <tr v-if="props.options.length === 0">
-                <td colspan="6" class="px-4 py-12 text-center">
+                <td colspan="7" class="px-4 py-12 text-center">
                   <i class="fa-solid fa-inbox text-3xl text-gray-200 block mb-2"></i>
                   <p class="text-sm text-gray-400">यस श्रेणीमा कुनै विकल्प छैन</p>
                   <p class="text-xs text-gray-300 mt-1">माथि "+ नयाँ विकल्प थप्नुहोस्" क्लिक गर्नुहोस्</p>
@@ -273,7 +297,12 @@
               </tr>
               <tr v-for="opt in props.options" :key="opt.id"
                 class="hover:bg-gray-50/50 transition-colors"
-                :class="!opt.is_active ? 'opacity-50' : ''">
+                :class="[!opt.is_active ? 'opacity-50' : '', selectedIds.includes(opt.id) ? 'bg-red-50/60' : '']">
+                <td class="px-3 py-2.5">
+                  <input type="checkbox" :checked="selectedIds.includes(opt.id)"
+                    @change="toggleSelect(opt.id)"
+                    class="w-3.5 h-3.5 rounded border-gray-300 text-[#206bc4] focus:ring-[#206bc4]/30 cursor-pointer" />
+                </td>
                 <td class="px-3 py-2.5 text-xs text-gray-400">{{ opt.sort_order }}</td>
                 <td class="px-3 py-2.5">
                   <code class="text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-mono">{{ opt.value }}</code>
@@ -423,6 +452,43 @@
               class="inline-flex items-center gap-2 px-4 py-2 bg-[#206bc4] hover:bg-[#1a5ba8] disabled:opacity-50 disabled:cursor-not-allowed text-white text-[13px] font-medium rounded transition-colors">
               <i :class="importForm.processing ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-file-import'" class="text-[11px]"></i>
               {{ importForm.processing ? 'आयात हुँदैछ...' : 'आयात गर्नुहोस्' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Bulk delete confirm modal -->
+    <Teleport to="body">
+      <div v-if="bulkDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+        <div class="bg-white rounded-md shadow-2xl max-w-sm w-full p-6">
+          <div class="w-12 h-12 rounded-md bg-red-100 flex items-center justify-center mx-auto mb-4">
+            <i class="fa-solid fa-trash text-red-500 text-lg"></i>
+          </div>
+          <h3 class="text-base font-bold text-gray-900 text-center mb-1">
+            {{ selectedIds.length }} विकल्पहरू मेटाउने?
+          </h3>
+          <p class="text-xs text-gray-500 text-center mb-3">यो कार्य पूर्ववत गर्न सकिँदैन।</p>
+          <ul class="mb-4 space-y-1 max-h-32 overflow-y-auto">
+            <li v-for="opt in bulkDeletePreview" :key="opt.id"
+              class="text-xs text-gray-700 bg-gray-50 px-2 py-1 rounded flex items-center gap-2">
+              <i class="fa-solid fa-circle text-red-300 text-[8px]"></i>
+              {{ opt.label_ne }}
+              <code class="text-[10px] text-gray-400 font-mono ml-auto">{{ opt.value }}</code>
+            </li>
+            <li v-if="selectedIds.length > 5"
+              class="text-xs text-gray-400 text-center py-1">
+              + {{ selectedIds.length - 5 }} थप विकल्पहरू…
+            </li>
+          </ul>
+          <div class="flex gap-3">
+            <button @click="bulkDeleteConfirm = false"
+              class="flex-1 py-2 rounded-md border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              रद्द गर्नुहोस्
+            </button>
+            <button @click="doBulkDelete"
+              class="flex-1 py-2 rounded-md bg-red-500 hover:bg-red-600 text-white text-sm font-medium">
+              मेटाउनुहोस्
             </button>
           </div>
         </div>
@@ -594,6 +660,46 @@ function doDelete() {
     onSuccess: () => { deleteTarget.value = null },
   })
 }
+
+// ── Bulk delete ────────────────────────────────────────────────────
+const selectedIds      = ref([])
+const bulkDeleteConfirm = ref(false)
+
+const allSelected  = computed(() => props.options.length > 0 && selectedIds.value.length === props.options.length)
+const someSelected = computed(() => selectedIds.value.length > 0 && selectedIds.value.length < props.options.length)
+
+const bulkDeletePreview = computed(() =>
+  props.options.filter(o => selectedIds.value.includes(o.id)).slice(0, 5)
+)
+
+function toggleSelect(id) {
+  const idx = selectedIds.value.indexOf(id)
+  if (idx === -1) selectedIds.value.push(id)
+  else selectedIds.value.splice(idx, 1)
+}
+
+function toggleAll() {
+  if (allSelected.value) {
+    selectedIds.value = []
+  } else {
+    selectedIds.value = props.options.map(o => o.id)
+  }
+}
+
+function doBulkDelete() {
+  router.post('/admin/survey-options/bulk-delete', {
+    ids: selectedIds.value,
+    category: props.activeCategory,
+  }, {
+    onSuccess: () => {
+      selectedIds.value    = []
+      bulkDeleteConfirm.value = false
+    },
+  })
+}
+
+// Clear selection when category changes
+watch(() => props.activeCategory, () => { selectedIds.value = [] })
 
 // ── Import ──────────────────────────────────────────────────────────
 const showImport   = ref(false)

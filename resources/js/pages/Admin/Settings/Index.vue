@@ -1672,7 +1672,7 @@
           <i class="fa-solid fa-eye text-xs"></i>
           मर्मत पृष्ठ प्रिभ्यू
         </a>
-        <button type="button" @click="saveMaintenance" :disabled="maintSaving"
+        <button type="button" @click="saveMaintenance" :disabled="maintSaving || locked"
           class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg
                  text-sm font-bold text-white transition-colors disabled:opacity-60"
           :class="maintForm.is_active ? 'bg-red-500 hover:bg-red-600' : 'bg-[#206bc4] hover:bg-[#1a5ba8]'">
@@ -3304,6 +3304,8 @@ onMounted(async () => {
     try {
       const res = await fetch(`/admin/settings/api/local-governments?district_id=${genForm.district_id}`)
       localGovs.value = await res.json()
+      const match = localGovs.value.find(l => l.name_np === genForm.name_np && l.name_en === genForm.name_en)
+      if (match) selectedLgId.value = match.id
     } finally {
       lgLoading.value = false
     }
