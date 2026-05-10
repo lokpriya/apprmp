@@ -1,17 +1,55 @@
 # =============================================================
 #  LGPAS - Build Deployment ZIP for cPanel Upload
-#  Run: powershell -ExecutionPolicy Bypass -File deploy\build-zip.ps1
+#
+#  Usage:
+#    powershell -ExecutionPolicy Bypass -File deploy\build-zip.ps1
+#    powershell -ExecutionPolicy Bypass -File deploy\build-zip.ps1 -Target ajirkot
+#    powershell -ExecutionPolicy Bypass -File deploy\build-zip.ps1 -Target apprmp
 # =============================================================
 
+param(
+    [string]$Target = 'apprmp'   # 'apprmp' = prayasnepal.com | 'ajirkot' = ajirkot.prayasprarambha.com.np
+)
+
+# ── Per-target config ────────────────────────────────────────────────────────
+$Targets = @{
+    'apprmp' = @{
+        LaravelRoot = '/home2/prayasne/apprmp'
+        WebRoot     = 'public_html/apprmp'
+        AppUrl      = 'https://apprmp.prayasnepal.com'
+        DbName      = 'prayasne_apprmp15'
+        DbUser      = 'prayasne_bhagwanuser'
+        ZipName     = 'apprmp-deploy.zip'
+        InstallUrl  = 'https://apprmp.prayasnepal.com/install.php'
+    }
+    'ajirkot' = @{
+        LaravelRoot = '/home2/prayaspra/ajirkot'
+        WebRoot     = 'public_html/ajirkot'
+        AppUrl      = 'https://ajirkot.prayasprarambha.com.np'
+        DbName      = 'prayaspra_ajirkotprofile'
+        DbUser      = 'prayaspra_lokpriya'
+        ZipName     = 'ajirkot-deploy.zip'
+        InstallUrl  = 'https://ajirkot.prayasprarambha.com.np/install.php'
+    }
+}
+
+if (-not $Targets.ContainsKey($Target)) {
+    Write-Host "  ERROR: Unknown target '$Target'. Use 'apprmp' or 'ajirkot'." -ForegroundColor Red
+    exit 1
+}
+
+$Cfg         = $Targets[$Target]
 $ProjectRoot = Split-Path $PSScriptRoot -Parent
-$ZipPath     = "$ProjectRoot\apprmp-deploy.zip"
+$ZipPath     = "$ProjectRoot\$($Cfg.ZipName)"
 $TempDir     = "$env:TEMP\apprmp-build-$(Get-Random)"
 
 Write-Host ''
 Write-Host '  LGPAS Deployment ZIP Builder' -ForegroundColor Cyan
 Write-Host '  ============================================' -ForegroundColor Cyan
-Write-Host "  Source : $ProjectRoot"
-Write-Host "  Output : $ZipPath"
+Write-Host "  Target  : $Target" -ForegroundColor Yellow
+Write-Host "  App URL : $($Cfg.AppUrl)" -ForegroundColor Yellow
+Write-Host "  Source  : $ProjectRoot"
+Write-Host "  Output  : $ZipPath"
 Write-Host ''
 
 # --- Clean temp dir ---
@@ -136,12 +174,12 @@ $indexSrc = Join-Path $ProjectRoot 'deploy\cpanel-public-index.php'
 $indexDst = Join-Path $webrootDir 'index.php'
 if (Test-Path $indexSrc) {
     $indexContent = Get-Content $indexSrc -Raw -Encoding UTF8
-    $indexContent = $indexContent -replace "define\('LARAVEL_ROOT', '[^']+'\)", "define('LARAVEL_ROOT', '/home2/prayasne/apprmp')"
+    $indexContent = $indexContent -replace "define\('LARAVEL_ROOT', '[^']+'\)", "define('LARAVEL_ROOT', '$($Cfg.LaravelRoot)')"
     [System.IO.File]::WriteAllText($indexDst, $indexContent, [System.Text.UTF8Encoding]::new($false))
-    Write-Host '    OK webroot/index.php — LARAVEL_ROOT pre-set to /home2/prayasne/apprmp' -ForegroundColor Green
+    Write-Host "    OK webroot/index.php - LARAVEL_ROOT pre-set to $($Cfg.LaravelRoot)" -ForegroundColor Green
 }
 
-# Copy install.php (web installer — runs migrations + seeders)
+# Copy install.php (web installer - runs migrations + seeders)
 $installSrc = Join-Path $ProjectRoot 'public\install.php'
 if (Test-Path $installSrc) {
     Copy-Item $installSrc (Join-Path $webrootDir 'install.php') -Force
@@ -153,7 +191,7 @@ if (Test-Path $installSrc) {
 # run.php is NOT auto-bundled — upload deploy\run.php to webroot manually when needed
 # and DELETE it immediately after use (token is in source; do not leave it on the server)
 
-Write-Host '    webroot/ bundle ready — upload its contents to public_html/apprmp/' -ForegroundColor Green
+Write-Host "    webroot/ bundle ready - upload its contents to $($Cfg.WebRoot)/" -ForegroundColor Green
 
 # --- Verify vendor ---
 $vendorDir = Join-Path $TempDir 'vendor'
@@ -185,31 +223,34 @@ Write-Host "  File : $ZipPath" -ForegroundColor Green
 Write-Host "  Size : $sizeMB MB" -ForegroundColor Green
 Write-Host '  ============================================' -ForegroundColor Green
 Write-Host ''
-Write-Host '  FRESH INSTALL STEPS (cPanel — apprmp.prayasnepal.com):' -ForegroundColor Cyan
-Write-Host ''
-Write-Host '  --- REMOTE CLEANUP ------------------------------------------' -ForegroundColor DarkGray
-Write-Host '  1. MySQL Databases: DROP prayasne_apprmp15 + recreate it'
-Write-Host '     Grant ALL PRIVILEGES to prayasne_bhagwanuser'
-Write-Host '  2. File Manager: delete /home2/prayasne/apprmp/ entirely'
-Write-Host '  3. File Manager: delete all files in /home2/prayasne/public_html/apprmp/'
+$homeDir = ($Cfg.LaravelRoot -split '/')[0..2] -join '/'  # e.g. /home2/prayaspra
+$laravelFolder = ($Cfg.LaravelRoot -split '/')[-1]       # e.g. ajirkot
+
+Write-Host "  DEPLOY STEPS (cPanel - $($Cfg.AppUrl)):" -ForegroundColor Cyan
 Write-Host ''
 Write-Host '  --- UPLOAD --------------------------------------------------' -ForegroundColor DarkGray
-Write-Host '  4. Upload apprmp-deploy.zip to /home2/prayasne/ via File Manager'
-Write-Host '  5. Extract zip, rename extracted folder to: apprmp'
-Write-Host '  6. Upload ALL files inside webroot/ to public_html/apprmp/'
+Write-Host "  1. Upload $($Cfg.ZipName) to $homeDir/ via File Manager"
+Write-Host "  2. Extract zip - overwrite existing files in $($Cfg.LaravelRoot)/"
+Write-Host '     (keep existing .env - do NOT overwrite it)'
+Write-Host "  3. Upload ALL files inside webroot/ to $homeDir/$($Cfg.WebRoot)/"
 Write-Host '     (index.php has LARAVEL_ROOT pre-set, no editing needed)'
-Write-Host '  6b. OPTIONAL: upload deploy\run.php manually if needed for post-install artisan'
-Write-Host '      DELETE run.php via its own button immediately after use'
 Write-Host ''
-Write-Host '  --- INSTALL -------------------------------------------------' -ForegroundColor DarkGray
-Write-Host '  7. Visit: https://apprmp.prayasnepal.com/install.php'
-Write-Host '  8. Step 2: DB host=localhost  db=prayasne_apprmp15'
-Write-Host '            user=prayasne_bhagwanuser  pass=prayasne_apprmp15'
-Write-Host '     Step 3: APP_URL=https://apprmp.prayasnepal.com'
+Write-Host '  --- UPGRADE (existing install) --------------------------------' -ForegroundColor DarkGray
+Write-Host '  4. Upload deploy\run.php to webroot manually'
+Write-Host '  5. Visit run.php - run: php artisan migrate'
+Write-Host '  6. Visit run.php - run: php artisan cache:clear'
+Write-Host '  7. DELETE run.php via its own button immediately after'
+Write-Host ''
+Write-Host '  --- FRESH INSTALL (only if starting from scratch) -------------' -ForegroundColor DarkGray
+Write-Host "  4. Visit: $($Cfg.InstallUrl)"
+Write-Host "  5. Step 2: DB host=localhost  db=$($Cfg.DbName)"
+Write-Host "            user=$($Cfg.DbUser)"
+Write-Host "     Step 3: APP_URL=$($Cfg.AppUrl)"
 Write-Host '     Steps 4-7: migrations, seeders, admin user, done'
 Write-Host '     Click "Delete install.php" on final step'
 Write-Host ''
-Write-Host '  --- POST-INSTALL --------------------------------------------' -ForegroundColor DarkGray
-Write-Host '  9. MultiPHP Manager: confirm PHP 8.4 (ea-php84) is set'
-Write-Host ' 10. Test login, PDF export, photo upload'
+Write-Host '  --- POST-DEPLOY ---------------------------------------------' -ForegroundColor DarkGray
+Write-Host '  * MultiPHP Manager: confirm PHP 8.4 (ea-php84) is set'
+Write-Host '  * Test login, survey form dropdowns, PDF export, photo upload'
+Write-Host "  * Check $($Cfg.AppUrl)/admin/google-sync/manual loads correctly"
 Write-Host ''
