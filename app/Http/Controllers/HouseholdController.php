@@ -65,11 +65,7 @@ class HouseholdController extends Controller
             'households'    => $households,
             'wards'         => Ward::where('local_government_id', $lgId)->orderBy('ward_number')->get(['id','ward_number']),
             'filters'       => $request->only('search','ward_id','status','per_page'),
-            'surveyOptions' => SurveyOption::allGrouped($lgId)
-                ->map(fn($opts) => collect($opts)
-                    ->map(fn($label, $value) => ['value' => $value, 'label' => $label])
-                    ->values()->all()
-                )->all(),
+            'surveyOptions' => SurveyOption::allGroupedForVue($lgId),
         ]);
     }
 
@@ -90,11 +86,7 @@ class HouseholdController extends Controller
             'initialWardId' => $user->isEnumerator()
                                    ? $user->assignedWards()->first()?->id
                                    : null,
-            'surveyOptions' => SurveyOption::allGrouped($lgId)
-                ->map(fn($opts) => collect($opts)
-                    ->map(fn($label, $value) => ['value' => $value, 'label' => $label])
-                    ->values()->all()
-                )->all(),
+            'surveyOptions' => SurveyOption::allGroupedForVue($lgId),
             'mapConfig'     => \App\Models\LocalGovernment::getCached($lgId)?->map_config ?? [],
         ]);
     }
@@ -147,11 +139,7 @@ class HouseholdController extends Controller
                 'verifier'    => $fv->verifier ? ['name' => $fv->verifier->name] : null,
                 'created_at'  => $fv->created_at?->format('Y-m-d'),
             ] : null,
-            'surveyOptions' => SurveyOption::allGrouped($lgId)
-                ->map(fn($opts) => collect($opts)
-                    ->map(fn($label, $value) => ['value' => $value, 'label' => $label])
-                    ->values()->all()
-                )->all(),
+            'surveyOptions' => SurveyOption::allGroupedForVue($lgId),
         ]);
     }
 
@@ -174,11 +162,7 @@ class HouseholdController extends Controller
                                          ->orderBy('name_np')
                                          ->get(['id', 'ward_id', 'name_np']),
             'initialWardId' => null,
-            'surveyOptions' => SurveyOption::allGrouped($lgId)
-                ->map(fn($opts) => collect($opts)
-                    ->map(fn($label, $value) => ['value' => $value, 'label' => $label])
-                    ->values()->all()
-                )->all(),
+            'surveyOptions' => SurveyOption::allGroupedForVue($lgId),
             'mapConfig'     => \App\Models\LocalGovernment::getCached($lgId)?->map_config ?? [],
         ]);
     }
@@ -208,6 +192,8 @@ class HouseholdController extends Controller
             'livestockDetail' => $data['livestockDetail'] ?? [],
             'beeFishSilk'     => $data['beeFishSilk']     ?? [],
             'cropProduction'  => $data['cropProduction']  ?? [],
+            'hasLandInMunicipality' => $data['hasLandInMunicipality'] ?? '',
+            'landParcels'     => $data['landParcels']     ?? [],
             'health'          => $data['health']          ?? [],
         ];
         $data['total_members'] = count($data['members'] ?? []) ?: 1;
@@ -258,6 +244,8 @@ class HouseholdController extends Controller
             'livestockDetail' => $data['livestockDetail'] ?? [],
             'beeFishSilk'     => $data['beeFishSilk']     ?? [],
             'cropProduction'  => $data['cropProduction']  ?? [],
+            'hasLandInMunicipality' => $data['hasLandInMunicipality'] ?? '',
+            'landParcels'     => $data['landParcels']     ?? [],
             'health'          => $data['health']          ?? [],
         ];
         $data['total_members'] = count($data['members'] ?? []) ?: $household->total_members;
@@ -487,11 +475,7 @@ class HouseholdController extends Controller
                 'business_type'  => $biz->business_type,
                 'status'         => $biz->status,
             ] : null,
-            'surveyOptions' => SurveyOption::allGrouped($lgId)
-                ->map(fn($opts) => collect($opts)
-                    ->map(fn($label, $value) => ['value' => $value, 'label' => $label])
-                    ->values()->all()
-                )->all(),
+            'surveyOptions' => SurveyOption::allGroupedForVue($lgId),
         ]);
     }
 

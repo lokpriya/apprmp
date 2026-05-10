@@ -75,6 +75,38 @@
           </div>
         </section>
 
+        <!-- 2b. जग्गा विवरण (पालिकामा) -->
+        <section v-if="household.survey_data?.hasLandInMunicipality" class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
+          <SectionHead icon="fa-map" color="amber" title="जग्गा विवरण (पालिकामा)" />
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5 mb-4">
+            <DetailRow label="पालिकामा जग्गा छ?"
+              :value="household.survey_data.hasLandInMunicipality === 'yes' ? 'छ' : 'छैन'" />
+          </div>
+          <template v-if="household.survey_data.hasLandInMunicipality === 'yes' && household.survey_data.landParcels?.length">
+            <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">जग्गा पार्सेल विवरण</p>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs">
+                <thead>
+                  <tr class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
+                    <th class="px-3 py-2 text-left font-semibold">#</th>
+                    <th class="px-3 py-2 text-left font-semibold">जमिनको किसिम</th>
+                    <th class="px-3 py-2 text-left font-semibold">एकाइ</th>
+                    <th class="px-3 py-2 text-right font-semibold">परिमाण</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[#e6e7e9]">
+                  <tr v-for="(parcel, i) in household.survey_data.landParcels" :key="i" class="hover:bg-gray-50">
+                    <td class="px-3 py-2 text-gray-400">{{ i + 1 }}</td>
+                    <td class="px-3 py-2 font-medium text-gray-800">{{ label('land_use_type', parcel.land_use_type) || parcel.land_use_type || '—' }}</td>
+                    <td class="px-3 py-2 text-gray-600">{{ label('land_measurement_unit', parcel.land_unit) || parcel.land_unit || '—' }}</td>
+                    <td class="px-3 py-2 text-right text-gray-800 font-medium">{{ parcel.quantity || '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </template>
+        </section>
+
         <!-- 3. परिवार तथा सामाजिक -->
         <section v-if="household.survey_data?.social" class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
           <SectionHead icon="fa-people-roof" color="violet" title="परिवार तथा सामाजिक" />

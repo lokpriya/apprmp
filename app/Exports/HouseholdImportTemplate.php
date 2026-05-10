@@ -28,6 +28,7 @@ class HouseholdImportTemplate implements WithMultipleSheets
             new EconomicTemplateSheet($grouped),
             new AgricultureTemplateSheet($grouped),
             new LivestockTemplateSheet($grouped),
+            new LandParcelsTemplateSheet($grouped),
             new HhDynamicValidValuesSheet($grouped),
         ];
     }
@@ -192,7 +193,7 @@ class HousingTemplateSheet implements FromArray, WithTitle, WithStyles, ShouldAu
     protected function headerColor(): string { return 'FF7C3AED'; }
     protected function lightColor(): string  { return 'FFF5F3FF'; }
     protected function sampleColor(): string { return 'FFEDE9FE'; }
-    protected function lastCol(): string     { return 'P'; }
+    protected function lastCol(): string     { return 'Q'; }
 
     public function array(): array
     {
@@ -201,7 +202,7 @@ class HousingTemplateSheet implements FromArray, WithTitle, WithStyles, ShouldAu
             ['household_code','house_type','roof_type','wall_type','foundation_type',
              'ownership_type','rent_amount','total_rooms','total_floors','construction_year',
              'house_condition','has_building_permit','is_at_risk','risk_types',
-             'land_measurement_unit','house_land_type'],
+             'land_measurement_unit','house_land_type','has_land_in_municipality'],
             ['Match Households sheet',
              hhOptHint($g,'house_type','rcc_building / wooden / mud_house / temporary / other'),
              hhOptHint($g,'roof_type','rcc / tin / slate / thatch / other'),
@@ -214,9 +215,10 @@ class HousingTemplateSheet implements FromArray, WithTitle, WithStyles, ShouldAu
              '1=yes, 0=no','1=yes, 0=no',
              'flood,landslide,fire (comma-separated or blank)',
              hhOptHint($g,'land_unit','ropani / ana / bigha / kattha / dhur / sq_meter / hectare / acre'),
-             hhOptHint($g,'house_land_type','registered / unregistered / leased / guthi / other')],
+             hhOptHint($g,'house_land_type','registered / unregistered / leased / guthi / other'),
+             '1=yes / 0=no — पालिकामा जग्गा छ? (see LandParcels sheet for details)'],
             ['HH-W01-00001','rcc_building','rcc','brick_cement','rcc',
-             'owned','','4','2','2010','good','1','0','','ropani','registered'],
+             'owned','','4','2','2010','good','1','0','','ropani','registered','1'],
         ];
     }
 }
@@ -377,7 +379,36 @@ class LivestockTemplateSheet implements FromArray, WithTitle, WithStyles, Should
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 8. DYNAMIC VALID VALUES SHEET  — generated from live survey options
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. LAND PARCELS SHEET  — one row per parcel (like Livestock)
+// ─────────────────────────────────────────────────────────────────────────────
+class LandParcelsTemplateSheet implements FromArray, WithTitle, WithStyles, ShouldAutoSize
+{
+    use TemplateSheetStyles;
+    public function __construct(private array $grouped) {}
+    public function title(): string { return 'LandParcels'; }
+    protected function headerColor(): string { return 'FFB45309'; }
+    protected function lightColor(): string  { return 'FFFEF3C7'; }
+    protected function sampleColor(): string { return 'FFFDE68A'; }
+    protected function lastCol(): string     { return 'D'; }
+
+    public function array(): array
+    {
+        $g = $this->grouped;
+        return [
+            ['household_code', 'land_use_type', 'land_unit', 'quantity'],
+            ['Match Households sheet — one row per parcel',
+             hhOptHint($g, 'land_use_type', 'khet / bari / pakho / residential / industrial'),
+             hhOptHint($g, 'land_measurement_unit', 'ropani / ana / bigha / kattha / dhur / sq_meter'),
+             'Amount / परिमाण (e.g. 2.5)'],
+            ['HH-W01-00001', 'khet',  'ropani', '2.5'],
+            ['HH-W01-00001', 'bari',  'ropani', '1'],
+        ];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9. DYNAMIC VALID VALUES SHEET  — generated from live survey options
 // ─────────────────────────────────────────────────────────────────────────────
 class HhDynamicValidValuesSheet implements FromArray, WithTitle, WithStyles, ShouldAutoSize
 {
@@ -394,7 +425,7 @@ class HhDynamicValidValuesSheet implements FromArray, WithTitle, WithStyles, Sho
         'Housing Fields'       => ['house_type','roof_type','wall_type','foundation_type',
                                    'ownership_type','house_condition','house_land_type',
                                    'house_purpose','risk_types'],
-        'Land & Agriculture'   => ['land_unit','crop_type','irrigation_source','farm_challenge'],
+        'Land & Agriculture'   => ['land_unit','land_use_type','crop_type','irrigation_source','farm_challenge'],
         'Utilities & Energy'   => ['water_source','toilet_type','sanitation_type',
                                    'electricity_source','cooking_fuel',
                                    'solid_waste_management','internet_type','handwashing'],

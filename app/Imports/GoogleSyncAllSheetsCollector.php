@@ -6,13 +6,13 @@ use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use Maatwebsite\Excel\Concerns\SkipsUnknownSheets;
 
 /**
- * Reads all 7 data sheets from a Google Sync XLSX in a single import pass.
+ * Reads all 8 data sheets from a Google Sync XLSX in a single import pass.
  */
 class GoogleSyncAllSheetsCollector implements WithMultipleSheets, SkipsUnknownSheets
 {
     private const SHEETS = [
         'Households', 'Members', 'Housing',
-        'Utilities', 'Economic', 'Agriculture', 'Livestock',
+        'Utilities', 'Economic', 'Agriculture', 'Livestock', 'LandParcels',
     ];
 
     /** @var RawRowCollector[] */

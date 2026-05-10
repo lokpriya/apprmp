@@ -263,6 +263,7 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
 
             // Google Sheets Sync
             Route::get('/google-sync',         [GoogleSyncController::class, 'index'])  ->name('google-sync');
+            Route::get('/google-sync/manual',   [GoogleSyncController::class, 'manual']) ->name('google-sync.manual');
             Route::post('/google-sync/preview', [GoogleSyncController::class, 'preview'])->name('google-sync.preview');
             Route::post('/google-sync/apply',   [GoogleSyncController::class, 'apply'])  ->name('google-sync.apply');
 

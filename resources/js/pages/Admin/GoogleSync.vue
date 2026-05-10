@@ -173,6 +173,11 @@ function actionClass(action) {
       <p class="text-sm text-gray-500 mt-1">
         Google Sheets बाट घरधुरी वा संस्था डेटा वडा अनुसार प्रिभ्यू गरी सिंक गर्नुहोस्।
       </p>
+      <a href="/admin/google-sync/manual" target="_blank"
+        class="inline-flex items-center gap-1.5 mt-2 text-xs text-[#206bc4] hover:underline">
+        <i class="fa-solid fa-book-open text-[11px]"></i>
+        Sheet तयारी निर्देशिका हेर्नुहोस् (Manual)
+      </a>
     </div>
 
     <!-- No sheet configured warning -->

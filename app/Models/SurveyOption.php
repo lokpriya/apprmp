@@ -49,7 +49,7 @@ class SurveyOption extends Model
             ->toArray();
     }
 
-    /** Fetch all active options grouped by category for a given LG. */
+    /** Fetch all active options grouped by category for a given LG. Returns {value: label_ne} per category — used by exports/imports. */
     public static function allGrouped(?int $lgId = null): Collection
     {
         $key = "survey_options.all." . ($lgId ?? 'global');
@@ -67,12 +67,37 @@ class SurveyOption extends Model
         });
     }
 
+    /** Fetch all active options grouped by category as [{value, label, label_ne, label_en}] arrays — for Vue frontend props. */
+    public static function allGroupedForVue(?int $lgId = null): Collection
+    {
+        $key = "survey_options.vue." . ($lgId ?? 'global');
+        return Cache::remember($key, 3600, function () use ($lgId) {
+            return static::where('is_active', true)
+                ->where(function ($q) use ($lgId) {
+                    $q->whereNull('local_government_id');
+                    if ($lgId) $q->orWhere('local_government_id', $lgId);
+                })
+                ->orderBy('sort_order')
+                ->orderBy('label_ne')
+                ->get(['category', 'value', 'label_ne', 'label_en'])
+                ->groupBy('category')
+                ->map(fn($items) => $items->map(fn($item) => [
+                    'value'    => $item->value,
+                    'label'    => $item->label_ne,
+                    'label_ne' => $item->label_ne,
+                    'label_en' => $item->label_en,
+                ])->values()->all());
+        });
+    }
+
     /** Clear all cache entries for a category (including the import validator cache). */
     public static function clearCache(string $category, ?int $lgId = null): void
     {
         Cache::forget("survey_options.{$category}." . ($lgId ?? 'global'));
         Cache::forget("survey_options.all." . ($lgId ?? 'global'));
         Cache::forget("survey_options.all.global");
+        Cache::forget("survey_options.vue." . ($lgId ?? 'global'));
+        Cache::forget("survey_options.vue.global");
         // Also clear the SurveyValueValidator cache so imports see the new option immediately
         Cache::forget("survey_validator." . ($lgId ?? 'global'));
         Cache::forget("survey_validator.global");
@@ -230,7 +255,7 @@ class SurveyOption extends Model
                 'title_ne' => 'घर विवरण',
                 'title_en' => 'House Details',
                 'keys'     => [
-                    'house_land_type', 'land_measurement_unit', 'house_type', 'house_purpose',
+                    'house_land_type', 'land_measurement_unit', 'land_use_type', 'house_type', 'house_purpose',
                     'location_house_built', 'roof_type', 'wall_type', 'foundation_type',
                     'ownership_type', 'house_condition',
                 ],
@@ -372,6 +397,7 @@ class SurveyOption extends Model
             // ── House Details
             'house_land_type'         => 'घरधुरी: जग्गाको किसिम (Land Type)',
             'land_measurement_unit'   => 'घरधुरी: जग्गाको नाप एकाइ (Land Measurement Unit)',
+            'land_use_type'           => 'घरधुरी: उपभोग जमिनको किसिम (Land Use Type)',
             'house_type'              => 'घरधुरी: घरको बनावट (House Type)',
             'house_purpose'           => 'घरधुरी: घरको उद्देश्य (House Purpose)',
             'location_house_built'    => 'घरधुरी: घर बनेको ठाउँको अवस्था (Location House Built)',

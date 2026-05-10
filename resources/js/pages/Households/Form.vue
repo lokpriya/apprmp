@@ -228,7 +228,7 @@
             <span class="text-[11px] text-gray-400 -mt-0.5">Contact No.</span>
             <input v-model="form.respondent_contact" type="text" placeholder="फोन नम्बर" class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-[13px] bg-white focus:ring-2 focus:ring-[#206bc4]/20 focus:border-[#206bc4]" />
           </div>
-          <div class="flex flex-col gap-1 col-span-2">
+          <div class="flex flex-col gap-1">
             <label class="text-[12px] font-semibold text-[#626976]">सर्वेक्षण मिति</label>
             <span class="text-[11px] text-gray-400 -mt-0.5">Survey Date</span>
             <NepaliDatePicker v-model="form.survey_date" placeholder="सर्वेक्षण मिति (बि.सं.)" />
@@ -415,6 +415,84 @@
             <label class="text-[12px] font-semibold text-[#626976]">विद्यालय पुग्न (मिनेट)</label>
             <span class="text-[11px] text-gray-400 -mt-0.5">Time to School (min)</span>
             <input v-model="form.housing.distance_to_school" type="number" min="0" placeholder="0" class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-[13px] bg-white focus:ring-2 focus:ring-[#206bc4]/20 focus:border-[#206bc4]" />
+          </div>
+
+          <!-- Land toggle + parcels table -->
+          <div class="col-span-2 mt-1 rounded-md border border-[#e6e7e9] overflow-hidden">
+            <!-- Toggle question -->
+            <div class="flex items-center justify-between px-4 py-2.5 bg-amber-50/60">
+              <div>
+                <p class="text-[13px] font-medium text-amber-900">पालिकामा यस परिवारको जग्गा छ कि छैन?</p>
+                <p class="text-[11px] text-amber-600/70">Does the family have land in the municipality?</p>
+              </div>
+              <div class="flex rounded overflow-hidden border border-[#e6e7e9] shrink-0 ml-4">
+                <button type="button" @click="form.hasLandInMunicipality = 'yes'"
+                  :class="['px-4 py-1.5 text-xs font-semibold transition-colors', form.hasLandInMunicipality === 'yes' ? 'bg-amber-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50']">छ</button>
+                <button type="button" @click="form.hasLandInMunicipality = 'no'; form.landParcels = []"
+                  :class="['px-4 py-1.5 text-xs font-semibold transition-colors border-l border-[#e6e7e9]', form.hasLandInMunicipality === 'no' ? 'bg-[#206bc4] text-white' : 'bg-white text-gray-600 hover:bg-gray-50']">छैन</button>
+              </div>
+            </div>
+
+            <!-- Land Parcels table — shown only when छ -->
+            <div v-if="form.hasLandInMunicipality === 'yes'" class="border-t border-amber-100 bg-amber-50/20 p-4">
+              <div class="flex items-center justify-between mb-2">
+                <div>
+                  <span class="text-[12px] font-semibold text-[#626976]">जग्गाको विवरण</span>
+                  <span class="text-[11px] text-gray-400 ml-1">— Land Parcels</span>
+                </div>
+                <button type="button" @click="addLandParcelRow"
+                  class="flex items-center gap-1.5 px-3 py-1 rounded border border-dashed border-amber-400 text-amber-700 bg-white hover:bg-amber-50 text-[11px] font-semibold transition-colors">
+                  <i class="fa-solid fa-plus text-xs"></i> जग्गा थप्नुहोस्
+                </button>
+              </div>
+
+              <div v-if="!form.landParcels.length"
+                class="text-center text-[12px] text-gray-400 py-3 border border-dashed border-amber-200 rounded bg-white">
+                जग्गा थप्न माथिको बटन थिच्नुहोस्
+              </div>
+
+              <div v-else class="overflow-x-auto rounded border border-amber-200">
+                <table class="w-full text-[12px]">
+                  <thead class="bg-amber-100/70">
+                    <tr>
+                      <th class="text-left font-semibold px-3 py-2 text-[11px] uppercase tracking-wide min-w-[140px]">नाप एकाइ<br><span class="font-normal normal-case opacity-70">Land Unit</span></th>
+                      <th class="text-left font-semibold px-3 py-2 text-[11px] uppercase tracking-wide min-w-[160px]">जमिनको किसिम<br><span class="font-normal normal-case opacity-70">Land Use Type</span></th>
+                      <th class="text-left font-semibold px-3 py-2 text-[11px] uppercase tracking-wide min-w-[110px]">परिमाण<br><span class="font-normal normal-case opacity-70">Quantity</span></th>
+                      <th class="w-8 px-2 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-amber-100">
+                    <tr v-for="(row, idx) in form.landParcels" :key="idx"
+                      :class="idx % 2 === 0 ? 'bg-white' : 'bg-amber-50/30'">
+                      <td class="px-2 py-1.5">
+                        <select v-model="row.land_unit"
+                          class="w-full rounded border border-[#e6e7e9] px-2 py-1.5 text-[12px] bg-white focus:ring-2 focus:ring-amber-400/20 focus:border-amber-400">
+                          <option value="">— एकाइ —</option>
+                          <option v-for="opt in (surveyOptions.land_measurement_unit ?? [])" :key="opt.value" :value="opt.value">{{ opt.label_ne ?? opt.label }}</option>
+                        </select>
+                      </td>
+                      <td class="px-2 py-1.5">
+                        <select v-model="row.land_use_type"
+                          class="w-full rounded border border-[#e6e7e9] px-2 py-1.5 text-[12px] bg-white focus:ring-2 focus:ring-amber-400/20 focus:border-amber-400">
+                          <option value="">— किसिम —</option>
+                          <option v-for="opt in (surveyOptions.land_use_type ?? [])" :key="opt.value" :value="opt.value">{{ opt.label_ne ?? opt.label }}</option>
+                        </select>
+                      </td>
+                      <td class="px-2 py-1.5">
+                        <input v-model="row.quantity" type="number" min="0" step="0.01" placeholder="0.00"
+                          class="w-full rounded border border-[#e6e7e9] px-2 py-1.5 text-[12px] bg-white focus:ring-2 focus:ring-amber-400/20 focus:border-amber-400" />
+                      </td>
+                      <td class="px-2 py-1.5 text-center">
+                        <button type="button" @click="removeLandParcelRow(idx)"
+                          class="text-red-400 hover:text-red-600 transition-colors">
+                          <i class="fa-solid fa-xmark text-xs"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -716,8 +794,8 @@
           <div class="rounded-md border border-[#e6e7e9] overflow-hidden">
             <div class="flex items-center justify-between px-4 py-2.5 bg-gray-50">
               <div>
-                <p class="text-[13px] font-medium text-gray-700">पालिकामा यस परिवारको जग्गा छ कि छैन?</p>
-                <p class="text-[11px] text-gray-400">Does the family have land in the municipality?</p>
+                <p class="text-[13px] font-medium text-gray-700">पालिका बाहेक अन्य ठाउँमा यस परिवारको जग्गा छ कि छैन?</p>
+                <p class="text-[11px] text-gray-400">Does the family have land outside of the municipality?</p>
               </div>
               <div class="flex rounded overflow-hidden border border-[#e6e7e9] shrink-0 ml-4">
                 <button type="button" @click="form.social.have_land = 'yes'"
@@ -4135,6 +4213,10 @@
             <div class="flex justify-between gap-2"><span class="text-gray-500 shrink-0">घरको अवस्था</span><span class="font-semibold text-right">{{ soLabel('house_condition', form.housing.house_condition) || '—' }}</span></div>
             <div class="flex justify-between gap-2"><span class="text-gray-500 shrink-0">कोठा / तला</span><span class="font-semibold text-right">{{ form.housing.total_rooms || '—' }} / {{ form.housing.total_floors || '—' }}</span></div>
             <div class="flex justify-between gap-2"><span class="text-gray-500 shrink-0">निर्माण वर्ष</span><span class="font-semibold text-right">{{ form.housing.construction_year || '—' }}</span></div>
+            <div v-if="form.hasLandInMunicipality" class="flex justify-between gap-2">
+              <span class="text-gray-500 shrink-0">पालिकामा जग्गा</span>
+              <span class="font-semibold text-right">{{ form.hasLandInMunicipality === 'yes' ? (form.landParcels.length + ' पार्सेल') : 'छैन' }}</span>
+            </div>
           </div>
         </div>
 
@@ -5118,6 +5200,9 @@ const form = useForm({
     annual_agri_income:     hh?.agriculture?.annual_agri_income     ?? '',
   },
 
+  hasLandInMunicipality: hh?.survey_data?.hasLandInMunicipality ?? '',
+  landParcels: Array.isArray(hh?.survey_data?.landParcels) ? hh.survey_data.landParcels : [],
+
   cropProduction: {
     food_crops:  Array.isArray(hh?.survey_data?.cropProduction?.food_crops)  ? hh.survey_data.cropProduction.food_crops  : [],
     pulses:      Array.isArray(hh?.survey_data?.cropProduction?.pulses)      ? hh.survey_data.cropProduction.pulses      : [],
@@ -5679,6 +5764,15 @@ function removeCropRow(category, idx) {
   form.cropProduction[category].splice(idx, 1)
 }
 
+// ── Land Parcels helpers ───────────────────────────────────────────
+function addLandParcelRow() {
+  form.landParcels.push({ land_unit: '', land_use_type: '', quantity: '' })
+}
+
+function removeLandParcelRow(idx) {
+  form.landParcels.splice(idx, 1)
+}
+
 // ── Local Draft (IndexedDB) ───────────────────────────────────────
 import { saveDraft as dbSaveDraft, getDraft as dbGetDraft, deleteDraft as dbDeleteDraft, enqueue as dbEnqueue } from '@/utils/draftStore'
 import { useSyncManager } from '@/utils/syncManager'
@@ -5690,7 +5784,7 @@ const DRAFT_KEYS = [
   'ward_id', 'settlement_id', 'respondent_name', 'respondent_contact',
   'survey_date', 'remarks', 'gps_lat', 'gps_lng', 'gps_accuracy', 'gps_altitude', 'photo_number',
   'location', 'housing', 'social', 'utilities', 'health', 'wellbeing', 'decisions', 'occupation',
-  'agriculture', 'cropProduction', 'livestock', 'livestockDetail',
+  'agriculture', 'hasLandInMunicipality', 'landParcels', 'cropProduction', 'livestock', 'livestockDetail',
   'beeFishSilk', 'economic', 'disaster', 'members',
 ]
 

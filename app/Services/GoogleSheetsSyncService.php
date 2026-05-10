@@ -68,12 +68,13 @@ class GoogleSheetsSyncService
         $wardNum = $ward?->ward_number;
 
         // Index supporting sheets by lowercase household_code
-        $housingIdx     = $this->indexBy($sheets['housing'],     'household_code');
-        $utilitiesIdx   = $this->indexBy($sheets['utilities'],   'household_code');
-        $economicIdx    = $this->indexBy($sheets['economic'],    'household_code');
-        $agricultureIdx = $this->indexBy($sheets['agriculture'], 'household_code');
-        $membersIdx     = $this->groupBy($sheets['members'],     'household_code');
-        $livestockIdx   = $this->groupBy($sheets['livestock'],   'household_code');
+        $housingIdx      = $this->indexBy($sheets['housing'],     'household_code');
+        $utilitiesIdx    = $this->indexBy($sheets['utilities'],   'household_code');
+        $economicIdx     = $this->indexBy($sheets['economic'],    'household_code');
+        $agricultureIdx  = $this->indexBy($sheets['agriculture'], 'household_code');
+        $membersIdx      = $this->groupBy($sheets['members'],     'household_code');
+        $livestockIdx    = $this->groupBy($sheets['livestock'],   'household_code');
+        $landParcelsIdx  = $this->groupBy($sheets['landParcels'], 'household_code');
 
         $existingMap = Household::where('ward_id', $wardId)
             ->select(['id', 'unique_code', 'sync_hash', 'sync_locked'])
@@ -98,21 +99,22 @@ class GoogleSheetsSyncService
             $row['unique_code'] = $uniqueCode;
             $codeKey = strtolower($uniqueCode);
 
-            $housingRow     = $housingIdx[$codeKey]     ?? null;
-            $utilitiesRow   = $utilitiesIdx[$codeKey]   ?? null;
-            $economicRow    = $economicIdx[$codeKey]    ?? null;
-            $agricultureRow = $agricultureIdx[$codeKey] ?? null;
-            $memberRows     = $membersIdx[$codeKey]     ?? [];
-            $livestockRows  = $livestockIdx[$codeKey]   ?? [];
+            $housingRow      = $housingIdx[$codeKey]     ?? null;
+            $utilitiesRow    = $utilitiesIdx[$codeKey]   ?? null;
+            $economicRow     = $economicIdx[$codeKey]    ?? null;
+            $agricultureRow  = $agricultureIdx[$codeKey] ?? null;
+            $memberRows      = $membersIdx[$codeKey]     ?? [];
+            $livestockRows   = $livestockIdx[$codeKey]   ?? [];
+            $landParcelRows  = $landParcelsIdx[$codeKey] ?? [];
 
             $hash = $this->hashAllSheets(
                 $row, $housingRow, $utilitiesRow, $economicRow,
-                $agricultureRow, $memberRows, $livestockRows
+                $agricultureRow, $memberRows, $livestockRows, $landParcelRows
             );
             $existing = $existingMap->get($uniqueCode);
 
             // Attach sub-sheet data (stripped before sending to frontend)
-            $row['_related'] = compact('housingRow', 'utilitiesRow', 'economicRow', 'agricultureRow', 'memberRows', 'livestockRows');
+            $row['_related'] = compact('housingRow', 'utilitiesRow', 'economicRow', 'agricultureRow', 'memberRows', 'livestockRows', 'landParcelRows');
 
             // Completeness snapshot — visible in preview
             $row['_completeness'] = [
@@ -122,6 +124,7 @@ class GoogleSheetsSyncService
                 'economic'    => !empty($economicRow),
                 'agriculture' => !empty($agricultureRow),
                 'livestock'   => count($livestockRows),
+                'landParcels' => count($landParcelRows),
                 'settlement'  => !empty(trim($row['settlement_name'] ?? '')),
             ];
 
@@ -225,7 +228,8 @@ class GoogleSheetsSyncService
 
     private function syncRelated(Household $household, array $related): void
     {
-        if ($housingRow = $related['housingRow'] ?? null) {
+        $housingRow = $related['housingRow'] ?? null;
+        if ($housingRow) {
             $household->housing()->updateOrCreate(
                 ['household_id' => $household->id],
                 $this->rowToHousingData($housingRow)
@@ -265,6 +269,22 @@ class GoogleSheetsSyncService
 
         if (!empty($related['memberRows'])) {
             $this->syncMembers($household, $related['memberRows']);
+        }
+
+        // Sync land parcel data → survey_data
+        $landParcelRows = $related['landParcelRows'] ?? [];
+        $rawFlag = $housingRow ? trim($housingRow['has_land_in_municipality'] ?? '') : '';
+        if ($rawFlag !== '' || !empty($landParcelRows)) {
+            $hasLand = $rawFlag !== ''
+                ? ($this->parseBool($rawFlag) ? 'yes' : 'no')
+                : 'yes';
+            $parcels = array_values(array_filter(
+                array_map(fn($r) => $this->rowToLandParcelData($r), $landParcelRows)
+            ));
+            $surveyData = $household->survey_data ?? [];
+            $surveyData['hasLandInMunicipality'] = $hasLand;
+            $surveyData['landParcels']            = $parcels;
+            $household->update(['survey_data' => $surveyData]);
         }
     }
 
@@ -621,6 +641,7 @@ class GoogleSheetsSyncService
             'economic'    => $collector->getRows('Economic'),
             'agriculture' => $collector->getRows('Agriculture'),
             'livestock'   => $collector->getRows('Livestock'),
+            'landParcels' => $collector->getRows('LandParcels'),
         ];
     }
 
@@ -646,7 +667,7 @@ class GoogleSheetsSyncService
         return $map;
     }
 
-    /** Combined hash across all 7 sheets for a single household */
+    /** Combined hash across all 8 sheets for a single household */
     private function hashAllSheets(
         array  $hhRow,
         ?array $housingRow,
@@ -654,7 +675,8 @@ class GoogleSheetsSyncService
         ?array $economicRow,
         ?array $agricultureRow,
         array  $memberRows,
-        array  $livestockRows
+        array  $livestockRows,
+        array  $landParcelRows = []
     ): string {
         usort($memberRows,    fn($a, $b) => strcmp(
             strtolower(trim($a['full_name'] ?? '')),
@@ -664,7 +686,7 @@ class GoogleSheetsSyncService
             strtolower(trim($a['livestock_type'] ?? '')),
             strtolower(trim($b['livestock_type'] ?? ''))
         ));
-        $combined = compact('hhRow', 'housingRow', 'utilitiesRow', 'economicRow', 'agricultureRow', 'memberRows', 'livestockRows');
+        $combined = compact('hhRow', 'housingRow', 'utilitiesRow', 'economicRow', 'agricultureRow', 'memberRows', 'livestockRows', 'landParcelRows');
         return hash('sha256', json_encode($combined, JSON_UNESCAPED_UNICODE));
     }
 
@@ -728,6 +750,19 @@ class GoogleSheetsSyncService
             'house_condition'       => trim($row['house_condition']       ?? '') ?: null,
             'is_at_risk'            => $this->parseBool($row['is_at_risk'] ?? null),
             'risk_types'            => $this->parseJsonArray($row['risk_types'] ?? null),
+        ];
+    }
+
+    private function rowToLandParcelData(array $row): ?array
+    {
+        $landUnit    = trim($row['land_unit']    ?? '');
+        $landUseType = trim($row['land_use_type'] ?? '');
+        $quantity    = trim($row['quantity']     ?? '');
+        if ($landUnit === '' && $landUseType === '' && $quantity === '') return null;
+        return [
+            'land_unit'     => $landUnit    ?: null,
+            'land_use_type' => $landUseType ?: null,
+            'quantity'      => $quantity    ?: null,
         ];
     }
 

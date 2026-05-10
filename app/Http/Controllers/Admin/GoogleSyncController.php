@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\LocalGovernment;
+use App\Models\SurveyOption;
 use App\Models\Ward;
 use App\Services\GoogleSheetsSyncService;
 use Illuminate\Http\JsonResponse;
@@ -31,6 +32,14 @@ class GoogleSyncController extends Controller
             'hasHouseholdSheet'   => $hasHouseholdSheet,
             'hasInstitutionSheet' => $hasInstitutionSheet,
         ]);
+    }
+
+    public function manual(): \Illuminate\View\View
+    {
+        abort_unless(auth()->user()?->isAdmin(), 403);
+        $lg      = LocalGovernment::getFirstCached();
+        $options = SurveyOption::allGrouped($lg?->id)->all();
+        return view('admin.google-sync-manual', compact('options'));
     }
 
     public function preview(Request $request): JsonResponse
