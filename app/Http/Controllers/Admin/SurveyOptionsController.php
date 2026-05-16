@@ -9,6 +9,7 @@ use App\Models\LocalGovernment;
 use App\Models\SurveyOption;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -30,6 +31,21 @@ class SurveyOptionsController extends Controller
             $activeCategory = array_key_first($householdCategories);
         }
 
+        $fieldMap    = $this->categoryFieldMap();
+        $usageKnown  = array_key_exists($activeCategory, $fieldMap);
+        $usageCounts = [];
+
+        if ($usageKnown) {
+            [$table, $column] = $fieldMap[$activeCategory];
+            $usageCounts = DB::table($table)
+                ->whereNotNull($column)
+                ->where($column, '!=', '')
+                ->selectRaw("`{$column}` as val, COUNT(*) as cnt")
+                ->groupBy($column)
+                ->pluck('cnt', 'val')
+                ->toArray();
+        }
+
         $options = SurveyOption::where('category', $activeCategory)
             ->orderBy('sort_order')
             ->orderBy('label_ne')
@@ -42,6 +58,8 @@ class SurveyOptionsController extends Controller
                 'sort_order'          => $o->sort_order,
                 'is_active'           => $o->is_active,
                 'local_government_id' => $o->local_government_id,
+                'usage_count'         => $usageKnown ? ($usageCounts[$o->value] ?? 0) : null,
+                'usage_known'         => $usageKnown,
             ]);
 
         return Inertia::render('Admin/SurveyOptions', [
@@ -156,6 +174,26 @@ class SurveyOptionsController extends Controller
             ->with('success', "{$deleted} विकल्प मेटाइयो।");
     }
 
+    public function reorder(Request $request)
+    {
+        abort_unless(auth()->user()?->isAdmin() || auth()->user()?->isSuperAdmin(), 403);
+
+        $data = $request->validate([
+            'category'           => 'required|string',
+            'order'              => 'required|array|min:1',
+            'order.*.id'         => 'required|integer',
+            'order.*.sort_order' => 'required|integer|min:0',
+        ]);
+
+        foreach ($data['order'] as $item) {
+            SurveyOption::where('id', $item['id'])->update(['sort_order' => $item['sort_order']]);
+        }
+
+        $this->clearCaches($data['category']);
+
+        return back();
+    }
+
     public function downloadTemplate()
     {
         abort_unless(auth()->user()?->isSuperAdmin(), 403);
@@ -193,6 +231,40 @@ class SurveyOptionsController extends Controller
                 'skipped'  => $import->skipped,
                 'errors'   => array_slice($import->errors, 0, 50), // cap error list
             ]);
+    }
+
+    private function categoryFieldMap(): array
+    {
+        return [
+            // household_members (VARCHAR columns)
+            'relation_to_head'  => ['household_members', 'relation_to_head'],
+            'marital_status'    => ['household_members', 'marital_status'],
+            'blood_group'       => ['household_members', 'blood_group'],
+            'disability_type'   => ['household_members', 'disability_type'],
+            'education_level'   => ['household_members', 'education_level'],
+            'occupation_type'   => ['household_members', 'occupation_type'],
+            'employment_status' => ['household_members', 'employment_status'],
+            'residence_status'  => ['household_members', 'residence_status'],
+            // household_housing (VARCHAR columns)
+            'roof_type'         => ['household_housing', 'roof_type'],
+            'wall_type'         => ['household_housing', 'wall_type'],
+            'foundation_type'   => ['household_housing', 'foundation_type'],
+            'ownership_type'    => ['household_housing', 'ownership_type'],
+            'house_condition'   => ['household_housing', 'house_condition'],
+            // household_utilities (VARCHAR columns)
+            'water_source'       => ['household_utilities', 'water_source'],
+            'toilet_type'        => ['household_utilities', 'toilet_type'],
+            'sanitation_type'    => ['household_utilities', 'sanitation_type'],
+            'electricity_source' => ['household_utilities', 'electricity_source'],
+            'cooking_fuel'       => ['household_utilities', 'cooking_fuel'],
+            'internet_type'      => ['household_utilities', 'internet_type'],
+            // institutions (VARCHAR — was ENUM, converted)
+            'inst_ownership_type' => ['institutions', 'ownership_type'],
+            // member_businesses
+            'business_location' => ['member_businesses', 'business_location'],
+            'business_type'     => ['member_businesses', 'business_type'],
+            'business_field'    => ['member_businesses', 'business_field'],
+        ];
     }
 
     private function clearCaches(string $category): void

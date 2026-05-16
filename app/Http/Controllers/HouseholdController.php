@@ -201,10 +201,15 @@ class HouseholdController extends Controller
         // Duplicate detection — skip if user has already confirmed
         if (!$request->boolean('duplicate_confirmed') && !$request->boolean('save_draft')) {
             $dupResult = app(DuplicateDetectionService::class)->checkHousehold($data);
+            $errors = [];
             if ($dupResult['found']) {
-                return back()->withErrors([
-                    'duplicate_warning' => json_encode($dupResult['matches']),
-                ])->withInput();
+                $errors['duplicate_warning'] = json_encode($dupResult['matches']);
+            }
+            if ($dupResult['phone_warning'] ?? null) {
+                $errors['phone_warning'] = $dupResult['phone_warning'];
+            }
+            if ($errors) {
+                return back()->withErrors($errors)->withInput();
             }
         }
 

@@ -44,7 +44,7 @@ class GoogleSyncController extends Controller
 
     public function preview(Request $request): JsonResponse
     {
-        set_time_limit(180);
+        set_time_limit(600);
         $request->validate([
             'type'    => ['required', 'in:households,institutions'],
             'ward_id' => ['required', 'integer', 'exists:wards,id'],
@@ -66,7 +66,7 @@ class GoogleSyncController extends Controller
             $diff = $request->type === 'households'
                 ? $this->sync->previewHouseholds($sheetId, (int)$request->ward_id, $lg->id)
                 : $this->sync->previewInstitutions($sheetId, (int)$request->ward_id, $lg->id);
-        } catch (\RuntimeException $e) {
+        } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
         }
 
@@ -92,19 +92,21 @@ class GoogleSyncController extends Controller
                 'upToDate' => count($diff['upToDate']),
                 'errors'   => count($diff['errors']),
             ],
-            'rows'   => array_map($stripInternal, $previewRows),
-            'errors' => $cleanErrors,
-            'debug'  => $diff['debug'] ?? null,
+            'rows'     => array_map($stripInternal, $previewRows),
+            'errors'   => $cleanErrors,
+            'debug'    => $diff['debug'] ?? null,
+            'diff_key' => $diff['_diff_key'] ?? null,
         ]);
     }
 
     public function apply(Request $request): JsonResponse
     {
-        set_time_limit(180);
+        set_time_limit(600);  // 10 min — large ward syncs (200+ households) need more time
         $request->validate([
             'type'         => ['required', 'in:households,institutions'],
             'ward_id'      => ['required', 'integer', 'exists:wards,id'],
             'force_locked' => ['boolean'],
+            'diff_key'     => ['nullable', 'string', 'max:80'],
         ]);
 
         $lg       = LocalGovernment::getFirstCached();
@@ -118,12 +120,13 @@ class GoogleSyncController extends Controller
         }
 
         $forceLocked = (bool)($request->force_locked ?? false);
+        $diffKey     = $request->diff_key ?: null;
 
         try {
             $result = $request->type === 'households'
-                ? $this->sync->applyHouseholds($sheetId, (int)$request->ward_id, $lg->id, $forceLocked)
-                : $this->sync->applyInstitutions($sheetId, (int)$request->ward_id, $lg->id, $forceLocked);
-        } catch (\RuntimeException $e) {
+                ? $this->sync->applyHouseholds($sheetId, (int)$request->ward_id, $lg->id, $forceLocked, $diffKey)
+                : $this->sync->applyInstitutions($sheetId, (int)$request->ward_id, $lg->id, $forceLocked, $diffKey);
+        } catch (\Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 422);
         }
 

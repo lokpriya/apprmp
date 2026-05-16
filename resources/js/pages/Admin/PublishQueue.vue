@@ -77,6 +77,19 @@
     <!-- ── HOUSEHOLDS TAB ── -->
     <template v-if="activeTab === 'households'">
       <div v-if="households.data?.length > 0" class="space-y-3">
+        <!-- Select-all row -->
+        <div class="flex items-center gap-3 px-1">
+          <label class="flex items-center gap-2 text-xs cursor-pointer select-none">
+            <input type="checkbox"
+              :checked="hhSelectedIds.size > 0 && hhSelectedIds.size === households.data.length"
+              :indeterminate.prop="hhSelectedIds.size > 0 && hhSelectedIds.size < households.data.length"
+              @change="toggleSelectAllHH"
+              class="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer"
+            />
+            <span v-if="hhSelectedIds.size > 0" class="font-medium text-green-700">{{ hhSelectedIds.size }} / {{ households.data.length }} छानिएको</span>
+            <span v-else class="text-gray-400 text-[11px]">यस पेजका सबै छान्नुहोस्</span>
+          </label>
+        </div>
         <div
           v-for="hh in households.data"
           :key="hh.id"
@@ -86,6 +99,8 @@
             <div class="flex items-start justify-between gap-4">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+                  <input type="checkbox" :checked="hhSelectedIds.has(hh.id)" @change="toggleSelectHH(hh.id)"
+                    class="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer shrink-0" />
                   <span class="font-mono text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">{{ hh.unique_code }}</span>
                   <!-- Status badge -->
                   <span :class="[
@@ -202,6 +217,19 @@
     <!-- ── INSTITUTIONS TAB ── -->
     <template v-if="activeTab === 'institutions'">
       <div v-if="institutions.data?.length > 0" class="space-y-3">
+        <!-- Select-all row -->
+        <div class="flex items-center gap-3 px-1">
+          <label class="flex items-center gap-2 text-xs cursor-pointer select-none">
+            <input type="checkbox"
+              :checked="instSelectedIds.size > 0 && instSelectedIds.size === institutions.data.length"
+              :indeterminate.prop="instSelectedIds.size > 0 && instSelectedIds.size < institutions.data.length"
+              @change="toggleSelectAllInst"
+              class="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
+            />
+            <span v-if="instSelectedIds.size > 0" class="font-medium text-teal-700">{{ instSelectedIds.size }} / {{ institutions.data.length }} छानिएको</span>
+            <span v-else class="text-gray-400 text-[11px]">यस पेजका सबै छान्नुहोस्</span>
+          </label>
+        </div>
         <div
           v-for="inst in institutions.data"
           :key="inst.id"
@@ -211,6 +239,8 @@
             <div class="flex items-start justify-between gap-4">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+                  <input type="checkbox" :checked="instSelectedIds.has(inst.id)" @change="toggleSelectInst(inst.id)"
+                    class="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 cursor-pointer shrink-0" />
                   <span class="font-mono text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">{{ inst.unique_code }}</span>
                   <span v-if="inst.institutionType" class="px-2 py-0.5 bg-teal-100 text-teal-700 rounded-full text-xs font-medium">
                     {{ inst.institutionType.name_np }}
@@ -325,6 +355,19 @@
     <!-- ── BUSINESSES TAB ── -->
     <template v-if="activeTab === 'businesses'">
       <div v-if="businesses.data?.length > 0" class="space-y-3">
+        <!-- Select-all row -->
+        <div class="flex items-center gap-3 px-1">
+          <label class="flex items-center gap-2 text-xs cursor-pointer select-none">
+            <input type="checkbox"
+              :checked="bizSelectedIds.size > 0 && bizSelectedIds.size === businesses.data.length"
+              :indeterminate.prop="bizSelectedIds.size > 0 && bizSelectedIds.size < businesses.data.length"
+              @change="toggleSelectAllBiz"
+              class="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+            />
+            <span v-if="bizSelectedIds.size > 0" class="font-medium text-amber-700">{{ bizSelectedIds.size }} / {{ businesses.data.length }} छानिएको</span>
+            <span v-else class="text-gray-400 text-[11px]">यस पेजका सबै छान्नुहोस्</span>
+          </label>
+        </div>
         <div
           v-for="biz in businesses.data"
           :key="biz.id"
@@ -335,6 +378,8 @@
               <div class="flex-1 min-w-0">
                 <!-- Code + badges -->
                 <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+                  <input type="checkbox" :checked="bizSelectedIds.has(biz.id)" @change="toggleSelectBiz(biz.id)"
+                    class="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 cursor-pointer shrink-0" />
                   <span class="font-mono text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">{{ biz.unique_code }}</span>
                   <span class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
                     <i class="fa-solid fa-check mr-1 text-[10px]"></i>वडा अनुमोदित
@@ -362,10 +407,10 @@
                     <i class="fa-solid fa-house-flag text-gray-300 mr-1"></i>{{ biz.settlement.name_np }}
                   </span>
                   <span v-if="biz.business_type">
-                    <i class="fa-solid fa-tag text-gray-300 mr-1"></i>{{ biz.business_type }}
+                    <i class="fa-solid fa-tag text-gray-300 mr-1"></i>{{ fieldLabel('business_type', biz.business_type) }}
                   </span>
                   <span v-if="biz.business_field">
-                    <i class="fa-solid fa-briefcase text-gray-300 mr-1"></i>{{ biz.business_field }}
+                    <i class="fa-solid fa-briefcase text-gray-300 mr-1"></i>{{ fieldLabel('business_field', biz.business_field) }}
                   </span>
                   <span v-if="biz.business_location">
                     <i class="fa-solid fa-map-pin text-gray-300 mr-1"></i>{{ biz.business_location }}
@@ -474,12 +519,108 @@
       </div>
     </template>
 
+    <!-- ── Bulk action toolbar (sticky bottom) ── -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition ease-out duration-200"
+        enter-from-class="opacity-0 translate-y-4"
+        enter-to-class="opacity-100 translate-y-0"
+        leave-active-class="transition ease-in duration-150"
+        leave-from-class="opacity-100 translate-y-0"
+        leave-to-class="opacity-0 translate-y-4"
+      >
+        <div v-if="activeSelectedIds.size > 0"
+          class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50
+                 bg-[#1d273b] text-white rounded-xl shadow-2xl
+                 flex items-center gap-3 px-5 py-3 min-w-max">
+
+          <span class="flex items-center gap-1.5 text-sm font-semibold">
+            <span class="bg-white/15 rounded-lg px-2.5 py-1 text-xs font-bold">{{ activeSelectedIds.size }}</span>
+            {{ activeTab === 'households' ? 'घरधुरी' : activeTab === 'institutions' ? 'संस्था' : 'व्यवसाय' }} छानिएको
+          </span>
+
+          <div class="h-5 w-px bg-white/20"></div>
+
+          <button @click="bulkPublish" :disabled="bulkProcessing"
+            class="flex items-center gap-1.5 px-4 py-1.5 bg-green-500 hover:bg-green-400
+                   disabled:opacity-50 rounded-lg text-sm font-semibold transition-colors">
+            <i class="fa-solid fa-paper-plane text-xs"></i>
+            सबै प्रकाशन
+          </button>
+
+          <button @click="openBulkRejectModal" :disabled="bulkProcessing"
+            class="flex items-center gap-1.5 px-4 py-1.5 bg-red-500 hover:bg-red-400
+                   disabled:opacity-50 rounded-lg text-sm font-semibold transition-colors">
+            <i class="fa-solid fa-xmark text-xs"></i>
+            सबै अस्वीकृत
+          </button>
+
+          <button @click="clearSelection"
+            class="flex items-center gap-1 px-2 py-1.5 text-white/60 hover:text-white transition-colors text-xs">
+            <i class="fa-solid fa-xmark"></i>
+            हटाउनुहोस्
+          </button>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- ── Bulk Reject Modal ── -->
+    <Teleport to="body">
+      <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0" enter-to-class="opacity-100"
+        leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0">
+        <div v-if="bulkRejectModalOpen" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" @click.self="bulkRejectModalOpen = false">
+          <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" @click.stop>
+            <div class="px-5 py-4 border-b border-[#e6e7e9] flex items-center justify-between">
+              <div>
+                <h3 class="text-sm font-bold text-gray-900">
+                  <i class="fa-solid fa-xmark text-red-500 mr-1.5"></i>
+                  {{ activeSelectedIds.size }} वटा अस्वीकृत गर्नुहोस्
+                </h3>
+                <p class="text-xs text-gray-500 mt-0.5">अस्वीकृतिको कारण अनिवार्य छ</p>
+              </div>
+              <button @click="bulkRejectModalOpen = false" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <div class="px-5 py-4 space-y-3">
+              <div class="flex flex-wrap gap-1.5">
+                <button v-for="reason in rejectReasons" :key="reason" type="button" @click="bulkRejectReason = reason"
+                  :class="['text-[11px] px-2.5 py-1 rounded-full border transition-colors',
+                    bulkRejectReason === reason
+                      ? 'bg-red-600 border-red-600 text-white'
+                      : 'bg-white border-red-200 text-red-700 hover:bg-red-100']">
+                  {{ reason }}
+                </button>
+              </div>
+              <textarea v-model="bulkRejectReason" rows="3"
+                placeholder="अस्वीकृतिको विस्तृत कारण लेख्नुहोस्..."
+                class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm
+                       focus:ring-2 focus:ring-red-400 focus:border-red-400 resize-none">
+              </textarea>
+            </div>
+            <div class="px-5 py-4 border-t border-[#e6e7e9] flex items-center justify-end gap-2">
+              <button @click="bulkRejectModalOpen = false" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors">
+                रद्द गर्नुहोस्
+              </button>
+              <button @click="confirmBulkReject" :disabled="!bulkRejectReason.trim() || bulkProcessing"
+                class="px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold
+                       hover:bg-red-700 disabled:opacity-50 transition-colors">
+                <i class="fa-solid fa-xmark mr-1"></i>
+                {{ activeSelectedIds.size }} वटा अस्वीकृत गर्नुहोस्
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Link, router } from '@inertiajs/vue3'
+import { fieldLabel } from '@/utils/fieldLabels'
 
 const props = defineProps({
   households:   { type: Object, default: () => ({ data: [], meta: {}, links: {} }) },
@@ -491,7 +632,8 @@ const props = defineProps({
 
 const activeTab = ref(props.tab)
 
-// Households
+// ── Individual record state ──────────────────────────────────────────────────
+
 const hhProcessing = ref({})
 const hhOpenPanel  = ref({})
 const hhComments   = ref({})
@@ -500,7 +642,6 @@ function toggleHHPanel(id) {
   hhOpenPanel.value[id] = !hhOpenPanel.value[id]
   if (hhOpenPanel.value[id]) hhComments.value[id] = ''
 }
-
 function publishHH(hh) {
   if (!confirm(`घरधुरी "${hh.respondent_name}" प्रकाशित गर्ने?`)) return
   hhProcessing.value[hh.id] = true
@@ -508,7 +649,6 @@ function publishHH(hh) {
     onFinish: () => { hhProcessing.value[hh.id] = false },
   })
 }
-
 function rejectHH(hh) {
   hhProcessing.value[hh.id] = true
   router.patch(`/admin/publish-queue/households/${hh.id}/reject`, { comment: hhComments.value[hh.id] }, {
@@ -517,7 +657,6 @@ function rejectHH(hh) {
   })
 }
 
-// Institutions
 const instProcessing = ref({})
 const instOpenPanel  = ref({})
 const instComments   = ref({})
@@ -526,7 +665,6 @@ function toggleInstPanel(id) {
   instOpenPanel.value[id] = !instOpenPanel.value[id]
   if (instOpenPanel.value[id]) instComments.value[id] = ''
 }
-
 function publishInst(inst) {
   if (!confirm(`"${inst.name_np || inst.name_en}" प्रकाशित गर्ने?`)) return
   instProcessing.value[inst.id] = true
@@ -534,7 +672,6 @@ function publishInst(inst) {
     onFinish: () => { instProcessing.value[inst.id] = false },
   })
 }
-
 function rejectInst(inst) {
   instProcessing.value[inst.id] = true
   router.patch(`/admin/publish-queue/institutions/${inst.id}/reject`, { comment: instComments.value[inst.id] }, {
@@ -543,7 +680,6 @@ function rejectInst(inst) {
   })
 }
 
-// Businesses
 const bizProcessing = ref({})
 const bizOpenPanel  = ref({})
 const bizComments   = ref({})
@@ -552,7 +688,6 @@ function toggleBizPanel(id) {
   bizOpenPanel.value[id] = !bizOpenPanel.value[id]
   if (bizOpenPanel.value[id]) bizComments.value[id] = ''
 }
-
 function publishBiz(biz) {
   if (!confirm(`व्यवसाय "${biz.business_name}" प्रकाशित गर्ने?`)) return
   bizProcessing.value[biz.id] = true
@@ -560,12 +695,101 @@ function publishBiz(biz) {
     onFinish: () => { bizProcessing.value[biz.id] = false },
   })
 }
-
 function rejectBiz(biz) {
   bizProcessing.value[biz.id] = true
   router.patch(`/admin/publish-queue/businesses/${biz.id}/reject`, { comment: bizComments.value[biz.id] }, {
     onSuccess: () => { bizOpenPanel.value[biz.id] = false },
     onFinish:  () => { bizProcessing.value[biz.id] = false },
+  })
+}
+
+// ── Bulk selection ────────────────────────────────────────────────────────────
+
+const hhSelectedIds   = ref(new Set())
+const instSelectedIds = ref(new Set())
+const bizSelectedIds  = ref(new Set())
+
+function toggleSelectHH(id) {
+  const s = new Set(hhSelectedIds.value); s.has(id) ? s.delete(id) : s.add(id); hhSelectedIds.value = s
+}
+function toggleSelectAllHH() {
+  hhSelectedIds.value = hhSelectedIds.value.size === props.households.data.length
+    ? new Set()
+    : new Set(props.households.data.map(h => h.id))
+}
+
+function toggleSelectInst(id) {
+  const s = new Set(instSelectedIds.value); s.has(id) ? s.delete(id) : s.add(id); instSelectedIds.value = s
+}
+function toggleSelectAllInst() {
+  instSelectedIds.value = instSelectedIds.value.size === props.institutions.data.length
+    ? new Set()
+    : new Set(props.institutions.data.map(i => i.id))
+}
+
+function toggleSelectBiz(id) {
+  const s = new Set(bizSelectedIds.value); s.has(id) ? s.delete(id) : s.add(id); bizSelectedIds.value = s
+}
+function toggleSelectAllBiz() {
+  bizSelectedIds.value = bizSelectedIds.value.size === props.businesses.data.length
+    ? new Set()
+    : new Set(props.businesses.data.map(b => b.id))
+}
+
+const activeSelectedIds = computed(() => {
+  if (activeTab.value === 'households')   return hhSelectedIds.value
+  if (activeTab.value === 'institutions') return instSelectedIds.value
+  return bizSelectedIds.value
+})
+
+function clearSelection() {
+  if (activeTab.value === 'households')   hhSelectedIds.value   = new Set()
+  if (activeTab.value === 'institutions') instSelectedIds.value = new Set()
+  if (activeTab.value === 'businesses')  bizSelectedIds.value  = new Set()
+}
+
+// ── Bulk actions ──────────────────────────────────────────────────────────────
+
+const bulkProcessing      = ref(false)
+const bulkRejectModalOpen = ref(false)
+const bulkRejectReason    = ref('')
+
+const rejectReasons = ['अपूर्ण जानकारी', 'गलत डाटा प्रविष्टि', 'डुप्लिकेट रेकर्ड', 'थप प्रमाणीकरण आवश्यक']
+
+function openBulkRejectModal() {
+  bulkRejectReason.value = ''
+  bulkRejectModalOpen.value = true
+}
+
+function bulkPublish() {
+  const ids = [...activeSelectedIds.value]
+  if (!ids.length) return
+  const label = activeTab.value === 'households' ? 'घरधुरी' : activeTab.value === 'institutions' ? 'संस्था' : 'व्यवसाय'
+  if (!confirm(`${ids.length} वटा ${label} प्रकाशित गर्ने?`)) return
+  bulkProcessing.value = true
+  const url = activeTab.value === 'households'
+    ? '/admin/publish-queue/households/bulk-publish'
+    : activeTab.value === 'institutions'
+      ? '/admin/publish-queue/institutions/bulk-publish'
+      : '/admin/publish-queue/businesses/bulk-publish'
+  router.post(url, { ids }, {
+    onSuccess: () => clearSelection(),
+    onFinish:  () => { bulkProcessing.value = false },
+  })
+}
+
+function confirmBulkReject() {
+  if (!bulkRejectReason.value.trim()) return
+  const ids = [...activeSelectedIds.value]
+  bulkProcessing.value = true
+  const url = activeTab.value === 'households'
+    ? '/admin/publish-queue/households/bulk-reject'
+    : activeTab.value === 'institutions'
+      ? '/admin/publish-queue/institutions/bulk-reject'
+      : '/admin/publish-queue/businesses/bulk-reject'
+  router.post(url, { ids, comment: bulkRejectReason.value }, {
+    onSuccess: () => { bulkRejectModalOpen.value = false; clearSelection() },
+    onFinish:  () => { bulkProcessing.value = false },
   })
 }
 </script>

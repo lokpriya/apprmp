@@ -123,6 +123,129 @@
     </div>
 
     <!-- ══════════════════════════════════════════════════════════════
+         DATA QUALITY BANNER
+    ══════════════════════════════════════════════════════════════ -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-4 flex flex-wrap items-center gap-4">
+
+      <!-- Label -->
+      <div class="flex items-center gap-2 shrink-0 mr-1">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center"
+          :class="hasQualityIssues ? 'bg-amber-100' : 'bg-green-100'">
+          <i class="fa-solid text-sm"
+            :class="hasQualityIssues ? 'fa-shield-halved text-amber-600' : 'fa-shield-check text-green-600'"></i>
+        </div>
+        <div>
+          <p class="text-[13px] font-bold text-gray-700">डेटा गुणस्तर</p>
+          <p class="text-[11px] text-gray-400">{{ hasQualityIssues ? 'ध्यान दिनुपर्ने समस्याहरू' : 'सबै ठीक छ' }}</p>
+        </div>
+      </div>
+
+      <div class="h-8 w-px bg-gray-100 shrink-0 hidden sm:block"></div>
+
+      <!-- Draft count -->
+      <a href="/households?status=draft"
+        :class="[
+          'flex items-center gap-2.5 px-3.5 py-2 rounded-lg border transition-colors group',
+          (stats.draft_households ?? 0) > 0
+            ? 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+            : 'border-gray-100 bg-gray-50 hover:bg-gray-100'
+        ]">
+        <div class="w-6 h-6 rounded-md flex items-center justify-center transition-colors"
+          :class="(stats.draft_households ?? 0) > 0 ? 'bg-slate-200 group-hover:bg-slate-300' : 'bg-green-100'">
+          <i class="text-[10px]"
+            :class="(stats.draft_households ?? 0) > 0 ? 'fa-solid fa-pen-to-square text-slate-600' : 'fa-solid fa-check text-green-600'"></i>
+        </div>
+        <div>
+          <p class="text-[18px] font-black leading-none"
+            :class="(stats.draft_households ?? 0) > 0 ? 'text-slate-700' : 'text-green-600'">
+            {{ formatNum(stats.draft_households ?? 0) }}
+          </p>
+          <p class="text-[10px] font-medium leading-none mt-0.5"
+            :class="(stats.draft_households ?? 0) > 0 ? 'text-slate-500' : 'text-green-500'">
+            मस्यौदा बाँकी
+          </p>
+        </div>
+        <i class="fa-solid fa-arrow-right text-[10px] transition-colors ml-0.5"
+          :class="(stats.draft_households ?? 0) > 0 ? 'text-slate-300 group-hover:text-slate-500' : 'text-gray-200 group-hover:text-gray-400'"></i>
+      </a>
+
+      <!-- Missing GPS count -->
+      <a href="/review/households?missing_gps=1"
+        :class="[
+          'flex items-center gap-2.5 px-3.5 py-2 rounded-lg border transition-colors group',
+          (stats.missing_gps_households ?? 0) > 0
+            ? 'border-red-200 bg-red-50 hover:bg-red-100'
+            : 'border-gray-100 bg-gray-50 hover:bg-gray-100'
+        ]">
+        <div class="w-6 h-6 rounded-md flex items-center justify-center transition-colors"
+          :class="(stats.missing_gps_households ?? 0) > 0 ? 'bg-red-200 group-hover:bg-red-300' : 'bg-green-100'">
+          <i class="text-[10px]"
+            :class="(stats.missing_gps_households ?? 0) > 0 ? 'fa-solid fa-location-dot text-red-700' : 'fa-solid fa-check text-green-600'"></i>
+        </div>
+        <div>
+          <p class="text-[18px] font-black leading-none"
+            :class="(stats.missing_gps_households ?? 0) > 0 ? 'text-red-700' : 'text-green-600'">
+            {{ formatNum(stats.missing_gps_households ?? 0) }}
+          </p>
+          <p class="text-[10px] font-medium leading-none mt-0.5"
+            :class="(stats.missing_gps_households ?? 0) > 0 ? 'text-red-500' : 'text-green-500'">
+            GPS छैन
+          </p>
+        </div>
+        <i class="fa-solid fa-arrow-right text-[10px] transition-colors ml-0.5"
+          :class="(stats.missing_gps_households ?? 0) > 0 ? 'text-red-300 group-hover:text-red-500' : 'text-gray-200 group-hover:text-gray-400'"></i>
+      </a>
+
+      <!-- No members count -->
+      <a href="/review/households?no_members=1"
+        :class="[
+          'flex items-center gap-2.5 px-3.5 py-2 rounded-lg border transition-colors group',
+          (stats.no_member_households ?? 0) > 0
+            ? 'border-orange-200 bg-orange-50 hover:bg-orange-100'
+            : 'border-gray-100 bg-gray-50 hover:bg-gray-100'
+        ]">
+        <div class="w-6 h-6 rounded-md flex items-center justify-center transition-colors"
+          :class="(stats.no_member_households ?? 0) > 0 ? 'bg-orange-200 group-hover:bg-orange-300' : 'bg-green-100'">
+          <i class="text-[10px]"
+            :class="(stats.no_member_households ?? 0) > 0 ? 'fa-solid fa-users text-orange-700' : 'fa-solid fa-check text-green-600'"></i>
+        </div>
+        <div>
+          <p class="text-[18px] font-black leading-none"
+            :class="(stats.no_member_households ?? 0) > 0 ? 'text-orange-700' : 'text-green-600'">
+            {{ formatNum(stats.no_member_households ?? 0) }}
+          </p>
+          <p class="text-[10px] font-medium leading-none mt-0.5"
+            :class="(stats.no_member_households ?? 0) > 0 ? 'text-orange-500' : 'text-green-500'">
+            सदस्य छैन
+          </p>
+        </div>
+        <i class="fa-solid fa-arrow-right text-[10px] transition-colors ml-0.5"
+          :class="(stats.no_member_households ?? 0) > 0 ? 'text-orange-300 group-hover:text-orange-500' : 'text-gray-200 group-hover:text-gray-400'"></i>
+      </a>
+
+      <!-- Quality score ring -->
+      <div class="ml-auto shrink-0 flex items-center gap-2">
+        <div class="text-right">
+          <p class="text-[11px] text-gray-400">गुणस्तर स्कोर</p>
+          <p class="text-[22px] font-black leading-none"
+            :class="qualityScore >= 90 ? 'text-green-600' : qualityScore >= 70 ? 'text-amber-600' : 'text-red-600'">
+            {{ qualityScore }}%
+          </p>
+        </div>
+        <div class="w-10 h-10 relative">
+          <svg class="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#f3f4f6" stroke-width="3.5"/>
+            <circle cx="18" cy="18" r="15.9" fill="none"
+              :stroke="qualityScore >= 90 ? '#22c55e' : qualityScore >= 70 ? '#f59e0b' : '#ef4444'"
+              stroke-width="3.5"
+              stroke-linecap="round"
+              :stroke-dasharray="`${qualityScore} 100`"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
          KPI CARDS — Row 1: data metrics (4 cards)
     ══════════════════════════════════════════════════════════════ -->
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -1054,6 +1177,25 @@ const maxInstCount = computed(() =>
 function instTypeWidth(count) {
   return Math.round((count / maxInstCount.value) * 100)
 }
+
+// ── Data quality ───────────────────────────────────────────────────────────────
+const hasQualityIssues = computed(() =>
+  (props.stats.draft_households       ?? 0) > 0 ||
+  (props.stats.missing_gps_households ?? 0) > 0 ||
+  (props.stats.no_member_households   ?? 0) > 0
+)
+
+const qualityScore = computed(() => {
+  const total = props.stats.total_households || 0
+  if (!total) return 100
+  const issues = Math.min(
+    (props.stats.missing_gps_households ?? 0) +
+    (props.stats.no_member_households   ?? 0) +
+    (props.stats.draft_households       ?? 0),
+    total
+  )
+  return Math.max(0, Math.round((1 - issues / total) * 100))
+})
 
 // ── Computed stats ─────────────────────────────────────────────────────────────
 const publishedHHPercent = computed(() => {

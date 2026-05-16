@@ -41,7 +41,7 @@ class RolePermissionsController extends Controller
     {
         abort_unless(auth()->user()->isSuperAdmin(), 403);
         $request->validate([
-            'role'        => 'required|in:super_admin,municipal_admin,ward_reviewer,enumerator',
+            'role'        => 'required|in:super_admin,municipal_admin,ward_admin,ward_reviewer,enumerator',
             'permissions' => 'present|array',
             'permissions.*' => 'string',
         ]);

@@ -37,35 +37,102 @@ class ReviewController extends Controller
 
     public function households(Request $request)
     {
-        $wardIds = $this->scopedWardIds();
+        $wardIds           = $this->scopedWardIds();
+        $filterWard        = $request->input('ward_id');
+        $filterMissingGps  = $request->boolean('missing_gps');
+        $filterNoMembers   = $request->boolean('no_members');
+        $filterLowComplete = $request->boolean('low_completeness');
 
-        $households = Household::with(['ward', 'settlement', 'enumerator', 'housing', 'utilities', 'economic', 'members'])
+        // Base (no quality filters) for counts shown on chips
+        $base = Household::whereIn('ward_id', $wardIds)->where('status', 'submitted');
+        if ($filterWard && in_array((int)$filterWard, $wardIds)) {
+            $base->where('ward_id', $filterWard);
+        }
+
+        $qualityCounts = [
+            'missing_gps'      => (clone $base)
+                ->where(fn($q) => $q->whereNull('gps_lat')->orWhereNull('gps_lng'))
+                ->count(),
+            'no_members'       => (clone $base)->whereDoesntHave('members')->count(),
+            'low_completeness' => (clone $base)
+                ->where(fn($q) => $q
+                    ->whereDoesntHave('housing')
+                    ->orWhereDoesntHave('utilities')
+                    ->orWhereNull('gps_lat')
+                    ->orWhereNull('survey_date')
+                    ->orWhereNull('respondent_name')
+                )->count(),
+        ];
+
+        $query = Household::with(['ward', 'settlement', 'enumerator', 'housing', 'utilities', 'economic', 'members'])
             ->whereIn('ward_id', $wardIds)
-            ->where('status', 'submitted')
-            ->latest('submitted_at')
+            ->where('status', 'submitted');
+
+        if ($filterWard && in_array((int)$filterWard, $wardIds)) {
+            $query->where('ward_id', $filterWard);
+        }
+        if ($filterMissingGps) {
+            $query->where(fn($q) => $q->whereNull('gps_lat')->orWhereNull('gps_lng'));
+        }
+        if ($filterNoMembers) {
+            $query->whereDoesntHave('members');
+        }
+        if ($filterLowComplete) {
+            $query->where(fn($q) => $q
+                ->whereDoesntHave('housing')
+                ->orWhereDoesntHave('utilities')
+                ->orWhereNull('gps_lat')
+                ->orWhereNull('survey_date')
+                ->orWhereNull('respondent_name')
+            );
+        }
+
+        $households = $query->latest('submitted_at')
             ->paginate(20)
+            ->withQueryString()
             ->through(fn($hh) => [
-                'id'             => $hh->id,
-                'unique_code'    => $hh->unique_code,
-                'respondent_name'=> $hh->respondent_name,
-                'ward'           => $hh->ward ? ['ward_number' => $hh->ward->ward_number] : null,
-                'settlement'     => $hh->settlement ? ['name_np' => $hh->settlement->name_np] : null,
-                'enumerator'     => $hh->enumerator ? ['name' => $hh->enumerator->name] : null,
-                'submitted_at'   => $hh->submitted_at?->diffForHumans(),
-                'completeness'   => CompletenessScoreService::score($hh),
+                'id'              => $hh->id,
+                'unique_code'     => $hh->unique_code,
+                'respondent_name' => $hh->respondent_name,
+                'ward'            => $hh->ward ? ['ward_number' => $hh->ward->ward_number] : null,
+                'settlement'      => $hh->settlement ? ['name_np' => $hh->settlement->name_np] : null,
+                'enumerator'      => $hh->enumerator ? ['name' => $hh->enumerator->name] : null,
+                'submitted_at'    => $hh->submitted_at?->diffForHumans(),
+                'completeness'    => CompletenessScoreService::score($hh),
+                'flags'           => [
+                    'missing_gps' => !filled($hh->gps_lat) || !filled($hh->gps_lng),
+                    'no_members'  => $hh->members->isEmpty(),
+                ],
             ]);
 
-        return Inertia::render('Review/Households', compact('households'));
+        $wards = \App\Models\Ward::whereIn('id', $wardIds)
+            ->orderBy('ward_number')
+            ->get(['id', 'ward_number']);
+
+        $filters = [
+            'ward_id'          => $filterWard,
+            'missing_gps'      => $filterMissingGps,
+            'no_members'       => $filterNoMembers,
+            'low_completeness' => $filterLowComplete,
+        ];
+
+        return Inertia::render('Review/Households', compact('households', 'wards', 'filters', 'qualityCounts'));
     }
 
     public function institutions(Request $request)
     {
-        $wardIds = $this->scopedWardIds();
+        $wardIds    = $this->scopedWardIds();
+        $filterWard = $request->input('ward_id');
 
-        $institutions = Institution::with(['ward', 'settlement', 'institutionType', 'enumerator', 'infrastructure'])
+        $query = Institution::with(['ward', 'settlement', 'institutionType', 'enumerator', 'infrastructure'])
             ->whereIn('ward_id', $wardIds)
-            ->where('status', 'submitted')
-            ->latest('submitted_at')
+            ->where('status', 'submitted');
+
+        if ($filterWard && in_array((int)$filterWard, $wardIds)) {
+            $query->where('ward_id', $filterWard);
+        }
+
+        $institutions = $query->latest('submitted_at')
             ->paginate(20)
             ->through(fn($i) => [
                 'id'              => $i->id,
@@ -80,7 +147,10 @@ class ReviewController extends Controller
                 'completeness'    => CompletenessScoreService::institution($i),
             ]);
 
-        return Inertia::render('Review/Institutions', compact('institutions'));
+        $wards   = \App\Models\Ward::whereIn('id', $wardIds)->orderBy('ward_number')->get(['id', 'ward_number']);
+        $filters = ['ward_id' => $filterWard];
+
+        return Inertia::render('Review/Institutions', compact('institutions', 'wards', 'filters'));
     }
 
     public function approveHousehold(Request $request, Household $household)
@@ -160,12 +230,18 @@ class ReviewController extends Controller
 
     public function businesses(Request $request)
     {
-        $wardIds = $this->scopedWardIds();
+        $wardIds    = $this->scopedWardIds();
+        $filterWard = $request->input('ward_id');
 
-        $businesses = MemberBusiness::with(['member', 'household', 'ward', 'settlement', 'enumerator'])
+        $query = MemberBusiness::with(['member', 'household', 'ward', 'settlement', 'enumerator'])
             ->whereIn('ward_id', $wardIds)
-            ->where('status', 'submitted')
-            ->latest('submitted_at')
+            ->where('status', 'submitted');
+
+        if ($filterWard && in_array((int)$filterWard, $wardIds)) {
+            $query->where('ward_id', $filterWard);
+        }
+
+        $businesses = $query->latest('submitted_at')
             ->paginate(20)
             ->through(fn($b) => [
                 'id'            => $b->id,
@@ -185,7 +261,10 @@ class ReviewController extends Controller
                 'completeness'  => CompletenessScoreService::business($b),
             ]);
 
-        return Inertia::render('Review/Businesses', compact('businesses'));
+        $wards   = \App\Models\Ward::whereIn('id', $wardIds)->orderBy('ward_number')->get(['id', 'ward_number']);
+        $filters = ['ward_id' => $filterWard];
+
+        return Inertia::render('Review/Businesses', compact('businesses', 'wards', 'filters'));
     }
 
     public function approveBusiness(Request $request, MemberBusiness $business)
@@ -223,6 +302,86 @@ class ReviewController extends Controller
         } catch (\RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
+    }
+
+    public function bulkApproveInstitutions(Request $request)
+    {
+        $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer']);
+        $user    = auth()->user();
+        $wardIds = $this->scopedWardIds();
+
+        $count = 0; $skipped = 0;
+        foreach ($request->ids as $id) {
+            $inst = Institution::find($id);
+            if (!$inst || $inst->status !== 'submitted') { $skipped++; continue; }
+            if (!$user->isAdmin() && !in_array($inst->ward_id, $wardIds)) { $skipped++; continue; }
+            try { $this->workflow->wardApprove($inst, $user); $count++; }
+            catch (\Throwable) { $skipped++; }
+        }
+
+        return back()->with('success', "{$count} संस्था अनुमोदन भयो।" . ($skipped ? " ({$skipped} छोडियो)" : ''));
+    }
+
+    public function bulkRejectInstitutions(Request $request)
+    {
+        $request->validate([
+            'ids'    => 'required|array|min:1',
+            'ids.*'  => 'integer',
+            'reason' => 'required|string|max:500',
+        ]);
+        $user    = auth()->user();
+        $wardIds = $this->scopedWardIds();
+
+        $count = 0; $skipped = 0;
+        foreach ($request->ids as $id) {
+            $inst = Institution::find($id);
+            if (!$inst || $inst->status !== 'submitted') { $skipped++; continue; }
+            if (!$user->isAdmin() && !in_array($inst->ward_id, $wardIds)) { $skipped++; continue; }
+            try { $this->workflow->reject($inst, $user, $request->reason); $count++; }
+            catch (\Throwable) { $skipped++; }
+        }
+
+        return back()->with('success', "{$count} संस्था अस्वीकार भयो।" . ($skipped ? " ({$skipped} छोडियो)" : ''));
+    }
+
+    public function bulkApproveBusinesses(Request $request)
+    {
+        $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer']);
+        $user    = auth()->user();
+        $wardIds = $this->scopedWardIds();
+
+        $count = 0; $skipped = 0;
+        foreach ($request->ids as $id) {
+            $biz = MemberBusiness::find($id);
+            if (!$biz || $biz->status !== 'submitted') { $skipped++; continue; }
+            if (!$user->isAdmin() && !in_array($biz->ward_id, $wardIds)) { $skipped++; continue; }
+            try { $this->workflow->wardApprove($biz, $user); $count++; }
+            catch (\Throwable) { $skipped++; }
+        }
+
+        return back()->with('success', "{$count} व्यवसाय अनुमोदन भयो।" . ($skipped ? " ({$skipped} छोडियो)" : ''));
+    }
+
+    public function bulkRejectBusinesses(Request $request)
+    {
+        $request->validate([
+            'ids'    => 'required|array|min:1',
+            'ids.*'  => 'integer',
+            'reason' => 'required|string|max:500',
+        ]);
+        $user    = auth()->user();
+        $wardIds = $this->scopedWardIds();
+
+        $count = 0; $skipped = 0;
+        foreach ($request->ids as $id) {
+            $biz = MemberBusiness::find($id);
+            if (!$biz || $biz->status !== 'submitted') { $skipped++; continue; }
+            if (!$user->isAdmin() && !in_array($biz->ward_id, $wardIds)) { $skipped++; continue; }
+            try { $this->workflow->reject($biz, $user, $request->reason); $count++; }
+            catch (\Throwable) { $skipped++; }
+        }
+
+        return back()->with('success', "{$count} व्यवसाय अस्वीकार भयो।" . ($skipped ? " ({$skipped} छोडियो)" : ''));
     }
 
     private function authorizeWardAccess(int $wardId): void

@@ -64,7 +64,7 @@ $SkipNames = @(
     '.env',
     'tests',
     'phpunit.xml', 'phpunit.xml.dist', '.phpunit.result.cache',
-    'apprmp-deploy.zip',
+    'apprmp-deploy.zip', 'ajirkot-deploy.zip',
     '.install_lock',
     'Makefile',
     'vite.config.js', 'tailwind.config.js', 'postcss.config.js',
@@ -153,6 +153,13 @@ if (Test-Path $pubBuild) {
     Write-Host '    OK webroot/build/ copied' -ForegroundColor Green
 }
 
+# Copy .user.ini to webroot (PHP-FPM reads from document root, not app root)
+$userIniSrc = Join-Path $ProjectRoot '.user.ini'
+if (Test-Path $userIniSrc) {
+    Copy-Item $userIniSrc (Join-Path $webrootDir '.user.ini') -Force
+    Write-Host '    OK webroot/.user.ini copied' -ForegroundColor Green
+}
+
 # Copy individual public files
 $webrootFiles = @('.htaccess', 'sw.js', 'offline.html', 'manifest.webmanifest',
                   'pwa-192.png', 'pwa-512.png', 'robots.txt', 'favicon.ico')
@@ -188,8 +195,18 @@ if (Test-Path $installSrc) {
     Write-Host '    WARNING: public/install.php not found!' -ForegroundColor Red
 }
 
-# run.php is NOT auto-bundled — upload deploy\run.php to webroot manually when needed
-# and DELETE it immediately after use (token is in source; do not leave it on the server)
+# run.php — patch $root and copy to deploy/ as run-{target}.php (ready to upload manually)
+$runSrc = Join-Path $ProjectRoot 'deploy\run.php'
+if (Test-Path $runSrc) {
+    $runContent = Get-Content $runSrc -Raw -Encoding UTF8
+    $runContent  = $runContent -replace "\`$root\s*=\s*'[^']+'", "`$root    = '$($Cfg.LaravelRoot)'"
+    $runPatched  = Join-Path $ProjectRoot "deploy\run-$Target.php"
+    [System.IO.File]::WriteAllText($runPatched, $runContent, [System.Text.UTF8Encoding]::new($false))
+    Write-Host "    OK deploy\run-$Target.php patched (root=$($Cfg.LaravelRoot))" -ForegroundColor Green
+} else {
+    Write-Host '    WARNING: deploy\run.php not found - skipping run patch' -ForegroundColor DarkGray
+}
+# Upload deploy\run-{target}.php to webroot manually when needed, DELETE immediately after use
 
 Write-Host "    webroot/ bundle ready - upload its contents to $($Cfg.WebRoot)/" -ForegroundColor Green
 

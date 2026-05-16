@@ -46,6 +46,13 @@ class DashboardController extends Controller
                                               ->where('role', 'enumerator')
                                               ->where('is_active', true)
                                               ->count(),
+
+            'missing_gps_households'  => Household::whereIn('ward_id', $wardIds)
+                ->where(fn($q) => $q->whereNull('gps_lat')->orWhereNull('gps_lng'))
+                ->count(),
+            'no_member_households'    => Household::whereIn('ward_id', $wardIds)
+                ->whereDoesntHave('members')
+                ->count(),
         ];
 
         // ── Total Population (published households only) ────────────────

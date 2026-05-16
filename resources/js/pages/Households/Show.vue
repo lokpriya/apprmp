@@ -839,7 +839,8 @@ const photoUrlFallback = computed(() => {
 function label(category, value) {
   if (!value) return null
   const opts = props.surveyOptions[category] ?? []
-  const found = opts.find(o => o.value === value)
+  const lower = String(value).toLowerCase()
+  const found = opts.find(o => o.value === value || String(o.value).toLowerCase() === lower)
   return found ? found.label : value
 }
 

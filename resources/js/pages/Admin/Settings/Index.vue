@@ -594,7 +594,7 @@
                   <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ s.name_np }}</td>
                   <td class="px-4 py-3 text-sm text-gray-500 hidden sm:table-cell">{{ s.name_en }}</td>
                   <td class="px-4 py-3 hidden md:table-cell">
-                    <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">{{ s.settlement_type }}</span>
+                    <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">{{ { tole: 'टोल', gau: 'गाउँ', chowk: 'चोक', basti: 'बस्ती' }[s.settlement_type] ?? s.settlement_type }}</span>
                   </td>
                   <td class="px-4 py-3 text-right">
                     <div class="flex items-center justify-end gap-1">
@@ -729,11 +729,33 @@
               वडा सीमा Choropleth (GeoJSON)
             </h3>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div class="sm:col-span-2">
+              <div class="sm:col-span-2 space-y-2">
                 <label class="field-label">GeoJSON File URL</label>
                 <input v-model="mapForm.geojson_url" type="text" class="field-input"
                   placeholder="https://example.com/ward-boundaries.geojson" />
-                <p class="text-[11px] text-gray-400 mt-1">वडा सीमा GeoJSON फाइलको URL (GitHub Raw, CDN, आदि)</p>
+                <p class="text-[11px] text-gray-400">वडा सीमा GeoJSON फाइलको URL (GitHub Raw, CDN, आदि)</p>
+
+                <!-- Local file upload -->
+                <div class="flex items-center gap-2 pt-1">
+                  <label class="text-[11px] text-gray-500 font-medium shrink-0">वा फाइल अपलोड:</label>
+                  <label class="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 border border-dashed border-[#206bc4]
+                                rounded text-xs text-[#206bc4] hover:bg-blue-50 transition">
+                    <i class="fa-solid fa-upload text-[10px]"></i>
+                    {{ geojsonUploading ? 'अपलोड हुँदैछ…' : 'GeoJSON अपलोड' }}
+                    <input type="file" accept=".json,.geojson" class="hidden"
+                           :disabled="geojsonUploading"
+                           @change="uploadGeojson" />
+                  </label>
+                  <button v-if="mapForm.geojson_url && mapForm.geojson_url.includes('/storage/')"
+                          type="button" @click="deleteGeojson"
+                          class="text-xs text-red-500 hover:underline">
+                    <i class="fa-solid fa-trash text-[10px]"></i> हटाउनुहोस्
+                  </button>
+                  <span v-if="geojsonMsg" class="text-[11px]"
+                        :class="geojsonMsg.startsWith('✓') ? 'text-green-600' : 'text-red-500'">
+                    {{ geojsonMsg }}
+                  </span>
+                </div>
               </div>
               <div>
                 <label class="field-label">Ward Number Property</label>
@@ -3172,6 +3194,7 @@
 <script setup>
 import { ref, computed, watch, reactive, onMounted, onUnmounted } from 'vue'
 import { useForm, router, usePage } from '@inertiajs/vue3'
+import axios from 'axios'
 import NepaliDatePicker from '@/components/NepaliDatePicker.vue'
 
 const props = defineProps({
@@ -3388,6 +3411,39 @@ function addMarker() {
 function saveMap() {
   if (locked.value) return
   mapForm.patch('/admin/settings/map')
+}
+
+const geojsonUploading = ref(false)
+const geojsonMsg       = ref('')
+
+async function uploadGeojson(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  geojsonUploading.value = true
+  geojsonMsg.value = ''
+  const fd = new FormData()
+  fd.append('geojson', file)
+  try {
+    const res = await axios.post('/admin/settings/map-geojson', fd)
+    mapForm.geojson_url = res.data.url
+    geojsonMsg.value = '✓ अपलोड सफल'
+  } catch (err) {
+    geojsonMsg.value = err.response?.data?.error ?? 'अपलोड असफल'
+  } finally {
+    geojsonUploading.value = false
+    e.target.value = ''
+  }
+}
+
+async function deleteGeojson() {
+  if (!confirm('Ward boundary GeoJSON फाइल हटाउने?')) return
+  try {
+    await axios.delete('/admin/settings/map-geojson')
+    mapForm.geojson_url = ''
+    geojsonMsg.value = '✓ हटाइयो'
+  } catch {
+    geojsonMsg.value = 'हटाउन सकिएन'
+  }
 }
 
 // ── Photo directory form ───────────────────────────────────────────────────

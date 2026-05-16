@@ -87,6 +87,10 @@
           <table class="w-full text-sm">
             <thead class="bg-gray-50 border-b border-[#e6e7e9]">
               <tr>
+                <th class="px-4 py-3 w-8">
+                  <input type="checkbox" :checked="allPageSelected" :indeterminate="someSelected && !allPageSelected"
+                    @change="toggleSelectAll" class="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 cursor-pointer" />
+                </th>
                 <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">कोड</th>
                 <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">नाम</th>
                 <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">प्रकार</th>
@@ -103,7 +107,12 @@
                 v-for="inst in institutions.data"
                 :key="inst.id"
                 class="hover:bg-gray-50 transition-colors"
+                :class="selectedIds.has(inst.id) ? 'bg-teal-50/40' : ''"
               >
+                <td class="px-4 py-3">
+                  <input type="checkbox" :checked="selectedIds.has(inst.id)" @change="toggleSelect(inst.id)"
+                    class="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 cursor-pointer" />
+                </td>
                 <td class="px-4 py-3">
                   <span class="font-mono text-xs bg-teal-50 text-teal-700 px-2 py-1 rounded">{{ inst.unique_code }}</span>
                 </td>
@@ -122,7 +131,7 @@
                     वडा {{ inst.ward.ward_number }}
                   </span>
                 </td>
-                <td class="px-4 py-3 text-xs text-gray-500">{{ inst.ownership_type || '—' }}</td>
+                <td class="px-4 py-3 text-xs text-gray-500">{{ fieldLabel('inst_ownership_type', inst.ownership_type) }}</td>
                 <td class="px-4 py-3">
                   <span :class="['text-xs px-2.5 py-1 rounded-full font-medium', statusBadge(inst.status)]">
                     {{ statusLabel(inst.status) }}
@@ -226,12 +235,69 @@
         </div>
       </div>
 
+    <!-- Bulk toolbar -->
+    <Teleport to="body">
+      <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 translate-y-4" enter-to-class="opacity-100 translate-y-0"
+        leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 translate-y-4">
+        <div v-if="selectedIds.size > 0"
+          class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#1d273b] text-white rounded-xl shadow-2xl flex items-center gap-3 px-5 py-3 min-w-max">
+          <span class="flex items-center gap-1.5 text-sm font-semibold">
+            <span class="bg-white/15 rounded-lg px-2.5 py-1 text-xs font-bold">{{ selectedIds.size }}</span>
+            संस्था छानिएको
+          </span>
+          <div class="h-5 w-px bg-white/20"></div>
+          <button v-if="canBulkSubmit" @click="bulkSubmit" :disabled="bulkProcessing"
+            class="flex items-center gap-1.5 px-4 py-1.5 bg-blue-500 hover:bg-blue-400 disabled:opacity-50 rounded-lg text-sm font-semibold transition-colors">
+            <i class="fa-solid fa-paper-plane text-xs"></i>सबै पेस
+          </button>
+          <button v-if="canBulkApprove" @click="bulkApprove" :disabled="bulkProcessing"
+            class="flex items-center gap-1.5 px-4 py-1.5 bg-green-500 hover:bg-green-400 disabled:opacity-50 rounded-lg text-sm font-semibold transition-colors">
+            <i class="fa-solid fa-check-double text-xs"></i>सबै अनुमोदन
+          </button>
+          <button @click="openRejectModal" :disabled="bulkProcessing"
+            class="flex items-center gap-1.5 px-4 py-1.5 bg-red-500 hover:bg-red-400 disabled:opacity-50 rounded-lg text-sm font-semibold transition-colors">
+            <i class="fa-solid fa-xmark text-xs"></i>सबै अस्वीकृत
+          </button>
+          <button @click="clearSelection" class="flex items-center gap-1 px-2 py-1.5 text-white/60 hover:text-white transition-colors text-xs">
+            <i class="fa-solid fa-xmark"></i>हटाउनुहोस्
+          </button>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Bulk Reject Modal -->
+    <Teleport to="body">
+      <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0" enter-to-class="opacity-100"
+        leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0">
+        <div v-if="rejectModalOpen" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" @click.self="rejectModalOpen = false">
+          <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" @click.stop>
+            <div class="px-5 py-4 border-b border-[#e6e7e9] flex items-center justify-between">
+              <h3 class="text-sm font-bold text-gray-900"><i class="fa-solid fa-xmark text-red-500 mr-1.5"></i>{{ selectedIds.size }} संस्था अस्वीकृत</h3>
+              <button @click="rejectModalOpen = false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="px-5 py-4">
+              <textarea v-model="rejectReason" rows="3" placeholder="अस्वीकृतिको कारण लेख्नुहोस्..."
+                class="w-full rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-red-400 resize-none"></textarea>
+            </div>
+            <div class="px-5 py-4 border-t border-[#e6e7e9] flex items-center justify-end gap-2">
+              <button @click="rejectModalOpen = false" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">रद्द गर्नुहोस्</button>
+              <button @click="confirmBulkReject" :disabled="!rejectReason.trim() || bulkProcessing"
+                class="px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50">
+                <i class="fa-solid fa-xmark mr-1"></i>{{ selectedIds.size }} वटा अस्वीकृत
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
+import { fieldLabel } from '@/utils/fieldLabels'
 
 const page = usePage()
 const surveyFrozen = computed(() => page.props.surveyFrozen && page.props.auth?.user?.role === 'enumerator')
@@ -358,6 +424,53 @@ function submitInstitution(id) {
   submitting.value = id
   router.post(`/institutions/${id}/submit`, {}, {
     onFinish: () => { submitting.value = null },
+  })
+}
+
+// ── Bulk selection ───────────────────────────────────────────────────────────
+const selectedIds     = ref(new Set())
+const bulkProcessing  = ref(false)
+const rejectModalOpen = ref(false)
+const rejectReason    = ref('')
+
+const pageIds         = computed(() => (props.institutions.data ?? []).map(i => i.id))
+const allPageSelected = computed(() => pageIds.value.length > 0 && pageIds.value.every(id => selectedIds.value.has(id)))
+const someSelected    = computed(() => pageIds.value.some(id => selectedIds.value.has(id)))
+const canBulkSubmit   = computed(() => (props.institutions.data ?? []).some(i => selectedIds.value.has(i.id) && i.can_submit))
+const canBulkApprove  = computed(() => (props.institutions.data ?? []).some(i => selectedIds.value.has(i.id) && i.status === 'submitted'))
+
+function toggleSelect(id) {
+  const s = new Set(selectedIds.value); s.has(id) ? s.delete(id) : s.add(id); selectedIds.value = s
+}
+function toggleSelectAll() {
+  if (allPageSelected.value) {
+    const s = new Set(selectedIds.value); pageIds.value.forEach(id => s.delete(id)); selectedIds.value = s
+  } else {
+    const s = new Set(selectedIds.value); pageIds.value.forEach(id => s.add(id)); selectedIds.value = s
+  }
+}
+function clearSelection() { selectedIds.value = new Set() }
+
+function bulkSubmit() {
+  if (!confirm(`${selectedIds.value.size} संस्था पेस गर्ने?`)) return
+  bulkProcessing.value = true
+  router.post('/institutions/bulk-submit', { ids: [...selectedIds.value] }, {
+    onFinish: () => { bulkProcessing.value = false; clearSelection() },
+  })
+}
+function bulkApprove() {
+  if (!confirm(`${selectedIds.value.size} संस्था अनुमोदन गर्ने?`)) return
+  bulkProcessing.value = true
+  router.post('/institutions/bulk-approve', { ids: [...selectedIds.value] }, {
+    onFinish: () => { bulkProcessing.value = false; clearSelection() },
+  })
+}
+function openRejectModal() { rejectReason.value = ''; rejectModalOpen.value = true }
+function confirmBulkReject() {
+  if (!rejectReason.value.trim()) return
+  bulkProcessing.value = true
+  router.post('/institutions/bulk-reject', { ids: [...selectedIds.value], reason: rejectReason.value }, {
+    onFinish: () => { bulkProcessing.value = false; rejectModalOpen.value = false; clearSelection() },
   })
 }
 </script>

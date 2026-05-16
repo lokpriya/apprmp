@@ -97,14 +97,14 @@ class HouseholdsTemplateSheet implements FromArray, WithTitle, WithStyles, Shoul
     protected function headerColor(): string { return 'FF1E40AF'; }
     protected function lightColor(): string  { return 'FFEFF6FF'; }
     protected function sampleColor(): string { return 'FFDBEAFE'; }
-    protected function lastCol(): string     { return 'O'; }
+    protected function lastCol(): string     { return 'M'; }
 
     public function array(): array
     {
         return [
             ['household_code','ward_number','settlement_name','respondent_name','respondent_contact',
              'total_members','gps_lat','gps_lng','gps_altitude','gps_accuracy',
-             'family_head','head_gender','family_type','survey_date','photo_number'],
+             'survey_date','photo_number','remarks'],
             ['Auto-generated if blank (e.g. HH-W01-00001)',
              'Ward number (1–9, must exist)',
              'Settlement/Tole (optional)',
@@ -113,14 +113,12 @@ class HouseholdsTemplateSheet implements FromArray, WithTitle, WithStyles, Shoul
              'Total family members',
              'GPS Latitude (e.g. 27.7172)','GPS Longitude (e.g. 85.3240)',
              'GPS Altitude metres (opt)','GPS Accuracy metres (opt)',
-             'Full name of household head',
-             'male / female / other',
-             'nuclear / joint / single / other  ← See Valid Values',
              'YYYY-MM-DD',
-             'Photo file name without extension (e.g. 00247)'],
+             'Photo file name without extension (e.g. 00247)',
+             'Optional remarks'],
             ['','1','Kalyanpur Tole','Ram Bahadur Shrestha','9841000001',
              '5','27.7172','85.3240','1350','5',
-             'Ram Bahadur Shrestha','male','nuclear',date('Y-m-d'),'00247'],
+             date('Y-m-d'),'00247',''],
         ];
     }
 }
@@ -136,48 +134,92 @@ class MembersTemplateSheet implements FromArray, WithTitle, WithStyles, ShouldAu
     protected function headerColor(): string { return 'FF065F46'; }
     protected function lightColor(): string  { return 'FFECFDF5'; }
     protected function sampleColor(): string { return 'FFD1FAE5'; }
-    protected function lastCol(): string     { return 'Z'; }
+    protected function lastCol(): string     { return 'AP'; }
 
     public function array(): array
     {
         $g = $this->grouped;
         return [
-            ['household_code','is_household_head','full_name','relation_to_head',
+            // ── Identity ──────────────────────────────────────────────────────
+            ['household_code','is_household_head','full_name','father_name','relation_to_head',
              'date_of_birth','age','gender','ethnicity','religion','mother_tongue',
-             'marital_status','education_level','is_literate','occupation_type',
-             'employment_status','disability_status','disability_type','blood_group',
+             // ── Marital ───────────────────────────────────────────────────────
+             'marital_status','ageofmarriage',
+             // ── Education & Occupation ────────────────────────────────────────
+             'education_level','is_literate',
+             'occupation_type','vocational_training','vt_subject','employment_status',
+             // ── Disability & Health ───────────────────────────────────────────
+             'disability_status','disability_type',
+             'chronic_illness','chronic_illness_types',
+             'child_labor','workplace_child_labor',
+             // ── Blood & Documents ─────────────────────────────────────────────
+             'blood_group',
              'has_birth_certificate','has_citizenship','has_voters_card',
-             'has_national_id_card','has_passport','residence_status',
-             'contact_phone','remarks'],
+             'has_national_id_card','has_passport','has_pan',
+             'has_drivers_license','drivers_license_category',
+             // ── Location & Contact ────────────────────────────────────────────
+             'residence_status','addrslocation',
+             'contact_phone','national_id',
+             // ── Social & Deceased ─────────────────────────────────────────────
+             'social_security_allowance',
+             'is_deceased','death_cause',
+             'remarks'],
+            // ── Hints row (row 2) ─────────────────────────────────────────────
             ['Match Households sheet',
              '1=yes, 0=no (one per household)',
-             'Full name',
+             'Full name — पूरा नाम',
+             'Father/husband name — बुबा/श्रीमानको नाम',
              hhOptHint($g,'relation_to_head','self / wife / husband / son / daughter / other'),
              'YYYY-MM-DD (or blank)',
              'Age in years',
              'male / female / other',
              hhOptHint($g,'ethnicity','brahmin / chhetri / magar / tamang / newar / other'),
              hhOptHint($g,'religion','hindu / buddhist / muslim / christian / kirant / other'),
-             hhOptHint($g,'mother_tongue','nepali / newari / tamang / maithili / tharu / other'),
+             hhOptHint($g,'language','nepali / newari / tamang / maithili / tharu / other'),
              hhOptHint($g,'marital_status','unmarried / married / divorced / widowed / separated'),
+             'Age at marriage (blank if unmarried)',
              hhOptHint($g,'education_level','illiterate / primary / slc / higher_secondary / bachelors / masters / other'),
              '1=yes, 0=no',
              hhOptHint($g,'occupation_type','agriculture / business / service_govt / service_private / student / homemaker / other'),
+             '1=yes, 0=no — सीप तालिम छ?',
+             hhOptHint($g,'vocational_training_subject','driving / tailoring / computer / mason / other (blank if none)'),
              hhOptHint($g,'employment_status','employed / unemployed / student / homemaker / retired'),
              '1=yes, 0=no',
              hhOptHint($g,'disability_type','physical / visual / hearing / speech / intellectual / mental / other'),
+             '1=yes, 0=no — दीर्घरोग छ?',
+             hhOptHint($g,'chronic_illness','diabetes / hypertension / heart / kidney / cancer / mental / other (comma-separated)'),
+             '1=yes, 0=no — बाल श्रम',
+             'Workplace if child_labor=1 (blank otherwise)',
              'A+ / A- / B+ / B- / O+ / O- / AB+ / AB-',
              '1=yes, 0=no','1=yes, 0=no','1=yes, 0=no','1=yes, 0=no','1=yes, 0=no',
+             '1=yes, 0=no — PAN card',
+             '1=yes, 0=no — सवारी चालक अनुमतिपत्र',
+             hhOptHint($g,'drivers_license_category','A / B / C / D (comma-separated, blank if none)'),
              hhOptHint($g,'residence_status','permanent / temporary / absent'),
-             'Phone (optional)','Optional remarks'],
-            ['HH-W01-00001','1','Ram Bahadur Shrestha','self',
+             'Current address / तोले ठेगाना (optional)',
+             'Phone (optional — stored encrypted)',
+             'National ID number (optional — stored encrypted)',
+             '1=yes, 0=no — सामाजिक सुरक्षा भत्ता',
+             '1=yes, 0=no — मृत्यु भएको?',
+             hhOptHint($g,'death_cause','accident / illness / old_age / maternal / suicide / other (blank if alive)'),
+             'Optional remarks'],
+            // ── Sample rows ───────────────────────────────────────────────────
+            ['HH-W01-00001','1','Ram Bahadur Shrestha','Hari Bahadur Shrestha','self',
              '1975-06-15','49','male','chhetri','hindu','nepali',
-             'married','slc','1','agriculture','employed',
-             '0','','B+','1','1','1','0','0','permanent','9841000001',''],
-            ['HH-W01-00001','0','Sita Shrestha','wife',
+             'married','20','slc','1',
+             'agriculture','0','','employed',
+             '0','','0','','0','',
+             'B+','1','1','1','0','0','0','0','',
+             'permanent','Kalyanpur Tole','9841000001','',
+             '0','0','',''],
+            ['HH-W01-00001','0','Sita Shrestha','Ram Bahadur Shrestha','wife',
              '1980-03-22','44','female','chhetri','hindu','nepali',
-             'married','slc','1','homemaker','homemaker',
-             '0','','O+','1','1','1','0','0','permanent','',''],
+             'married','18','slc','1',
+             'homemaker','0','','homemaker',
+             '0','','0','','0','',
+             'O+','1','1','1','0','0','0','0','',
+             'permanent','','','',
+             '0','0','',''],
         ];
     }
 }
@@ -193,7 +235,7 @@ class HousingTemplateSheet implements FromArray, WithTitle, WithStyles, ShouldAu
     protected function headerColor(): string { return 'FF7C3AED'; }
     protected function lightColor(): string  { return 'FFF5F3FF'; }
     protected function sampleColor(): string { return 'FFEDE9FE'; }
-    protected function lastCol(): string     { return 'Q'; }
+    protected function lastCol(): string     { return 'U'; }
 
     public function array(): array
     {
@@ -202,7 +244,9 @@ class HousingTemplateSheet implements FromArray, WithTitle, WithStyles, ShouldAu
             ['household_code','house_type','roof_type','wall_type','foundation_type',
              'ownership_type','rent_amount','total_rooms','total_floors','construction_year',
              'house_condition','has_building_permit','is_at_risk','risk_types',
-             'land_measurement_unit','house_land_type','has_land_in_municipality'],
+             'land_measurement_unit','house_land_type',
+             'house_purpose','location_house_built','distance_to_mainroad','distance_to_school',
+             'has_land_in_municipality'],
             ['Match Households sheet',
              hhOptHint($g,'house_type','rcc_building / wooden / mud_house / temporary / other'),
              hhOptHint($g,'roof_type','rcc / tin / slate / thatch / other'),
@@ -214,11 +258,15 @@ class HousingTemplateSheet implements FromArray, WithTitle, WithStyles, ShouldAu
              hhOptHint($g,'house_condition','good / average / poor / damaged'),
              '1=yes, 0=no','1=yes, 0=no',
              'flood,landslide,fire (comma-separated or blank)',
-             hhOptHint($g,'land_unit','ropani / ana / bigha / kattha / dhur / sq_meter / hectare / acre'),
+             hhOptHint($g,'land_measurement_unit','ropani / ana / bigha / kattha / dhur / sq_meter / hectare / acre'),
              hhOptHint($g,'house_land_type','registered / unregistered / leased / guthi / other'),
+             hhOptHint($g,'house_purpose','residential / commercial / mixed / other'),
+             'rural / urban / roadside / hillside / riverside (optional)',
+             'Minutes to main road (optional)','Minutes to nearest school (optional)',
              '1=yes / 0=no — पालिकामा जग्गा छ? (see LandParcels sheet for details)'],
             ['HH-W01-00001','rcc_building','rcc','brick_cement','rcc',
-             'owned','','4','2','2010','good','1','0','','ropani','registered','1'],
+             'owned','','4','2','2010','good','1','0','','ropani','registered',
+             'residential','rural','15','10','1'],
         ];
     }
 }
@@ -246,16 +294,16 @@ class UtilitiesTemplateSheet implements FromArray, WithTitle, WithStyles, Should
              'handwashing',
              'vehicles_bike','vehicles_car','vehicles_tempo','vehicles_tractor','vehicles_other','has_own_vehicle'],
             ['Match Households sheet',
-             hhOptHint($g,'water_source','tap_water / tube_well / river / spring / well / rainwater / other'),
+             hhOptHint($g,'water_source','tap_inside / tap_outside / tube_well / river / well / rain / jar_water / other'),
              'Walking minutes to water source (0 = at home)',
              '1=yes, 0=no',
-             hhOptHint($g,'toilet_type','flush / pit / open_field / none'),
-             hhOptHint($g,'sanitation_type','sewer / septic / open / other'),
-             hhOptHint($g,'electricity_source','grid / solar / generator / none / other'),
+             hhOptHint($g,'toilet_type','flush / pit / eco_san / other'),
+             hhOptHint($g,'sanitation_type','flush_piped / flush_septic / simple_pit / improved_pit / open / other'),
+             hhOptHint($g,'electricity_source','national_grid / solar / generator / micro_hydro / biogas / none'),
              'Monthly kWh',
-             hhOptHint($g,'cooking_fuel','lpg / firewood / kerosene / biogas / electric / other'),
+             hhOptHint($g,'cooking_fuel','lpg / biogas / firewood / kerosene / electricity / improved_cook / other'),
              '1=yes, 0=no',
-             hhOptHint($g,'solid_waste_management','municipal / compost / burning / dumping / other'),
+             hhOptHint($g,'waste_management','municipal / compost / burning / dumping / other'),
              '1=yes, 0=no',
              hhOptHint($g,'internet_type','broadband / mobile_data / fiber / none'),
              hhOptHint($g,'handwashing','soap_water / ash / water_only / none'),
@@ -280,7 +328,7 @@ class EconomicTemplateSheet implements FromArray, WithTitle, WithStyles, ShouldA
     protected function headerColor(): string { return 'FFB45309'; }
     protected function lightColor(): string  { return 'FFFEFCE8'; }
     protected function sampleColor(): string { return 'FFFEF9C3'; }
-    protected function lastCol(): string     { return 'S'; }
+    protected function lastCol(): string     { return 'R'; }
 
     public function array(): array
     {
@@ -288,24 +336,24 @@ class EconomicTemplateSheet implements FromArray, WithTitle, WithStyles, ShouldA
         return [
             ['household_code','primary_income_source','annual_income_range','annual_expenditure_range',
              'remittance_amount','loan_sources','total_loan_amount','has_bank_account','has_insurance',
-             'poverty_card','social_security_allowance',
+             'poverty_card',
              'decision_household_work','decision_property','decision_consumer_committee',
              'decision_school_mgmt','decision_business','decision_bank_account',
              'has_foreign_employment','foreign_employment_country'],
             ['Match Households sheet',
-             hhOptHint($g,'primary_income_source','agriculture / livestock / business / service / remittance / daily_wage / pension / other'),
+             hhOptHint($g,'income_source','agriculture / livestock / business / service / remittance / daily_wage / pension / other'),
              hhOptHint($g,'annual_income_range','below_50000 / 50000_100000 / 100000_200000 / 200000_500000 / above_500000'),
              hhOptHint($g,'annual_expenditure_range','below_50000 / 50000_100000 / 100000_200000 / 200000_500000 / above_500000'),
              'Annual remittance NPR (0 if none)',
              'bank,cooperative,moneylender (comma-separated)',
              'Total loan NPR',
-             '1=yes, 0=no','1=yes, 0=no','1=yes, 0=no (poverty card)','1=yes, 0=no',
+             '1=yes, 0=no','1=yes, 0=no','1=yes, 0=no (गरिबी परिचयपत्र)',
              'Male / Female / Both / Other','Male / Female / Both / Other',
              'Male / Female / Both / Other','Male / Female / Both / Other',
              'Male / Female / Both / Other','Male / Female / Both / Other (blank if no bank)',
              '1=yes, 0=no','Country name (blank if none)'],
             ['HH-W01-00001','agriculture','100000_200000','80000_150000',
-             '0','','0','1','0','0','0',
+             '0','','0','1','0','0',
              'Both','Male','Female','Female','Male','Both','0',''],
         ];
     }
@@ -322,7 +370,7 @@ class AgricultureTemplateSheet implements FromArray, WithTitle, WithStyles, Shou
     protected function headerColor(): string { return 'FF166534'; }
     protected function lightColor(): string  { return 'FFF0FDF4'; }
     protected function sampleColor(): string { return 'FFBBF7D0'; }
-    protected function lastCol(): string     { return 'J'; }
+    protected function lastCol(): string     { return 'O'; }
 
     public function array(): array
     {
@@ -330,17 +378,28 @@ class AgricultureTemplateSheet implements FromArray, WithTitle, WithStyles, Shou
         return [
             // Column names match HouseholdAgriculture $fillable exactly
             ['household_code','agriculture','owns_land','land_area_ropani','irrigated_area_ropani',
-             'agri_categories','use_of_chem_fertilizer','farm_challenges','annual_agri_income'],
+             'agri_categories',
+             'use_of_chem_fertilizer','chem_fertilizer_types','chem_fertilizer_kg','fertilizer_sources',
+             'use_of_chem_pesticide','chem_pesticide_types','chem_pesticide_cost',
+             'farm_challenges','annual_agri_income'],
             ['Match Households sheet',
              '1=yes (practices agriculture), 0=no',
              '1=yes (owns land), 0=no',
              'Total land area in ropani',
              'Irrigated area in ropani',
-             hhOptHint($g, 'crop_type', 'food_crops / pulses / oil_crops / vegetables / cash_crops / fruits (comma-separated)'),
-             '1=yes, 0=no',
+             hhOptHint($g, 'agri_category', 'food_crops / pulses / oil_seeds / vegetables / cash_crops / fruits / other_crops (comma-separated)'),
+             '1=yes, 0=no — रासायनिक मल प्रयोग',
+             hhOptHint($g, 'chem_fertilizer', 'urea / dap / potash / nano_urea / other (comma-separated)'),
+             'Fertilizer quantity kg/year',
+             hhOptHint($g, 'fertilizer_source', 'small_farmers / private_agro / cooperative / salt_trading / other (comma-separated)'),
+             '1=yes, 0=no — रासायनिक विषादी प्रयोग',
+             hhOptHint($g, 'chem_pesticide', 'malathion / chlorpyrifos / glyphosate / mancozeb / atrazine (comma-separated)'),
+             'Pesticide cost NPR/year',
              hhOptHint($g, 'farm_challenge', 'drought / flood / pest / disease / market / labour / credit / other (comma-separated)'),
-             'Annual income NPR'],
-            ['HH-W01-00001','1','1','4.5','2.0','food_crops,vegetables','1','drought,market','85000'],
+             'Annual agri income NPR'],
+            ['HH-W01-00001','1','1','4.5','2.0','food_crops,vegetables',
+             '1','urea,dap','50','cooperative',
+             '0','','','drought,market','85000'],
         ];
     }
 }
@@ -367,7 +426,7 @@ class LivestockTemplateSheet implements FromArray, WithTitle, WithStyles, Should
              'has_beekeeping','mudhe_hive','modern_hive','honey_prod_mudhe','honey_prod_modern','honey_sales',
              'has_fishery','pond_area','fish_prod','fish_sales'],
             ['Match Households sheet (one row per type)',
-             hhOptHint($g,'livestock_type','cow / buffalo / goat / sheep / pig / poultry / yak / other'),
+             hhOptHint($g,'livestock_kind','cow / buffalo / goat / sheep / pig / poultry / yak / other'),
              'Number of animals','1=yes, 0=no','1=yes, 0=no',
              '1=yes, 0=no (once per HH)','Traditional hive count','Modern hive count',
              'Honey kg/year (mudhe)','Honey kg/year (modern)','Honey sold kg/year',
@@ -417,21 +476,23 @@ class HhDynamicValidValuesSheet implements FromArray, WithTitle, WithStyles, Sho
 
     // Ordered sections mapping sheet usage → category keys
     private const SECTIONS = [
-        'Member Fields'        => ['relation_to_head','ethnicity','religion','mother_tongue',
+        'Member Fields'        => ['relation_to_head','ethnicity','religion','language',
                                    'marital_status','education_level','education_status',
                                    'occupation_type','employment_status','disability_type',
                                    'disability_card_color','residence_status',
-                                   'chronic_illness_type','family_type','settlement_type'],
+                                   'chronic_illness','settlement_type'],
         'Housing Fields'       => ['house_type','roof_type','wall_type','foundation_type',
                                    'ownership_type','house_condition','house_land_type',
-                                   'house_purpose','risk_types'],
-        'Land & Agriculture'   => ['land_unit','land_use_type','crop_type','irrigation_source','farm_challenge'],
+                                   'house_purpose','location_house_built'],
+        'Land & Agriculture'   => ['land_measurement_unit','land_use_type','agri_category',
+                                   'irrigation_source','farm_challenge',
+                                   'chem_fertilizer','fertilizer_source','chem_pesticide'],
         'Utilities & Energy'   => ['water_source','toilet_type','sanitation_type',
                                    'electricity_source','cooking_fuel',
-                                   'solid_waste_management','internet_type','handwashing'],
-        'Economic & Income'    => ['primary_income_source','annual_income_range',
-                                   'annual_expenditure_range','loan_source'],
-        'Livestock & Farming'  => ['livestock_type'],
+                                   'waste_management','internet_type','handwashing'],
+        'Economic & Income'    => ['income_source','loan_source','expense_category'],
+        'Livestock & Farming'  => ['livestock_kind','livestock_breed','livestock_rearing_method',
+                                   'livestock_product','livestock_product_unit'],
     ];
 
     public function array(): array
@@ -451,8 +512,6 @@ class HhDynamicValidValuesSheet implements FromArray, WithTitle, WithStyles, Sho
         $rows[] = ['━━ STATIC FIELDS ━━', '', '', ''];
         $rows[] = ['gender',       'male / female / other',                                   'पुरुष / महिला / अन्य',  ''];
         $rows[] = ['blood_group',  'A+ / A- / B+ / B- / O+ / O- / AB+ / AB-',                '',                      ''];
-        $rows[] = ['head_gender',  'male / female / other',                                   '',                      ''];
-        $rows[] = ['family_type',  'nuclear / joint / single / other',                        '',                      'If not in options below'];
         $rows[] = ['Boolean 1/0',  '1 = Yes / True  ·  0 = No / False',                      '',                      'For all has_*, is_* columns'];
         $rows[] = ['Date format',  'YYYY-MM-DD  (e.g. ' . date('Y-m-d') . ')',               '',                      'English calendar AD'];
         $rows[] = ['household_code','Leave blank for auto-generation',                         '',                      'Format: HH-W01-00001'];

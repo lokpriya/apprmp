@@ -48,7 +48,7 @@ class MembersSheet implements ToCollection, WithChunkReading, WithHeadingRow, Wi
                             'relation_to_head'  => trim($row['relation_to_head']  ?? ''),
                             'ethnicity'         => trim($row['ethnicity']         ?? ''),
                             'religion'          => trim($row['religion']          ?? ''),
-                            'mother_tongue'     => trim($row['mother_tongue']     ?? ''),
+                            'language'          => trim($row['mother_tongue']     ?? ''),
                             'marital_status'    => trim($row['marital_status']    ?? ''),
                             'education_level'   => trim($row['education_level']   ?? ''),
                             'occupation_type'   => trim($row['occupation_type']   ?? ''),
@@ -64,33 +64,56 @@ class MembersSheet implements ToCollection, WithChunkReading, WithHeadingRow, Wi
                     }
 
                     HouseholdMember::create([
-                        'household_id'        => $householdId,
-                        'is_household_head'   => $this->bool($row['is_household_head'] ?? 0),
-                        'full_name'           => trim($row['full_name'] ?? ''),
-                        'relation_to_head'    => trim($row['relation_to_head'] ?? '') ?: null,
-                        'date_of_birth'       => $this->parseDate($row['date_of_birth'] ?? null),
-                        'age'                 => is_numeric($row['age'] ?? '') ? (int)$row['age'] : null,
-                        'gender'              => trim($row['gender'] ?? '') ?: null,
-                        'ethnicity'           => trim($row['ethnicity'] ?? '') ?: null,
-                        'religion'            => trim($row['religion'] ?? '') ?: null,
-                        'mother_tongue'       => trim($row['mother_tongue'] ?? '') ?: null,
-                        'marital_status'      => trim($row['marital_status'] ?? '') ?: null,
-                        'education_level'     => trim($row['education_level'] ?? '') ?: null,
-                        'is_literate'         => $this->bool($row['is_literate'] ?? 0),
-                        'occupation_type'     => trim($row['occupation_type'] ?? '') ?: null,
-                        'employment_status'   => trim($row['employment_status'] ?? '') ?: null,
-                        'disability_status'   => $this->bool($row['disability_status'] ?? 0),
-                        'disability_type'     => trim($row['disability_type'] ?? '') ?: null,
-                        'blood_group'         => trim($row['blood_group'] ?? '') ?: null,
-                        'has_birth_certificate' => $this->bool($row['has_birth_certificate'] ?? 0),
-                        'has_citizenship'     => $this->bool($row['has_citizenship'] ?? 0),
-                        'has_voters_card'     => $this->bool($row['has_voters_card'] ?? 0),
-                        'has_national_id_card'=> $this->bool($row['has_national_id_card'] ?? 0),
-                        'has_passport'        => $this->bool($row['has_passport'] ?? 0),
-                        'residence_status'    => trim($row['residence_status'] ?? '') ?: null,
-                        'contact_phone'       => trim($row['contact_phone'] ?? '') ?: null,
-                        'remarks'             => trim($row['remarks'] ?? '') ?: null,
-                        'sort_order'          => $sortCounters[$householdId],
+                        // ── Identity ─────────────────────────────────────────
+                        'household_id'           => $householdId,
+                        'is_household_head'      => $this->bool($row['is_household_head'] ?? 0),
+                        'full_name'              => trim($row['full_name'] ?? ''),
+                        'father_name'            => trim($row['father_name'] ?? '') ?: null,
+                        'relation_to_head'       => trim($row['relation_to_head'] ?? '') ?: null,
+                        'date_of_birth'          => $this->parseDate($row['date_of_birth'] ?? null),
+                        'age'                    => is_numeric($row['age'] ?? '') ? (int)$row['age'] : null,
+                        'gender'                 => trim($row['gender'] ?? '') ?: null,
+                        'ethnicity'              => trim($row['ethnicity'] ?? '') ?: null,
+                        'religion'               => trim($row['religion'] ?? '') ?: null,
+                        'mother_tongue'          => trim($row['mother_tongue'] ?? '') ?: null,
+                        // ── Marital ───────────────────────────────────────────
+                        'marital_status'         => trim($row['marital_status'] ?? '') ?: null,
+                        'ageofmarriage'          => is_numeric($row['ageofmarriage'] ?? '') ? (int)$row['ageofmarriage'] : null,
+                        // ── Education & Occupation ────────────────────────────
+                        'education_level'        => trim($row['education_level'] ?? '') ?: null,
+                        'is_literate'            => $this->bool($row['is_literate'] ?? 0),
+                        'occupation_type'        => trim($row['occupation_type'] ?? '') ?: null,
+                        'vocational_training'    => $this->bool($row['vocational_training'] ?? 0),
+                        'vt_subject'             => trim($row['vt_subject'] ?? '') ?: null,
+                        'employment_status'      => trim($row['employment_status'] ?? '') ?: null,
+                        // ── Disability & Health ───────────────────────────────
+                        'disability_status'      => $this->bool($row['disability_status'] ?? 0),
+                        'disability_type'        => trim($row['disability_type'] ?? '') ?: null,
+                        'chronic_illness'        => $this->bool($row['chronic_illness'] ?? 0),
+                        'chronic_illness_types'  => $this->parseArray($row['chronic_illness_types'] ?? null) ?: null,
+                        'child_labor'            => $this->bool($row['child_labor'] ?? 0),
+                        'workplace_child_labor'  => trim($row['workplace_child_labor'] ?? '') ?: null,
+                        // ── Blood & Documents ─────────────────────────────────
+                        'blood_group'            => trim($row['blood_group'] ?? '') ?: null,
+                        'has_birth_certificate'  => $this->bool($row['has_birth_certificate'] ?? 0),
+                        'has_citizenship'        => $this->bool($row['has_citizenship'] ?? 0),
+                        'has_voters_card'        => $this->bool($row['has_voters_card'] ?? 0),
+                        'has_national_id_card'   => $this->bool($row['has_national_id_card'] ?? 0),
+                        'has_passport'           => $this->bool($row['has_passport'] ?? 0),
+                        'has_pan'                => $this->bool($row['has_pan'] ?? 0),
+                        'has_drivers_license'    => $this->bool($row['has_drivers_license'] ?? 0),
+                        'drivers_license_category' => $this->parseArray($row['drivers_license_category'] ?? null) ?: null,
+                        // ── Location & Contact ────────────────────────────────
+                        'residence_status'       => trim($row['residence_status'] ?? '') ?: null,
+                        'addrslocation'          => trim($row['addrslocation'] ?? '') ?: null,
+                        'contact_phone'          => trim($row['contact_phone'] ?? '') ?: null,
+                        'national_id'            => trim($row['national_id'] ?? '') ?: null,
+                        // ── Social & Deceased ─────────────────────────────────
+                        'ss_allowance'           => $this->bool($row['social_security_allowance'] ?? 0),
+                        'is_deceased'            => $this->bool($row['is_deceased'] ?? 0),
+                        'death_cause'            => trim($row['death_cause'] ?? '') ?: null,
+                        'remarks'                => trim($row['remarks'] ?? '') ?: null,
+                        'sort_order'             => $sortCounters[$householdId],
                     ]);
                     $this->imported++;
                 } catch (\Throwable $e) {
@@ -103,6 +126,12 @@ class MembersSheet implements ToCollection, WithChunkReading, WithHeadingRow, Wi
     private function bool(mixed $val): bool
     {
         return in_array(strtolower((string)$val), ['1', 'yes', 'true', 'y'], true);
+    }
+
+    private function parseArray(mixed $val): array
+    {
+        if (!$val) return [];
+        return array_values(array_filter(array_map('trim', explode(',', (string)$val))));
     }
 
     private function parseDate(mixed $val): ?string

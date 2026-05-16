@@ -5,7 +5,7 @@ if (($_GET['token'] ?? '') !== 'deploy2026secret') {
     die('forbidden');
 }
 
-$root    = '/home2/prayasne/apprmp';
+$root    = '/home2/prayasne/apprmp';   // patched by build-zip.ps1 per target
 $webRoot = __DIR__;
 
 // ── Auto-detect PHP 8.2+ binary ───────────────────────────────────────────────

@@ -86,6 +86,7 @@ class UtilitiesSheet implements ToCollection, WithChunkReading, WithHeadingRow, 
                             'solid_waste_management'    => trim($row['solid_waste_management'] ?? '') ?: null,
                             'has_internet'              => $this->bool($row['has_internet'] ?? 0),
                             'internet_type'             => trim($row['internet_type'] ?? '') ?: null,
+                            'handwashing'               => trim($row['handwashing'] ?? '') ?: null,
                             'vehicle'                   => $hasVehicle ? 'Yes' : 'No',
                             'vehicles'                  => $vehiclesArr ?: null,
                         ]

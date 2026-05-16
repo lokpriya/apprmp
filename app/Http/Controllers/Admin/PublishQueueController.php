@@ -148,4 +148,92 @@ class PublishQueueController extends Controller
         $this->workflow->reject($business, auth()->user(), $request->comment);
         return back()->with('success', "व्यवसाय {$business->unique_code} अस्वीकृत गरियो।");
     }
+
+    // ── Bulk Publish / Reject ────────────────────────────────────────────────
+
+    private function resolveWardIds(): \Illuminate\Support\Collection
+    {
+        $user = auth()->user();
+        return $user->isAdmin()
+            ? Ward::where('local_government_id', $user->local_government_id)->pluck('id')
+            : $user->assignedWards()->pluck('wards.id');
+    }
+
+    public function bulkPublishHouseholds(Request $request)
+    {
+        $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer']);
+        $user = auth()->user(); $wardIds = $this->resolveWardIds();
+        [$published, $skipped] = [0, 0];
+        foreach ($request->ids as $id) {
+            $hh = Household::find($id);
+            if (!$hh || !in_array($hh->status, ['ward_approved', 'escalated']) || !$wardIds->contains($hh->ward_id)) { $skipped++; continue; }
+            $this->workflow->publish($hh, $user); $published++;
+        }
+        return back()->with('success', "{$published} घरधुरी प्रकाशित गरियो" . ($skipped ? " ({$skipped} छोडियो)।" : "।"));
+    }
+
+    public function bulkRejectHouseholds(Request $request)
+    {
+        $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer', 'comment' => 'required|string|max:500']);
+        $user = auth()->user(); $wardIds = $this->resolveWardIds();
+        [$rejected, $skipped] = [0, 0];
+        foreach ($request->ids as $id) {
+            $hh = Household::find($id);
+            if (!$hh || !in_array($hh->status, ['ward_approved', 'escalated']) || !$wardIds->contains($hh->ward_id)) { $skipped++; continue; }
+            $this->workflow->reject($hh, $user, $request->comment); $rejected++;
+        }
+        return back()->with('success', "{$rejected} घरधुरी अस्वीकृत गरियो" . ($skipped ? " ({$skipped} छोडियो)।" : "।"));
+    }
+
+    public function bulkPublishInstitutions(Request $request)
+    {
+        $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer']);
+        $user = auth()->user(); $wardIds = $this->resolveWardIds();
+        [$published, $skipped] = [0, 0];
+        foreach ($request->ids as $id) {
+            $inst = Institution::find($id);
+            if (!$inst || !in_array($inst->status, ['ward_approved', 'escalated']) || !$wardIds->contains($inst->ward_id)) { $skipped++; continue; }
+            $this->workflow->publish($inst, $user); $published++;
+        }
+        return back()->with('success', "{$published} संस्था प्रकाशित गरियो" . ($skipped ? " ({$skipped} छोडियो)।" : "।"));
+    }
+
+    public function bulkRejectInstitutions(Request $request)
+    {
+        $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer', 'comment' => 'required|string|max:500']);
+        $user = auth()->user(); $wardIds = $this->resolveWardIds();
+        [$rejected, $skipped] = [0, 0];
+        foreach ($request->ids as $id) {
+            $inst = Institution::find($id);
+            if (!$inst || !in_array($inst->status, ['ward_approved', 'escalated']) || !$wardIds->contains($inst->ward_id)) { $skipped++; continue; }
+            $this->workflow->reject($inst, $user, $request->comment); $rejected++;
+        }
+        return back()->with('success', "{$rejected} संस्था अस्वीकृत गरियो" . ($skipped ? " ({$skipped} छोडियो)।" : "।"));
+    }
+
+    public function bulkPublishBusinesses(Request $request)
+    {
+        $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer']);
+        $user = auth()->user(); $wardIds = $this->resolveWardIds();
+        [$published, $skipped] = [0, 0];
+        foreach ($request->ids as $id) {
+            $biz = MemberBusiness::find($id);
+            if (!$biz || !in_array($biz->status, ['ward_approved', 'escalated']) || !$wardIds->contains($biz->ward_id)) { $skipped++; continue; }
+            $this->workflow->publish($biz, $user); $published++;
+        }
+        return back()->with('success', "{$published} व्यवसाय प्रकाशित गरियो" . ($skipped ? " ({$skipped} छोडियो)।" : "।"));
+    }
+
+    public function bulkRejectBusinesses(Request $request)
+    {
+        $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer', 'comment' => 'required|string|max:500']);
+        $user = auth()->user(); $wardIds = $this->resolveWardIds();
+        [$rejected, $skipped] = [0, 0];
+        foreach ($request->ids as $id) {
+            $biz = MemberBusiness::find($id);
+            if (!$biz || !in_array($biz->status, ['ward_approved', 'escalated']) || !$wardIds->contains($biz->ward_id)) { $skipped++; continue; }
+            $this->workflow->reject($biz, $user, $request->comment); $rejected++;
+        }
+        return back()->with('success', "{$rejected} व्यवसाय अस्वीकृत गरियो" . ($skipped ? " ({$skipped} छोडियो)।" : "।"));
+    }
 }

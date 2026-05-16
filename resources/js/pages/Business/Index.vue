@@ -87,6 +87,10 @@
         <table class="w-full text-sm">
           <thead class="bg-gray-50 border-b border-[#e6e7e9]">
             <tr>
+              <th class="px-4 py-3 w-8">
+                <input type="checkbox" :checked="allPageSelected" :indeterminate="someSelected && !allPageSelected"
+                  @change="toggleSelectAll" class="w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer" />
+              </th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">कोड</th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">व्यवसाय नाम</th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">सदस्य</th>
@@ -104,7 +108,14 @@
               v-for="biz in businesses.data"
               :key="biz.id"
               class="hover:bg-gray-50 transition-colors"
+              :class="selectedIds.has(biz.id) ? 'bg-orange-50/40' : ''"
             >
+              <!-- Checkbox -->
+              <td class="px-4 py-3">
+                <input type="checkbox" :checked="selectedIds.has(biz.id)" @change="toggleSelect(biz.id)"
+                  class="w-4 h-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer" />
+              </td>
+
               <!-- Code -->
               <td class="px-4 py-3">
                 <span class="font-mono text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded">{{ biz.unique_code }}</span>
@@ -113,7 +124,7 @@
               <!-- Name + type -->
               <td class="px-4 py-3">
                 <div class="font-medium text-gray-800">{{ biz.business_name || '—' }}</div>
-                <div v-if="biz.business_type" class="text-xs text-gray-400">{{ biz.business_type }}</div>
+                <div v-if="biz.business_type" class="text-xs text-gray-400">{{ fieldLabel('business_type', biz.business_type) }}</div>
               </td>
 
               <!-- Member -->
@@ -135,7 +146,7 @@
               <!-- Business field -->
               <td class="px-4 py-3">
                 <span v-if="biz.business_field" class="text-xs bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full">
-                  {{ biz.business_field }}
+                  {{ fieldLabel('business_field', biz.business_field) }}
                 </span>
                 <span v-else class="text-gray-400">—</span>
               </td>
@@ -216,6 +227,88 @@
       </div>
     </div>
 
+    <!-- Bulk toolbar -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="translate-y-4 opacity-0"
+        enter-to-class="translate-y-0 opacity-100"
+        leave-active-class="transition duration-150 ease-in"
+        leave-from-class="translate-y-0 opacity-100"
+        leave-to-class="translate-y-4 opacity-0"
+      >
+        <div v-if="selectedIds.size > 0"
+          class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-gray-900 text-white rounded-xl shadow-2xl px-5 py-3 min-w-[360px]">
+          <span class="text-sm font-medium shrink-0">{{ selectedIds.size }} व्यवसाय छानिएको</span>
+          <div class="flex-1 flex items-center gap-2 justify-end">
+            <button v-if="canBulkSubmit"
+              @click="bulkSubmit"
+              :disabled="bulkProcessing"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium transition disabled:opacity-50">
+              <i class="fa-solid fa-paper-plane text-[10px]"></i> पेस गर्नुस्
+            </button>
+            <button v-if="canBulkApprove"
+              @click="bulkApprove"
+              :disabled="bulkProcessing"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition disabled:opacity-50">
+              <i class="fa-solid fa-check text-[10px]"></i> अनुमोदन
+            </button>
+            <button v-if="canBulkApprove"
+              @click="openRejectModal"
+              :disabled="bulkProcessing"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-medium transition disabled:opacity-50">
+              <i class="fa-solid fa-xmark text-[10px]"></i> अस्वीकार
+            </button>
+            <button @click="clearSelection"
+              class="inline-flex items-center gap-1 px-2.5 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-xs transition">
+              <i class="fa-solid fa-xmark text-[10px]"></i>
+            </button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Bulk reject modal -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-150 ease-out"
+        enter-from-class="opacity-0 scale-95"
+        enter-to-class="opacity-100 scale-100"
+        leave-active-class="transition duration-100 ease-in"
+        leave-from-class="opacity-100 scale-100"
+        leave-to-class="opacity-0 scale-95"
+      >
+        <div v-if="rejectModalOpen" class="fixed inset-0 z-[60] flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/40" @click="rejectModalOpen = false"></div>
+          <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <h3 class="text-sm font-semibold text-gray-800 mb-3">
+              <i class="fa-solid fa-xmark-circle text-red-500 mr-1"></i>
+              {{ selectedIds.size }} व्यवसाय अस्वीकार गर्नुहोस्
+            </h3>
+            <div class="flex flex-wrap gap-2 mb-3">
+              <button v-for="chip in rejectChips" :key="chip"
+                @click="rejectReason = chip"
+                :class="['px-2.5 py-1 rounded-full text-xs border transition',
+                  rejectReason === chip ? 'bg-red-600 text-white border-red-600' : 'border-gray-300 text-gray-600 hover:border-red-400']">
+                {{ chip }}
+              </button>
+            </div>
+            <textarea v-model="rejectReason" rows="3" placeholder="अस्वीकारको कारण (ऐच्छिक)..."
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none resize-none"></textarea>
+            <div class="flex justify-end gap-2 mt-4">
+              <button @click="rejectModalOpen = false"
+                class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition">रद्द गर्नुस्</button>
+              <button @click="confirmBulkReject" :disabled="bulkProcessing"
+                class="px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg transition disabled:opacity-50">
+                <i v-if="bulkProcessing" class="fa-solid fa-spinner fa-spin mr-1"></i>
+                अस्वीकार गर्नुस्
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- Pagination -->
     <div v-if="businesses.meta && businesses.meta.last_page > 1" class="flex items-center justify-between">
       <p class="text-xs text-gray-500">
@@ -261,6 +354,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
+import { fieldLabel } from '@/utils/fieldLabels'
 
 const page = usePage()
 const surveyFrozen = computed(() => page.props.surveyFrozen && page.props.auth?.user?.role === 'enumerator')
@@ -275,6 +369,73 @@ const searchQuery  = ref(props.filters.search || '')
 const wardFilter   = ref(props.filters.ward   || '')
 const statusFilter = ref(props.filters.status || '')
 const submitting   = ref(null)
+
+// ── bulk ops state ─────────────────────────────────────────────────────────────
+const selectedIds      = ref(new Set())
+const bulkProcessing   = ref(false)
+const rejectModalOpen  = ref(false)
+const rejectReason     = ref('')
+
+const rejectChips = ['अपूर्ण जानकारी', 'गलत वडा', 'नक्कल प्रविष्टि', 'प्रमाण नभएको']
+
+const pageIds = computed(() => (props.businesses.data ?? []).map(b => b.id))
+const allPageSelected = computed(() => pageIds.value.length > 0 && pageIds.value.every(id => selectedIds.value.has(id)))
+const someSelected    = computed(() => pageIds.value.some(id => selectedIds.value.has(id)))
+
+const canBulkSubmit  = computed(() => page.props.auth?.user?.role !== undefined)
+const canBulkApprove = computed(() => {
+  const role = page.props.auth?.user?.role
+  return ['ward_reviewer', 'ward_admin', 'municipal_admin', 'super_admin'].includes(role)
+})
+
+function toggleSelect(id) {
+  const s = new Set(selectedIds.value)
+  s.has(id) ? s.delete(id) : s.add(id)
+  selectedIds.value = s
+}
+
+function toggleSelectAll() {
+  if (allPageSelected.value) {
+    const s = new Set(selectedIds.value)
+    pageIds.value.forEach(id => s.delete(id))
+    selectedIds.value = s
+  } else {
+    const s = new Set(selectedIds.value)
+    pageIds.value.forEach(id => s.add(id))
+    selectedIds.value = s
+  }
+}
+
+function clearSelection() { selectedIds.value = new Set() }
+
+function bulkSubmit() {
+  if (!selectedIds.value.size) return
+  bulkProcessing.value = true
+  router.post('/businesses/bulk-submit', { ids: [...selectedIds.value] }, {
+    onSuccess: () => { selectedIds.value = new Set() },
+    onFinish:  () => { bulkProcessing.value = false },
+  })
+}
+
+function bulkApprove() {
+  if (!selectedIds.value.size) return
+  bulkProcessing.value = true
+  router.post('/businesses/bulk-approve', { ids: [...selectedIds.value] }, {
+    onSuccess: () => { selectedIds.value = new Set() },
+    onFinish:  () => { bulkProcessing.value = false },
+  })
+}
+
+function openRejectModal() { rejectReason.value = ''; rejectModalOpen.value = true }
+
+function confirmBulkReject() {
+  if (!selectedIds.value.size) return
+  bulkProcessing.value = true
+  router.post('/businesses/bulk-reject', { ids: [...selectedIds.value], reason: rejectReason.value }, {
+    onSuccess: () => { selectedIds.value = new Set(); rejectModalOpen.value = false },
+    onFinish:  () => { bulkProcessing.value = false },
+  })
+}
 
 let searchTimeout = null
 

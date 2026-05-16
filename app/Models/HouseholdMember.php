@@ -115,6 +115,9 @@ class HouseholdMember extends Model
         'smoking_drinking_items'     => 'array',
         // Social security
         'ss_allowance'               => 'boolean',
+        // PII — stored encrypted at rest
+        'national_id'                => 'encrypted',
+        'contact_phone'              => 'encrypted',
         // Contact info
         'has_phone'                  => 'boolean',
         'know_phone'                 => 'boolean',

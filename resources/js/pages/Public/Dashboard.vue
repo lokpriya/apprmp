@@ -363,6 +363,101 @@
         </div>
       </section>
 
+      <!-- ══ SOCIAL INDICATORS ══ -->
+      <section v-if="hasSocialData" class="mb-4">
+        <div class="flex items-center gap-2 mb-3">
+          <h2 class="text-[13px] font-bold uppercase tracking-widest text-[#9aa0ac]">सामाजिक सूचकहरू</h2>
+          <div class="flex-1 border-t border-[#e6e7e9]"></div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="bg-white border border-[#e6e7e9] rounded-md p-4 flex flex-col gap-1">
+            <div class="w-8 h-8 rounded bg-rose-100 flex items-center justify-center mb-1">
+              <i class="fa-solid fa-plane-departure text-rose-600 text-sm"></i>
+            </div>
+            <p class="text-2xl font-bold text-[#1d273b]">{{ fmt(props.migrationData?.abroad ?? 0) }}</p>
+            <p class="text-[12px] font-semibold text-[#1d273b]">विदेश गएका</p>
+            <p class="text-[11px] text-[#9aa0ac]">Abroad</p>
+          </div>
+          <div class="bg-white border border-[#e6e7e9] rounded-md p-4 flex flex-col gap-1">
+            <div class="w-8 h-8 rounded bg-amber-100 flex items-center justify-center mb-1">
+              <i class="fa-solid fa-road text-amber-600 text-sm"></i>
+            </div>
+            <p class="text-2xl font-bold text-[#1d273b]">{{ fmt(props.migrationData?.internal ?? 0) }}</p>
+            <p class="text-[12px] font-semibold text-[#1d273b]">आन्तरिक बसाइसराइ</p>
+            <p class="text-[11px] text-[#9aa0ac]">Internal Migration</p>
+          </div>
+          <div class="bg-white border border-[#e6e7e9] rounded-md p-4 flex flex-col gap-1">
+            <div class="w-8 h-8 rounded bg-indigo-100 flex items-center justify-center mb-1">
+              <i class="fa-solid fa-hammer text-indigo-600 text-sm"></i>
+            </div>
+            <p class="text-2xl font-bold text-[#1d273b]">{{ props.trainingData?.vocational_pct ?? 0 }}%</p>
+            <p class="text-[12px] font-semibold text-[#1d273b]">व्यावसायिक तालिम</p>
+            <p class="text-[11px] text-[#9aa0ac]">Vocational Training</p>
+          </div>
+          <div class="bg-white border border-[#e6e7e9] rounded-md p-4 flex flex-col gap-1">
+            <div class="w-8 h-8 rounded bg-teal-100 flex items-center justify-center mb-1">
+              <i class="fa-solid fa-microchip text-teal-600 text-sm"></i>
+            </div>
+            <p class="text-2xl font-bold text-[#1d273b]">{{ props.trainingData?.technical_pct ?? 0 }}%</p>
+            <p class="text-[12px] font-semibold text-[#1d273b]">प्राविधिक तालिम</p>
+            <p class="text-[11px] text-[#9aa0ac]">Technical Training</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ DECISION MAKING ══ -->
+      <section v-if="props.decisionData?.length" class="mb-4">
+        <div class="flex items-center gap-2 mb-3">
+          <h2 class="text-[13px] font-bold uppercase tracking-widest text-[#9aa0ac]">निर्णय लिने अधिकार</h2>
+          <div class="flex-1 border-t border-[#e6e7e9]"></div>
+        </div>
+        <div class="bg-white border border-[#e6e7e9] rounded-md overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-[12px]">
+              <thead class="bg-[#f8f9fa] border-b border-[#e6e7e9]">
+                <tr>
+                  <th class="text-left px-4 py-2.5 font-semibold text-[#6e7985] w-40">निर्णय क्षेत्र</th>
+                  <th class="text-right px-3 py-2.5 font-semibold text-blue-700">पुरुष</th>
+                  <th class="text-right px-3 py-2.5 font-semibold text-pink-600">महिला</th>
+                  <th class="text-right px-3 py-2.5 font-semibold text-emerald-600">दुवै</th>
+                  <th class="text-left px-3 py-2.5 font-semibold text-[#6e7985] w-36">वितरण</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in props.decisionData" :key="row.key"
+                  class="border-b border-[#f3f4f6] hover:bg-[#f8f9fa] transition-colors">
+                  <td class="px-4 py-2.5 font-medium text-[#1d273b]">{{ row.label }}</td>
+                  <td class="px-3 py-2.5 text-right text-blue-700 font-semibold tabular-nums">
+                    {{ fmt(row.male) }}
+                    <span class="text-[10px] text-[#9aa0ac] font-normal ml-0.5">({{ decisionPct(row.male, row) }}%)</span>
+                  </td>
+                  <td class="px-3 py-2.5 text-right text-pink-600 font-semibold tabular-nums">
+                    {{ fmt(row.female) }}
+                    <span class="text-[10px] text-[#9aa0ac] font-normal ml-0.5">({{ decisionPct(row.female, row) }}%)</span>
+                  </td>
+                  <td class="px-3 py-2.5 text-right text-emerald-600 font-semibold tabular-nums">
+                    {{ fmt(row.both) }}
+                    <span class="text-[10px] text-[#9aa0ac] font-normal ml-0.5">({{ decisionPct(row.both, row) }}%)</span>
+                  </td>
+                  <td class="px-3 py-2.5">
+                    <div class="flex h-3 rounded overflow-hidden w-full bg-gray-100 min-w-[80px]">
+                      <div v-if="row.male"   :style="`width:${decisionPct(row.male,row)}%`"   class="bg-blue-500"></div>
+                      <div v-if="row.female" :style="`width:${decisionPct(row.female,row)}%`" class="bg-pink-400"></div>
+                      <div v-if="row.both"   :style="`width:${decisionPct(row.both,row)}%`"   class="bg-emerald-400"></div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="px-4 py-2 border-t border-[#f3f4f6] flex gap-4 text-[10px] text-[#9aa0ac]">
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block"></span> पुरुष Male</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-pink-400 inline-block"></span> महिला Female</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-400 inline-block"></span> दुवै Both</span>
+          </div>
+        </div>
+      </section>
+
       <!-- ══ QUICK LINKS TO DETAIL REPORTS ══ -->
       <section class="mb-4">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -428,6 +523,18 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow })
 
+function toSafeGeoJsonUrl(url) {
+  if (!url) return url
+  // Convert GitHub blob → raw content URL
+  url = url.replace(
+    /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/(.+)$/,
+    'https://raw.githubusercontent.com/$1/$2/$3'
+  )
+  // Force HTTPS — prevents mixed-content block on HTTPS sites
+  url = url.replace(/^http:\/\//, 'https://')
+  return url
+}
+
 defineOptions({ layout: PublicLayout })
 
 const { locale, t } = useLocale()
@@ -452,6 +559,9 @@ const props = defineProps({
   educationData:        { type: Array,   default: () => [] },
   litByGender:          { type: Array,   default: () => [] },
   businessData:         { type: Array,   default: () => [] },
+  migrationData:        { type: Object,  default: () => ({}) },
+  trainingData:         { type: Object,  default: () => ({}) },
+  decisionData:         { type: Array,   default: () => [] },
   selectedWardId:       { type: [Number, null], default: null },
   selectedSettlementId: { type: [Number, null], default: null },
   profileFilledCount:   { type: Number,  default: 0 },
@@ -475,6 +585,12 @@ const ucLabel = v => (v ?? '').split('_').map(w => w.charAt(0).toUpperCase() + w
 
 const hasInstitutions = computed(() => props.institutionData.length > 0)
 const hasServices     = computed(() => props.waterData?.length || props.toiletData?.length || props.electricityData?.length || props.cookingData?.length)
+const hasSocialData   = computed(() => (props.migrationData?.abroad ?? 0) + (props.migrationData?.internal ?? 0) + (props.trainingData?.total ?? 0) > 0)
+
+const decisionPct = (n, row) => {
+  const tot = (row.male ?? 0) + (row.female ?? 0) + (row.both ?? 0) + (row.other ?? 0)
+  return tot > 0 ? Math.round(n / tot * 100) : 0
+}
 
 onMounted(() => {
   initAllCharts()
@@ -554,7 +670,7 @@ async function initMap() {
     }
 
     try {
-      const res = await fetch(cfg.geojson_url)
+      const res = await fetch(toSafeGeoJsonUrl(cfg.geojson_url))
       if (res.ok) {
         const geojson = await res.json()
         L.geoJSON(geojson, {

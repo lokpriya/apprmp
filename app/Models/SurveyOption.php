@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class SurveyOption extends Model
 {
@@ -101,6 +102,46 @@ class SurveyOption extends Model
         // Also clear the SurveyValueValidator cache so imports see the new option immediately
         Cache::forget("survey_validator." . ($lgId ?? 'global'));
         Cache::forget("survey_validator.global");
+        Cache::forget('survey_options.lookup.' . ($lgId ?? 'global'));
+        Cache::forget('survey_options.lookup.global');
+    }
+
+    /** Build a flat {category: {value: canonical, lowercase: canonical}} map for fast lookups. */
+    private static function buildLookupMap(?int $lgId = null): array
+    {
+        $key = 'survey_options.lookup.' . ($lgId ?? 'global');
+        return Cache::remember($key, 3600, function () use ($lgId) {
+            $map = [];
+            static::where('is_active', true)
+                ->where(function ($q) use ($lgId) {
+                    $q->whereNull('local_government_id');
+                    if ($lgId) $q->orWhere('local_government_id', $lgId);
+                })
+                ->get(['category', 'value'])
+                ->each(function ($opt) use (&$map) {
+                    $cat = $opt->category;
+                    $val = $opt->value;
+                    $map[$cat][$val]             = $val;
+                    $map[$cat][strtolower($val)] = $val;
+                });
+            return $map;
+        });
+    }
+
+    /**
+     * Normalize a raw string value to the canonical DB value for a category.
+     * Tries exact match first, then case-insensitive. Logs unknown values and passes through.
+     */
+    public static function canonicalize(string $category, ?string $value, ?int $lgId = null): ?string
+    {
+        if ($value === null || $value === '') return $value;
+        $map = static::buildLookupMap($lgId);
+        if (!isset($map[$category])) return $value;
+        if (isset($map[$category][$value])) return $map[$category][$value];
+        $lower = strtolower($value);
+        if (isset($map[$category][$lower])) return $map[$category][$lower];
+        Log::info('GS sync: unrecognized survey value', ['category' => $category, 'value' => $value]);
+        return $value;
     }
 
     // ── Category registry ─────────────────────────────────────────────────────

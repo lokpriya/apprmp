@@ -226,7 +226,12 @@
           <div class="flex flex-col gap-1">
             <label class="text-[12px] font-semibold text-[#626976]">सम्पर्क नं.</label>
             <span class="text-[11px] text-gray-400 -mt-0.5">Contact No.</span>
-            <input v-model="form.respondent_contact" type="text" placeholder="फोन नम्बर" class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-[13px] bg-white focus:ring-2 focus:ring-[#206bc4]/20 focus:border-[#206bc4]" />
+            <input v-model="form.respondent_contact" type="text" placeholder="फोन नम्बर" class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-[13px] bg-white focus:ring-2 focus:ring-[#206bc4]/20 focus:border-[#206bc4]"
+              :class="(phoneWarning || serverPhoneWarning) ? 'border-amber-400 bg-amber-50/40' : ''" />
+            <p v-if="phoneWarning || serverPhoneWarning" class="flex items-center gap-1.5 text-[11px] text-amber-700 mt-0.5">
+              <i class="fa-solid fa-triangle-exclamation text-xs shrink-0"></i>
+              {{ phoneWarning || serverPhoneWarning }}
+            </p>
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-[12px] font-semibold text-[#626976]">सर्वेक्षण मिति</label>
@@ -267,6 +272,15 @@
             <input v-model="form.gps_altitude" type="number" step="any" placeholder="masl" class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-[13px] bg-white focus:ring-2 focus:ring-[#206bc4]/20 focus:border-[#206bc4]" />
           </div>
         </div>
+        <!-- GPS Mini-Map -->
+        <div v-show="form.gps_lat && form.gps_lng" class="px-4 pb-3">
+          <div ref="gpsMapEl" class="h-48 w-full rounded border border-slate-200 overflow-hidden" style="z-index:0;position:relative"></div>
+          <p class="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+            <i class="fa-solid fa-up-down-left-right text-[10px]"></i>
+            पिन तान्नुहोस् — स्थान सच्याउन सकिन्छ (Drag pin to adjust location)
+          </p>
+        </div>
+
         <!-- GPS boundary alert -->
         <div v-if="gpsBoundaryResult && gpsBoundaryResult.status !== 'inside'"
           class="mx-4 mb-3 flex items-start gap-2 rounded px-3 py-2 text-[12px]"
@@ -2766,6 +2780,32 @@
         <div v-else class="bg-blue-50 border-b border-blue-100 px-5 py-2.5">
           <p class="text-[12px] text-blue-700"><i class="fa-solid fa-circle-info mr-1"></i> कृपया पहिले चरण २ मा पुरुष/महिला/अन्यको सङ्ख्या भर्नुहोस्।</p>
         </div>
+
+        <!-- ── Alert: household head check ── -->
+        <div v-if="form.members.length > 0"
+          :class="form.members.filter(m => m.is_household_head).length === 1
+            ? 'bg-green-50 border-green-200'
+            : 'bg-red-50 border-red-200'"
+          class="px-5 py-3 border-b flex items-start gap-3">
+          <i :class="form.members.filter(m => m.is_household_head).length === 1
+              ? 'fa-solid fa-circle-check text-green-500'
+              : 'fa-solid fa-triangle-exclamation text-red-500'"
+            class="text-sm mt-0.5 shrink-0"></i>
+          <div>
+            <p :class="form.members.filter(m => m.is_household_head).length === 1 ? 'text-green-800' : 'text-red-800'"
+              class="text-[12px] font-semibold">
+              <template v-if="form.members.filter(m => m.is_household_head).length === 0">
+                घरमुली तोकिएको छैन — कुनै एक सदस्यको "घरमुली: हो" गर्नुहोस्
+              </template>
+              <template v-else-if="form.members.filter(m => m.is_household_head).length > 1">
+                {{ form.members.filter(m => m.is_household_head).length }} सदस्यहरूलाई घरमुली चिह्न लगाइएको छ — एक मात्र हुनुपर्छ
+              </template>
+              <template v-else>
+                घरमुली: {{ form.members.find(m => m.is_household_head)?.full_name || '—' }}
+              </template>
+            </p>
+          </div>
+        </div>
       </div>
 
       <!-- ── Accordion member list ── -->
@@ -4910,9 +4950,81 @@ const facilityOptions = computed(() => props.surveyOptions.facilities ?? [])
 // ── Vehicle type options (from surveyOptions) ──────────────────────
 
 // ── GPS ────────────────────────────────────────────────────────────
-const gpsLoading       = ref(false)
-const gpsError         = ref('')
+const gpsLoading        = ref(false)
+const gpsError          = ref('')
 const gpsBoundaryResult = ref(null)
+
+// ── GPS Mini-Map ────────────────────────────────────────────────────
+const gpsMapEl = ref(null)
+let gpsL       = null   // Leaflet (lazy-loaded)
+let gpsMap     = null   // map instance
+let gpsMarker  = null   // draggable pin
+
+async function initGpsMap() {
+  if (gpsMap || !gpsMapEl.value) return
+  const lat = parseFloat(form.gps_lat)
+  const lng = parseFloat(form.gps_lng)
+  if (isNaN(lat) || isNaN(lng)) return
+
+  if (!gpsL) {
+    gpsL = (await import('leaflet')).default
+    await import('leaflet/dist/leaflet.css')
+  }
+
+  gpsMap = gpsL.map(gpsMapEl.value, { zoomControl: true, dragging: true, scrollWheelZoom: false })
+  gpsL.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 19,
+  }).addTo(gpsMap)
+  gpsMap.setView([lat, lng], 17)
+
+  // Red circle pin — no external PNG needed, avoids Leaflet default icon path issues
+  const icon = gpsL.divIcon({
+    className: '',
+    iconSize:  [22, 22],
+    iconAnchor:[11, 11],
+    html: '<div style="width:22px;height:22px;border-radius:50%;background:#d63939;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.45)"></div>',
+  })
+
+  gpsMarker = gpsL.marker([lat, lng], { draggable: true, icon }).addTo(gpsMap)
+  gpsMarker.on('dragend', () => {
+    const pos = gpsMarker.getLatLng()
+    form.gps_lat = parseFloat(pos.lat.toFixed(6))
+    form.gps_lng = parseFloat(pos.lng.toFixed(6))
+  })
+}
+
+function updateGpsMap(lat, lng) {
+  if (!gpsMap || !gpsMarker) return
+  const ll = [lat, lng]
+  gpsMarker.setLatLng(ll)
+  gpsMap.setView(ll, Math.max(gpsMap.getZoom(), 16))
+}
+
+function destroyGpsMap() {
+  if (gpsMap) { gpsMap.remove(); gpsMap = null; gpsMarker = null }
+}
+
+// Update map when coordinates change (typed manually or captured via button)
+watch([() => form.gps_lat, () => form.gps_lng], async ([lat, lng]) => {
+  const latF = parseFloat(lat)
+  const lngF = parseFloat(lng)
+  if (!lat || !lng || isNaN(latF) || isNaN(lngF)) return
+  await nextTick()
+  if (!gpsMap) {
+    await initGpsMap()
+  } else {
+    updateGpsMap(latF, lngF)
+  }
+})
+
+// Re-init when user navigates back to step 1; destroy when leaving
+watch(step, async (newStep) => {
+  if (newStep !== 1) { destroyGpsMap(); return }
+  if (!form.gps_lat || !form.gps_lng) return
+  await nextTick()
+  await initGpsMap()
+})
 
 import { useGpsBoundary } from '@/composables/useGpsBoundary.js'
 const { checkBoundary } = useGpsBoundary()
@@ -5867,6 +5979,7 @@ watch(_draftSnapshot, () => {
 onUnmounted(() => {
   clearTimeout(_autoSaveTimer)
   clearTimeout(_statusTimer)
+  destroyGpsMap()
 })
 
 // ── Offline toast ──────────────────────────────────────────────────
@@ -5877,6 +5990,24 @@ function showOfflineToast(msg) {
   clearTimeout(_toastTimer)
   _toastTimer = setTimeout(() => { offlineToast.value = '' }, 4000)
 }
+
+// ── Phone validation ───────────────────────────────────────────────
+const phoneWarning = computed(() => {
+  const raw    = (form.respondent_contact ?? '').trim()
+  if (!raw) return null
+  const digits = raw.replace(/\D/g, '')
+  // Strip Nepal country code: 977XXXXXXXXXX (13 digits) → 10 digits
+  const local  = digits.length === 13 && digits.startsWith('977') ? digits.slice(3) : digits
+  if (!local)          return null
+  if (local.length < 7)  return 'फोन नम्बर धेरै छोटो छ — कम्तीमा ७ अंक हुनुपर्छ'
+  if (local.length > 10) return 'फोन नम्बर धेरै लामो छ — बढीमा १० अंक (वा +९७७ सहित १३)'
+  if (local.length === 10 && !/^9[678]/.test(local))
+    return 'नेपाली मोबाइल नम्बर ९६/९७/९८ बाट सुरु हुनुपर्छ'
+  return null
+})
+
+// Also surface any server-side phone_warning (fallback)
+const serverPhoneWarning = computed(() => form.errors.phone_warning ?? null)
 
 // ── Duplicate detection ────────────────────────────────────────────
 const duplicateMatches = computed(() => {
@@ -6003,6 +6134,9 @@ const stepValidationErrors = computed(() => {
       if (m.age === '' || m.age === null) s14.push(`सदस्य ${i + 1}: उमेर आवश्यक छ`)
       if (!m.gender)            s14.push(`सदस्य ${i + 1}: लिङ्ग आवश्यक छ`)
     })
+    const headCount = f.members.filter(m => m.is_household_head).length
+    if (headCount === 0) s14.push('घरमुली (Household Head) चिह्न लगाउनु आवश्यक छ — एक सदस्यलाई "घरमुली: हो" गर्नुहोस्')
+    if (headCount > 1)  s14.push(`${headCount} सदस्यहरूलाई घरमुली चिह्न लगाइएको छ — एक मात्र हुनुपर्छ`)
   }
   if (s14.length) errs[14] = s14
 

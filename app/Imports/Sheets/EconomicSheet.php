@@ -65,10 +65,10 @@ class EconomicSheet implements ToCollection, WithChunkReading, WithHeadingRow, W
                             'remittance_amount'          => is_numeric($row['remittance_amount'] ?? '') ? $row['remittance_amount'] : null,
                             'loan_sources'               => $loanSources ?: null,
                             'total_loan_amount'          => is_numeric($row['total_loan_amount'] ?? '') ? $row['total_loan_amount'] : null,
-                            'has_bank_account'           => $this->bool($row['has_bank_account'] ?? 0),
-                            'has_insurance'              => $this->bool($row['has_insurance'] ?? 0),
-                            'poverty_card'               => $this->bool($row['poverty_card'] ?? 0),
-                            'social_security_allowance'  => $this->bool($row['social_security_allowance'] ?? 0),
+                            'has_bank_account'           => (bool)($this->bool($row['has_bank_account'] ?? 0)),
+                            'has_insurance'              => (bool)($this->bool($row['has_insurance'] ?? 0)),
+                            'poverty_card'               => (bool)($this->bool($row['poverty_card'] ?? 0)),
+                            // social_security_allowance is per-person — now in Members sheet (ss_allowance)
                         ]
                     );
 

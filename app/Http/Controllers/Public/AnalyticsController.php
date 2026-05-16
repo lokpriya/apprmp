@@ -310,6 +310,72 @@ class AnalyticsController extends Controller
             ->groupBy('value')->orderByDesc('count')->limit(8)->get()
             ->map(fn($r) => ['value' => $r->value, 'count' => (int)$r->count])->toArray(), 'business_type');
 
+        // ── Migration summary (abroad / internal) ──────────────────────
+        $migCounts = DB::table('member_migration')
+            ->join('household_members', 'member_migration.member_id', '=', 'household_members.id')
+            ->join('households', 'household_members.household_id', '=', 'households.id')
+            ->whereIn('households.ward_id', $activeWardIds)->where('households.status', 'published')
+            ->when($selectedSettlementId, fn($q) => $q->where('households.settlement_id', $selectedSettlementId))
+            ->where('household_members.is_deceased', false)
+            ->whereIn('member_migration.migration_status', ['abroad', 'internal'])
+            ->select('member_migration.migration_status', DB::raw('count(*) as cnt'))
+            ->groupBy('member_migration.migration_status')
+            ->pluck('cnt', 'migration_status');
+
+        $migrationData = [
+            'abroad'   => (int) ($migCounts->get('abroad',   0)),
+            'internal' => (int) ($migCounts->get('internal', 0)),
+        ];
+
+        // ── Training participation ─────────────────────────────────────
+        $trainRow = HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->select(
+                DB::raw('SUM(CASE WHEN vocational_training=1 THEN 1 ELSE 0 END) as voc'),
+                DB::raw('SUM(CASE WHEN techtraining=1 THEN 1 ELSE 0 END) as tech'),
+                DB::raw('count(*) as tot')
+            )->first();
+
+        $trainTot  = $trainRow?->tot ?? 0;
+        $trainingData = [
+            'vocational_count' => (int) ($trainRow?->voc  ?? 0),
+            'technical_count'  => (int) ($trainRow?->tech ?? 0),
+            'total'            => (int) $trainTot,
+            'vocational_pct'   => $trainTot > 0 ? round($trainRow->voc  / $trainTot * 100, 1) : 0,
+            'technical_pct'    => $trainTot > 0 ? round($trainRow->tech / $trainTot * 100, 1) : 0,
+        ];
+
+        // ── Decision-making breakdown (survey_data→decisions JSON) ─────
+        $decisionKeys = [
+            'decisioninHHWork'     => 'घरेलु काम',
+            'decisioninProperty'   => 'सम्पत्ति',
+            'decisioninCCommittee' => 'उपभोक्ता समिति',
+            'decisioninSMC'        => 'विद्यालय व्यवस्थापन',
+            'decisioninBusiness'   => 'व्यवसाय',
+            'bank_account_owner'   => 'बैंक खाता',
+        ];
+        $decisionData = [];
+        foreach ($decisionKeys as $key => $label) {
+            $path = "$.decisions.{$key}";
+            $rows = DB::table('households')
+                ->whereIn('ward_id', $activeWardIds)->where('status', 'published')
+                ->when($selectedSettlementId, fn($q) => $q->where('settlement_id', $selectedSettlementId))
+                ->selectRaw('LOWER(JSON_UNQUOTE(JSON_EXTRACT(survey_data, ?))) as owner, count(*) as count', [$path])
+                ->whereRaw('JSON_UNQUOTE(JSON_EXTRACT(survey_data, ?)) IS NOT NULL', [$path])
+                ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, ?)) NOT IN ('null', '')", [$path])
+                ->groupBy('owner')
+                ->pluck('count', 'owner');
+            if ($rows->sum() > 0) {
+                $decisionData[] = [
+                    'key'    => $key,
+                    'label'  => $label,
+                    'male'   => (int) ($rows->get('male',   0)),
+                    'female' => (int) ($rows->get('female', 0)),
+                    'both'   => (int) ($rows->get('both',   0)),
+                    'other'  => (int) ($rows->get('other',  0)),
+                ];
+            }
+        }
+
         $profileContent  = $lg->profile_content ?? [];
         $profileSections = LocalGovernment::profileSections();
         $profileFilledCount = collect($profileSections)->filter(fn($l, $k) => !empty($profileContent[$k]))->count();
@@ -321,6 +387,10 @@ class AnalyticsController extends Controller
             'stats'               => $stats,
             'genderData'          => $genderData,
             'ageData'             => $ageData,
+            'pyramidData'         => $pyramidData,
+            'ethnicityData'       => $ethnicityData,
+            'religionData'        => $religionData,
+            'motherTongueData'    => $motherTongueData,
             'institutionData'     => $institutionData,
             'wardSummary'         => $wardSummary,
             'keyMetrics'          => $keyMetrics,
@@ -333,6 +403,9 @@ class AnalyticsController extends Controller
             'educationData'       => $educationData,
             'litByGender'         => $litByGender,
             'businessData'        => $businessData,
+            'migrationData'       => $migrationData,
+            'trainingData'        => $trainingData,
+            'decisionData'        => $decisionData,
             'selectedWardId'      => $selectedWardId,
             'selectedSettlementId' => $selectedSettlementId,
             'profileFilledCount'  => $profileFilledCount,
@@ -691,21 +764,20 @@ class AnalyticsController extends Controller
             ->whereIn('households.ward_id', $wid)->where('households.status', 'published');
 
         $agriRow = $agriBase()->select(
+            DB::raw('SUM(CASE WHEN agriculture=1 THEN 1 ELSE 0 END) as agri'),
             DB::raw('SUM(CASE WHEN owns_land=1 THEN 1 ELSE 0 END) as owns'),
-            DB::raw('SUM(CASE WHEN uses_chemical_fertilizer=1 THEN 1 ELSE 0 END) as chem_fert'),
-            DB::raw('SUM(CASE WHEN uses_organic_fertilizer=1 THEN 1 ELSE 0 END) as org_fert'),
-            DB::raw('SUM(CASE WHEN sells_produce=1 THEN 1 ELSE 0 END) as sells'),
-            DB::raw('SUM(CASE WHEN has_agri_loan=1 THEN 1 ELSE 0 END) as agri_loan'),
+            DB::raw('SUM(CASE WHEN use_of_chem_fertilizer=1 THEN 1 ELSE 0 END) as chem_fert'),
+            DB::raw('SUM(CASE WHEN use_of_chem_pesticide=1 THEN 1 ELSE 0 END) as chem_pest'),
             DB::raw('count(*) as tot'))->first();
 
         $agriculture = [
-            'owns_land_pct'     => $pct($agriRow?->owns ?? 0, $agriRow?->tot ?? 0),
-            'chem_fert_pct'     => $pct($agriRow?->chem_fert ?? 0, $agriRow?->owns ?? 1),
-            'org_fert_pct'      => $pct($agriRow?->org_fert ?? 0, $agriRow?->owns ?? 1),
-            'sells_pct'         => $pct($agriRow?->sells ?? 0, $agriRow?->owns ?? 1),
-            'agri_loan_pct'     => $pct($agriRow?->agri_loan ?? 0, $agriRow?->owns ?? 1),
-            'owns_count'        => (int) ($agriRow?->owns ?? 0),
-            'total_hh'          => (int) ($agriRow?->tot ?? 0),
+            'agri_pct'      => $pct($agriRow?->agri ?? 0, $agriRow?->tot ?? 0),
+            'owns_land_pct' => $pct($agriRow?->owns ?? 0, $agriRow?->tot ?? 0),
+            'chem_fert_pct' => $pct($agriRow?->chem_fert ?? 0, $agriRow?->agri ?? 1),
+            'chem_pest_pct' => $pct($agriRow?->chem_pest ?? 0, $agriRow?->agri ?? 1),
+            'agri_count'    => (int) ($agriRow?->agri ?? 0),
+            'owns_count'    => (int) ($agriRow?->owns ?? 0),
+            'total_hh'      => (int) ($agriRow?->tot ?? 0),
         ];
 
         // ── 9. Migration ─────────────────────────────────────────────────────

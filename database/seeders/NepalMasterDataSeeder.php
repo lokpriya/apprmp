@@ -77,6 +77,7 @@ class NepalMasterDataSeeder extends Seeder
         $lgCount         = 0;
         $currentProvince = null;
         $currentDistrict = null;
+        $lastDistCode    = null;
 
         for ($row = 2; $row <= $maxRow; $row++) {
             $provEn  = trim((string) $sheet->getCell('A' . $row)->getValue());
@@ -101,7 +102,10 @@ class NepalMasterDataSeeder extends Seeder
                         'name_np'     => $distNp,
                     ]
                 );
-                $distCount++;
+                if ($distEn !== $lastDistCode) {
+                    $distCount++;
+                    $lastDistCode = $distEn;
+                }
             }
 
             // Skip header/blank rows that have no LG name

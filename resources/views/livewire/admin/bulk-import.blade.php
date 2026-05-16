@@ -34,17 +34,20 @@
         <div class="flex gap-3">
             <i class="fa-solid fa-circle-info text-blue-500 text-base mt-0.5 shrink-0"></i>
             <div class="flex-1 min-w-0">
-                <p class="text-sm font-semibold text-blue-800 mb-3">Excel Template — 8 Sheets</p>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <p class="text-sm font-semibold text-blue-800 mb-1">Excel Template — 8 Data Sheets + 1 Reference Sheet</p>
+                <p class="text-xs text-blue-600 mb-3">All data sheets share <code class="bg-blue-100 px-1 rounded font-mono">household_code</code> as the link key. Only the Households sheet is required.</p>
+
+                {{-- 8 data sheets --}}
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
                     @foreach([
-                        ['Households',   'bg-blue-600',    'fa-house',           'Core household info',       true],
-                        ['Members',      'bg-emerald-600', 'fa-people-group',    'Family members',            false],
-                        ['Housing',      'bg-purple-600',  'fa-building',        'House + land unit',         false],
-                        ['Utilities',    'bg-sky-600',     'fa-bolt',            'Water, power, sanitation',  false],
-                        ['Economic',     'bg-amber-600',   'fa-coins',           'Income, loans, bank',       false],
-                        ['Agriculture',  'bg-green-700',   'fa-seedling',        'Land, crops (6 categories)',false],
-                        ['Livestock',    'bg-orange-700',  'fa-cow',             'Animals + bee/fish/silk',   false],
-                        ['Valid Values', 'bg-gray-600',    'fa-list-check',      'Reference sheet',           false],
+                        ['Households',   'bg-blue-600',    'fa-house',        '13 cols — ward, GPS, respondent, total members, survey date, photo', true],
+                        ['Members',      'bg-emerald-600', 'fa-people-group', '42 cols — identity, education, occupation, disability, 7 documents, health, migration status', false],
+                        ['Housing',      'bg-purple-600',  'fa-building',     '21 cols — house type, materials, ownership, rooms, risk, land type, purpose, distances', false],
+                        ['Utilities',    'bg-sky-600',     'fa-bolt',         '20 cols — water, toilet, electricity, cooking fuel, waste, internet, handwashing, vehicles', false],
+                        ['Economic',     'bg-amber-600',   'fa-coins',        '18 cols — income source, income/expenditure range, loans, bank, insurance, 6 decision-making fields', false],
+                        ['Agriculture',  'bg-green-700',   'fa-seedling',     '15 cols — land area, crop categories, chemical fertilizer details, pesticide details, farm challenges', false],
+                        ['Livestock',    'bg-orange-700',  'fa-cow',          '14 cols — one row per animal type; also beekeeping and fishery data (once per household)', false],
+                        ['LandParcels',  'bg-yellow-700',  'fa-map',          '4 cols — one row per land parcel: land_use_type, land_unit, quantity (linked by household_code)', false],
                     ] as [$sheet, $color, $icon, $desc, $required])
                     <div class="flex items-start gap-2 bg-white/60 rounded-lg p-2">
                         <span class="inline-flex w-6 h-6 rounded items-center justify-center {{ $color }} shrink-0 mt-0.5">
@@ -55,15 +58,27 @@
                                 {{ $sheet }}
                                 @if($required)<span class="text-red-500 ml-0.5">*</span>@endif
                             </p>
-                            <p class="text-xs text-blue-600 leading-tight">{{ $desc }}</p>
+                            <p class="text-[11px] text-blue-600 leading-tight">{{ $desc }}</p>
                         </div>
                     </div>
                     @endforeach
                 </div>
+
+                {{-- Valid Values reference note --}}
+                <div class="flex items-start gap-2 bg-white/60 border border-blue-200 rounded-lg p-2">
+                    <span class="inline-flex w-6 h-6 rounded items-center justify-center bg-gray-500 shrink-0 mt-0.5">
+                        <i class="fa-solid fa-list-check text-white text-xs"></i>
+                    </span>
+                    <p class="text-[11px] text-blue-700">
+                        <span class="font-semibold">Valid Values</span> — Reference-only sheet (do not edit).
+                        Auto-generated from live survey options. Lists all accepted values for every dropdown field across all sheets.
+                        Hint row (row 2) in each sheet already shows a preview of valid values.
+                    </p>
+                </div>
+
                 <p class="mt-2.5 text-xs text-blue-600">
                     <i class="fa-solid fa-circle-exclamation mr-1"></i>
-                    Only <strong>Households</strong> sheet is required. All others are optional.
-                    Use <code class="bg-blue-100 px-1 rounded font-mono">household_code</code> to link rows across sheets.
+                    Row 1 = column headers &nbsp;|&nbsp; Row 2 = hints (do not delete) &nbsp;|&nbsp; Row 3 onwards = your data.
                 </p>
             </div>
         </div>
@@ -72,11 +87,14 @@
     {{-- ─── New Fields Notice ────────────────────────────────────────────────── --}}
     <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2.5 items-start text-xs text-amber-800">
         <i class="fa-solid fa-triangle-exclamation text-amber-500 mt-0.5 shrink-0"></i>
-        <span>
-            <strong>Updated template (v2):</strong>
-            Now includes GPS altitude & accuracy, land measurement unit, 6 crop categories with sub-crops,
-            bee/fish/silk data, and decision-making fields. Re-download the template if using an older version.
-        </span>
+        <div>
+            <strong>Updated template (v3):</strong>
+            Members sheet expanded to 42 columns — now includes father_name, chronic_illness types, child_labor,
+            has_pan, has_drivers_license, drivers_license_category, vocational_training, addrslocation, national_id, is_deceased.
+            Agriculture sheet now includes chemical fertilizer types/kg/sources and pesticide types/cost.
+            LandParcels sheet added for per-parcel land details.
+            <strong class="ml-1">Re-download the template if using an older version.</strong>
+        </div>
     </div>
 
     {{-- ─── Upload Form ──────────────────────────────────────────────────────── --}}
@@ -311,7 +329,7 @@
         @endif
         @endif
 
-        <div class="px-6 pb-5 pt-3 flex gap-3">
+        <div class="px-6 pb-5 pt-3 flex flex-wrap gap-3 items-center">
             <button wire:click="resetImport"
                     class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition">
                 <i class="fa-solid fa-rotate"></i> Import Another File
@@ -320,6 +338,13 @@
                class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition">
                 <i class="fa-solid fa-list"></i> View Households
             </a>
+            @if(!empty($errorLog))
+            <button wire:click="downloadErrorCsv"
+                    class="inline-flex items-center gap-2 px-4 py-2 border border-red-300 text-red-700 text-sm font-medium rounded-lg hover:bg-red-50 transition ml-auto">
+                <i class="fa-solid fa-file-arrow-down"></i>
+                त्रुटि सूची डाउनलोड गर्नुहोस् (.csv)
+            </button>
+            @endif
         </div>
     </div>
     @endif
@@ -420,12 +445,41 @@
         </h2>
         <ol class="space-y-3">
             @foreach([
-                ['Download the template', 'Click <strong>Template Download</strong> above. The file has 8 sheets — 7 data sheets and 1 Valid Values reference.', 'fa-download', 'bg-blue-100 text-blue-700'],
-                ['Fill Households sheet first', 'Enter one household per row starting from row 3. Row 2 is the hint row — <strong>do not delete it</strong>. Only this sheet is required.', 'fa-house', 'bg-blue-100 text-blue-700'],
-                ['Link other sheets with household_code', 'If filling Members, Housing, Agriculture etc., use the same <code class="bg-gray-100 px-1 rounded text-xs font-mono">household_code</code> to connect related rows. Leave blank for auto-generation.', 'fa-link', 'bg-blue-100 text-blue-700'],
-                ['Fill Agriculture sheet for crop data', 'The Agriculture sheet now supports 6 crop categories (food, pulses, oil, vegetables, cash crops, fruits). Enter sub-crops as comma-separated values.', 'fa-seedling', 'bg-green-100 text-green-700'],
-                ['Check Valid Values sheet', 'Refer to the <strong>Valid Values</strong> sheet for allowed dropdown values (roof_type, ethnicity, land_measurement_unit, crop types, etc.).', 'fa-list-check', 'bg-gray-100 text-gray-700'],
-                ['Upload and import', 'Save the file and upload it here. All records will be set to <strong>Draft</strong> status pending ward reviewer approval.', 'fa-upload', 'bg-blue-100 text-blue-700'],
+                ['Download the template',
+                 'Click <strong>Template Download</strong> above. The file has <strong>9 sheets</strong> — 8 data sheets and 1 <em>Valid Values</em> reference sheet. Do not rename or reorder the sheets.',
+                 'fa-download', 'bg-blue-100 text-blue-700'],
+
+                ['Fill Households sheet first (required)',
+                 'Enter one household per row starting from <strong>row 3</strong>. Row 1 is headers, row 2 is the hint row — <strong>do not delete or edit row 2</strong>. <code class="bg-gray-100 px-1 rounded text-xs font-mono">household_code</code> is auto-generated if left blank (recommended).',
+                 'fa-house', 'bg-blue-100 text-blue-700'],
+
+                ['Fill Members sheet — one row per person',
+                 'Use the same <code class="bg-gray-100 px-1 rounded text-xs font-mono">household_code</code> to link each member to their household. 42 columns cover identity, education, occupation, disability, 7 document flags, chronic illness, vocational training, and more.',
+                 'fa-people-group', 'bg-emerald-100 text-emerald-700'],
+
+                ['Fill Housing, Utilities, Economic — one row per household',
+                 '<strong>Housing</strong>: house type, materials, ownership, building permit, risk types, land info, distances to road/school. <strong>Utilities</strong>: water, toilet, cooking fuel, electricity, internet, handwashing, vehicle counts. <strong>Economic</strong>: income source, income/expenditure range, loans, bank account, insurance, and 6 decision-making fields (household work, property, business, etc.).',
+                 'fa-building', 'bg-purple-100 text-purple-700'],
+
+                ['Fill Agriculture sheet — one row per household',
+                 'Covers: owns_land, land area (ropani), irrigated area, crop categories (comma-separated: food_crops, vegetables, cash_crops, etc.), chemical fertilizer type/kg/source, pesticide type/cost, farm challenges, and annual agri income.',
+                 'fa-seedling', 'bg-green-100 text-green-700'],
+
+                ['Fill Livestock sheet — one row per animal type',
+                 'Enter one row per livestock type per household (e.g. cow, goat, buffalo). Beekeeping and fishery columns (has_beekeeping, mudhe_hive, modern_hive, honey_prod_*, has_fishery, fish_prod) are filled once per household — just include them on any one row.',
+                 'fa-cow', 'bg-orange-100 text-orange-700'],
+
+                ['Fill LandParcels sheet — one row per land parcel',
+                 'If a household has multiple land parcels, add one row per parcel. Columns: <code class="bg-gray-100 px-1 rounded text-xs font-mono">household_code</code>, <code class="bg-gray-100 px-1 rounded text-xs font-mono">land_use_type</code> (khet / bari / pakho / residential…), <code class="bg-gray-100 px-1 rounded text-xs font-mono">land_unit</code> (ropani / bigha / sq_meter…), <code class="bg-gray-100 px-1 rounded text-xs font-mono">quantity</code>.',
+                 'fa-map', 'bg-yellow-100 text-yellow-700'],
+
+                ['Check Valid Values sheet for dropdown values',
+                 'The <strong>Valid Values</strong> sheet lists every accepted value for each dropdown field, grouped by category. Also check the hint row (row 2) in each data sheet — it shows a live preview of accepted values pulled directly from your survey options.',
+                 'fa-list-check', 'bg-gray-100 text-gray-700'],
+
+                ['Upload and import',
+                 'Save the file (.xlsx) and upload it here. All imported records are saved as <strong>Draft</strong> status and require ward reviewer approval before becoming published.',
+                 'fa-upload', 'bg-blue-100 text-blue-700'],
             ] as [$title, $desc, $icon, $badgeCls])
             <li class="flex gap-3 text-sm text-gray-600">
                 <span class="flex-shrink-0 w-7 h-7 rounded-full {{ $badgeCls }} font-bold text-xs flex items-center justify-center mt-0.5">

@@ -277,8 +277,8 @@ $optVals = function(string $cat, string $fallback = '', int $max = 10) use ($opt
     </div>
 
     <div class="callout blue">
-      एउटा Excel फाइलमा तलका <strong>८ ट्याब (Sheet)</strong> हुनु पर्छ। ट्याबको नाम ठीक यस्तै हुनु पर्छ।<br>
-      <em>The Excel file must have exactly these <strong>8 tab names</strong>. Tab names are case-sensitive.</em>
+      Google Sheet मा तलका <strong>८ ट्याब (Sheet)</strong> हुनु पर्छ। ट्याबको नाम ठीक यस्तै हुनु पर्छ — अक्षरको साना/ठूला ध्यान दिनुहोस्।<br>
+      <em>The Google Sheet must have exactly these <strong>8 tab names</strong>. Tab names are case-sensitive. Row 1 = column headers, row 2 onwards = data.</em>
     </div>
 
     <div class="colour-key">
@@ -307,11 +307,11 @@ $optVals = function(string $cat, string $fallback = '', int $max = 10) use ($opt
               <tr><td class="col-name">total_members</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">कुल परिवार सदस्य संख्या</span></td></tr>
               <tr><td class="col-name">gps_lat</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">GPS Latitude (Nepal: <code>26.0–30.5</code>)</span></td></tr>
               <tr><td class="col-name">gps_lng</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">GPS Longitude (Nepal: <code>80.0–88.5</code>)</span></td></tr>
-              <tr><td class="col-name">family_head</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">परिवारको मूलीको पूरा नाम</span></td></tr>
-              <tr><td class="col-name">head_gender</td><td class="col-req"><span class="req-dot">●</span></td><td><span class="val-hint"><code>male</code> / <code>female</code> / <code>other</code></span></td></tr>
-              <tr><td class="col-name">family_type</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>nuclear</code> / <code>joint</code> / <code>single</code> / <code>other</code></span></td></tr>
+              <tr><td class="col-name">gps_altitude</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">उचाइ मिटरमा (metres above sea level)</span></td></tr>
+              <tr><td class="col-name">gps_accuracy</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">GPS सटीकता मिटरमा (accuracy in metres, e.g. <code>5</code>)</span></td></tr>
               <tr><td class="col-name">survey_date</td><td class="col-req"><span class="req-dot">●</span></td><td><span class="val-hint">सर्वेक्षण मिति — format: <code>YYYY-MM-DD</code></span></td></tr>
               <tr><td class="col-name">photo_number</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">फोटो फाइलको नाम (extension बिना, e.g. <code>00247</code>)</span></td></tr>
+              <tr><td class="col-name">remarks</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">थप टिप्पणी</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -366,12 +366,20 @@ $optVals = function(string $cat, string $fallback = '', int $max = 10) use ($opt
               <tr><td class="col-name">wall_type</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('wall_type', '<code>brick_cement</code> / <code>stone_cement</code> / <code>wood</code> / <code>bamboo</code>') !!}</span></td></tr>
               <tr><td class="col-name">foundation_type</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('foundation_type', '<code>rcc</code> / <code>brick_cement</code> / <code>stone_cement</code> / <code>stone_mud</code>') !!}</span></td></tr>
               <tr><td class="col-name">ownership_type</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('ownership_type', '<code>owned</code> / <code>rented</code> / <code>institutional</code>') !!}</span></td></tr>
+              <tr><td class="col-name">rent_amount</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">भाडा रकम रु. (ownership_type=rented भए)</span></td></tr>
+              <tr><td class="col-name">house_purpose</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('house_purpose', '<code>residential</code> / <code>commercial</code> / <code>mixed</code>') !!}</span></td></tr>
+              <tr><td class="col-name">location_house_built</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('location_house_built', '<code>plain</code> / <code>hilly</code> / <code>valley</code> / <code>roadside</code>') !!}</span></td></tr>
               <tr><td class="col-name">total_rooms</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">कोठाहरूको संख्या</span></td></tr>
+              <tr><td class="col-name">total_floors</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">तलाहरूको संख्या</span></td></tr>
               <tr><td class="col-name">house_condition</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('house_condition', '<code>good</code> / <code>average</code> / <code>poor</code> / <code>damaged</code>') !!}</span></td></tr>
               <tr><td class="col-name">land_measurement_unit</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('land_measurement_unit', '<code>ropani</code> / <code>ana</code> / <code>bigha</code> / <code>kattha</code> / <code>dhur</code>') !!}</span></td></tr>
               <tr><td class="col-name">house_land_type</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('house_land_type', '<code>registered</code> / <code>unregistered</code> / <code>leased</code> / <code>guthi</code>') !!}</span></td></tr>
               <tr><td class="col-name">has_building_permit</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>1</code>=छ / <code>0</code>=छैन</span></td></tr>
               <tr><td class="col-name">construction_year</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">निर्माण वर्ष (e.g. <code>2010</code>)</span></td></tr>
+              <tr><td class="col-name">is_at_risk</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>1</code>=जोखिममा छ / <code>0</code>=छैन</span></td></tr>
+              <tr><td class="col-name">risk_types</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">comma-separated: <code>flood,landslide,earthquake,fire</code></span></td></tr>
+              <tr><td class="col-name">distance_to_mainroad</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">मुख्य सडकसम्मको दूरी मिनेटमा</span></td></tr>
+              <tr><td class="col-name">distance_to_school</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">नजिकको विद्यालयसम्मको दूरी मिनेटमा</span></td></tr>
               <tr><td class="col-name">has_land_in_municipality</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>1</code>=पालिकामा जग्गा छ / <code>0</code>=छैन — details in LandParcels sheet</span></td></tr>
             </tbody>
           </table>
@@ -389,16 +397,25 @@ $optVals = function(string $cat, string $fallback = '', int $max = 10) use ($opt
             <thead><tr><th>Column Name</th><th class="col-req">चाहिन्छ?</th><th>विवरण / Description</th></tr></thead>
             <tbody>
               <tr><td class="col-name">household_code</td><td class="col-req"><span class="req-dot">●</span></td><td><span class="val-hint">Households शिटसँग मिल्नु पर्छ</span></td></tr>
-              <tr><td class="col-name">water_source</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('water_source', '<code>tap_water</code> / <code>tube_well</code> / <code>river</code> / <code>spring</code> / <code>well</code>') !!}</span></td></tr>
+              <tr><td class="col-name">water_source</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('water_source', '<code>tap_inside</code> / <code>tap_outside</code> / <code>tube_well</code> / <code>river</code> / <code>well</code> / <code>rain</code> / <code>jar_water</code>') !!}</span></td></tr>
+              <tr><td class="col-name">water_distance_minutes</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">पानी स्रोतसम्म हिँड्ने मिनेट (<code>0</code>=घरमै)</span></td></tr>
               <tr><td class="col-name">has_toilet</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>1</code>=छ / <code>0</code>=छैन</span></td></tr>
-              <tr><td class="col-name">toilet_type</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('toilet_type', '<code>flush</code> / <code>pit</code> / <code>open_field</code> / <code>none</code>') !!}</span></td></tr>
-              <tr><td class="col-name">electricity_source</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('electricity_source', '<code>grid</code> / <code>solar</code> / <code>generator</code> / <code>none</code>') !!}</span></td></tr>
-              <tr><td class="col-name">cooking_fuel</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('cooking_fuel', '<code>lpg</code> / <code>firewood</code> / <code>biogas</code> / <code>electric</code>') !!}</span></td></tr>
+              <tr><td class="col-name">toilet_type</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('toilet_type', '<code>flush</code> / <code>pit</code> / <code>eco_san</code> / <code>other</code>') !!}</span></td></tr>
+              <tr><td class="col-name">sanitation_type</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('sanitation_type', '<code>flush_piped</code> / <code>flush_septic</code> / <code>simple_pit</code> / <code>improved_pit</code> / <code>open</code> / <code>other</code>') !!}</span></td></tr>
+              <tr><td class="col-name">electricity_source</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('electricity_source', '<code>national_grid</code> / <code>solar</code> / <code>generator</code> / <code>micro_hydro</code> / <code>biogas</code> / <code>none</code>') !!}</span></td></tr>
+              <tr><td class="col-name">monthly_electricity_units</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">मासिक बिजुली खपत युनिट (kWh)</span></td></tr>
+              <tr><td class="col-name">cooking_fuel</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('cooking_fuel', '<code>lpg</code> / <code>biogas</code> / <code>firewood</code> / <code>kerosene</code> / <code>electricity</code> / <code>improved_cook</code>') !!}</span></td></tr>
+              <tr><td class="col-name">has_biogas</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>1</code>=बायोग्यास छ / <code>0</code>=छैन</span></td></tr>
+              <tr><td class="col-name">solid_waste_management</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('solid_waste_management', '<code>municipal</code> / <code>compost</code> / <code>burning</code> / <code>dumping</code> / <code>other</code>') !!}</span></td></tr>
               <tr><td class="col-name">has_internet</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>1</code>=छ / <code>0</code>=छैन</span></td></tr>
-              <tr><td class="col-name">handwashing</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('handwashing', '<code>soap_water</code> / <code>water_only</code> / <code>none</code>') !!}</span></td></tr>
-              <tr><td class="col-name">has_own_vehicle</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code></span></td></tr>
+              <tr><td class="col-name">internet_type</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('internet_type', '<code>broadband</code> / <code>mobile_data</code> / <code>fiber</code> / <code>none</code>') !!}</span></td></tr>
+              <tr><td class="col-name">handwashing</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('handwashing', '<code>soap_water</code> / <code>ash</code> / <code>water_only</code> / <code>none</code>') !!}</span></td></tr>
+              <tr><td class="col-name">has_own_vehicle</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>1</code>=सवारी साधन छ / <code>0</code>=छैन</span></td></tr>
               <tr><td class="col-name">vehicles_bike</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">मोटरसाइकल/स्कुटर संख्या</span></td></tr>
               <tr><td class="col-name">vehicles_car</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">कार/जिप संख्या</span></td></tr>
+              <tr><td class="col-name">vehicles_tempo</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">टेम्पो/भ्यान संख्या</span></td></tr>
+              <tr><td class="col-name">vehicles_tractor</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">ट्र्याक्टर संख्या</span></td></tr>
+              <tr><td class="col-name">vehicles_other</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">अन्य सवारी संख्या</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -417,10 +434,21 @@ $optVals = function(string $cat, string $fallback = '', int $max = 10) use ($opt
               <tr><td class="col-name">household_code</td><td class="col-req"><span class="req-dot">●</span></td><td><span class="val-hint">Households शिटसँग मिल्नु पर्छ</span></td></tr>
               <tr><td class="col-name">primary_income_source</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('primary_income_source', '<code>agriculture</code> / <code>business</code> / <code>service</code> / <code>remittance</code> / <code>daily_wage</code>') !!}</span></td></tr>
               <tr><td class="col-name">annual_income_range</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('annual_income_range', '<code>below_50000</code> / <code>50000_100000</code> / <code>100000_200000</code> / <code>above_500000</code>') !!}</span></td></tr>
+              <tr><td class="col-name">annual_expenditure_range</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">{!! $optVals('annual_expenditure_range', '<code>below_50000</code> / <code>50000_100000</code> / <code>100000_200000</code> / <code>above_500000</code>') !!}</span></td></tr>
+              <tr><td class="col-name">remittance_amount</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">वार्षिक रेमिट्यान्स रु. (नभए <code>0</code>)</span></td></tr>
+              <tr><td class="col-name">loan_sources</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">comma-separated: <code>bank,cooperative,moneylender,friend</code></span></td></tr>
+              <tr><td class="col-name">total_loan_amount</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">जम्मा ऋण रकम रु.</span></td></tr>
               <tr><td class="col-name">has_bank_account</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>1</code>=छ / <code>0</code>=छैन</span></td></tr>
+              <tr><td class="col-name">has_insurance</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>1</code>=बीमा छ / <code>0</code>=छैन</span></td></tr>
               <tr><td class="col-name">poverty_card</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>1</code>=छ / <code>0</code>=छैन (गरिबी परिचय पत्र)</span></td></tr>
               <tr><td class="col-name">has_foreign_employment</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>1</code>=छ / <code>0</code>=छैन</span></td></tr>
-              <tr><td class="col-name">remittance_amount</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">वार्षिक रेमिट्यान्स रु. (नभए <code>0</code>)</span></td></tr>
+              <tr><td class="col-name">foreign_employment_country</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">विदेश रोजगारी भएको देश (e.g. <code>Qatar</code>, <code>UAE</code>, <code>Malaysia</code>)</span></td></tr>
+              <tr><td class="col-name">decision_household_work</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">घरकामको निर्णय: <code>male</code> / <code>female</code> / <code>both</code> — survey_data मा सुरक्षित</span></td></tr>
+              <tr><td class="col-name">decision_property</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">सम्पत्ति निर्णय: <code>male</code> / <code>female</code> / <code>both</code></span></td></tr>
+              <tr><td class="col-name">decision_consumer_committee</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">उपभोक्ता समिति निर्णय: <code>male</code> / <code>female</code> / <code>both</code></span></td></tr>
+              <tr><td class="col-name">decision_school_mgmt</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">विद्यालय व्यवस्थापन: <code>male</code> / <code>female</code> / <code>both</code></span></td></tr>
+              <tr><td class="col-name">decision_business</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">व्यवसाय निर्णय: <code>male</code> / <code>female</code> / <code>both</code></span></td></tr>
+              <tr><td class="col-name">decision_bank_account</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">बैंक खाता निर्णय: <code>male</code> / <code>female</code> / <code>both</code></span></td></tr>
             </tbody>
           </table>
         </div>
@@ -440,7 +468,10 @@ $optVals = function(string $cat, string $fallback = '', int $max = 10) use ($opt
               <tr><td class="col-name">agriculture</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>1</code>=कृषि गर्छ / <code>0</code>=गर्दैन</span></td></tr>
               <tr><td class="col-name">owns_land</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>1</code>=जग्गा छ / <code>0</code>=छैन</span></td></tr>
               <tr><td class="col-name">land_area_ropani</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">जम्मा जग्गा क्षेत्रफल (रोपनीमा)</span></td></tr>
-              <tr><td class="col-name">agri_categories</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">अल्पविराम (comma) ले छुट्याएर: <code>food_crops,vegetables,cash_crops</code></span></td></tr>
+              <tr><td class="col-name">irrigated_area_ropani</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">सिँचित जग्गा क्षेत्रफल (रोपनीमा)</span></td></tr>
+              <tr><td class="col-name">agri_categories</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">comma-separated: <code>food_crops,vegetables,cash_crops,fruits,spices</code></span></td></tr>
+              <tr><td class="col-name">use_of_chem_fertilizer</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>1</code>=रासायनिक मल प्रयोग / <code>0</code>=छैन</span></td></tr>
+              <tr><td class="col-name">farm_challenges</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">comma-separated: <code>drought,flood,pest,market,labor</code></span></td></tr>
               <tr><td class="col-name">annual_agri_income</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">वार्षिक कृषि आय रु.</span></td></tr>
             </tbody>
           </table>
@@ -465,8 +496,17 @@ $optVals = function(string $cat, string $fallback = '', int $max = 10) use ($opt
               <tr><td class="col-name">livestock_type</td><td class="col-req"><span class="req-dot">●</span></td><td><span class="val-hint">{!! $optVals('livestock_kind', '<code>cow</code> / <code>buffalo</code> / <code>goat</code> / <code>sheep</code> / <code>pig</code> / <code>poultry</code> / <code>yak</code> / <code>other</code>') !!}</span></td></tr>
               <tr><td class="col-name">count</td><td class="col-req"><span class="req-dot">●</span></td><td><span class="val-hint">पशुको संख्या</span></td></tr>
               <tr><td class="col-name">vet_service_access</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>1</code>=पशु सेवा छ / <code>0</code>=छैन</span></td></tr>
+              <tr><td class="col-name">insurance</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>1</code>=पशु बीमा छ / <code>0</code>=छैन</span></td></tr>
               <tr><td class="col-name">has_beekeeping</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>1</code>=मौरीपालन छ (घरधुरीमा एकपटक मात्र भर्नुस्)</span></td></tr>
+              <tr><td class="col-name">mudhe_hive</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">मुढे घार संख्या</span></td></tr>
+              <tr><td class="col-name">modern_hive</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">आधुनिक घार संख्या</span></td></tr>
+              <tr><td class="col-name">honey_prod_mudhe</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">मुढे घारबाट मह उत्पादन (kg)</span></td></tr>
+              <tr><td class="col-name">honey_prod_modern</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">आधुनिक घारबाट मह उत्पादन (kg)</span></td></tr>
+              <tr><td class="col-name">honey_sales</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">मह बिक्रीबाट आय रु.</span></td></tr>
               <tr><td class="col-name">has_fishery</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>1</code>=माछापालन छ (घरधुरीमा एकपटक मात्र भर्नुस्)</span></td></tr>
+              <tr><td class="col-name">pond_area</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">पोखरी क्षेत्रफल (रोपनीमा)</span></td></tr>
+              <tr><td class="col-name">fish_prod</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">माछा उत्पादन (kg)</span></td></tr>
+              <tr><td class="col-name">fish_sales</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">माछा बिक्रीबाट आय रु.</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -505,8 +545,8 @@ $optVals = function(string $cat, string $fallback = '', int $max = 10) use ($opt
     </div>
 
     <div class="callout blue">
-      संस्था Excel फाइलमा पनि <strong>७ ट्याब</strong> हुनु पर्छ। संस्था प्रकार अनुसार सबै ट्याब नभरे पनि हुन्छ।<br>
-      <em>Institution file also needs 7 tabs. Not all tabs need data — only fill what applies to the institution type.</em>
+      संस्था Google Sheet मा पनि <strong>७ ट्याब</strong> हुनु पर्छ। संस्था प्रकार अनुसार सबै ट्याब नभरे पनि हुन्छ।<br>
+      <em>Institution Google Sheet also needs 7 tabs. Not all tabs need data — only fill what applies to the institution type.</em>
     </div>
 
     <div class="sheet-grid">
@@ -528,8 +568,13 @@ $optVals = function(string $cat, string $fallback = '', int $max = 10) use ($opt
               <tr><td class="col-name">name_en</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">संस्थाको अंग्रेजी नाम</span></td></tr>
               <tr><td class="col-name">ownership_type</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>govt</code> / <code>private</code> / <code>community</code> / <code>ngo</code> / <code>cooperative</code></span></td></tr>
               <tr><td class="col-name">settlement_name</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">टोल/बस्तीको नाम</span></td></tr>
+              <tr><td class="col-name">registration_number</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">दर्ता नम्बर</span></td></tr>
+              <tr><td class="col-name">respondent_name</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">उत्तरदाताको नाम</span></td></tr>
+              <tr><td class="col-name">respondent_contact</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">उत्तरदाताको सम्पर्क नम्बर</span></td></tr>
               <tr><td class="col-name">survey_date</td><td class="col-req"><span class="req-dot">●</span></td><td><span class="val-hint">सर्वेक्षण मिति — <code>YYYY-MM-DD</code></span></td></tr>
+              <tr><td class="col-name">established_date</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">स्थापना मिति — <code>YYYY-MM-DD</code></span></td></tr>
               <tr><td class="col-name">gps_lat / gps_lng</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">GPS निर्देशाङ्क</span></td></tr>
+              <tr><td class="col-name">photo_number</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">फोटो फाइलको नाम</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -549,10 +594,22 @@ $optVals = function(string $cat, string $fallback = '', int $max = 10) use ($opt
               <tr><td class="col-name">building_type</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>concrete</code> / <code>tin</code> / <code>bamboo</code> / <code>brick</code> / <code>stone</code> / <code>wood</code></span></td></tr>
               <tr><td class="col-name">building_condition</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>good</code> / <code>average</code> / <code>poor</code> / <code>dilapidated</code></span></td></tr>
               <tr><td class="col-name">total_rooms</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">कुल कोठा संख्या</span></td></tr>
+              <tr><td class="col-name">total_floors</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">तलाहरूको संख्या</span></td></tr>
+              <tr><td class="col-name">land_area_sqft</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">जग्गा क्षेत्रफल (वर्ग फिटमा)</span></td></tr>
               <tr><td class="col-name">has_boundary_wall</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code></span></td></tr>
+              <tr><td class="col-name">toilet_count</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">कुल शौचालय संख्या</span></td></tr>
+              <tr><td class="col-name">female_toilet</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">महिला शौचालय संख्या</span></td></tr>
+              <tr><td class="col-name">male_toilet</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">पुरुष शौचालय संख्या</span></td></tr>
+              <tr><td class="col-name">disabled_toilet</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code> — अपांग शौचालय</span></td></tr>
+              <tr><td class="col-name">accessible_ramp</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code> — ढलान</span></td></tr>
               <tr><td class="col-name">drinking_water</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code></span></td></tr>
               <tr><td class="col-name">electricity</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code></span></td></tr>
+              <tr><td class="col-name">solar</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code> — सौर्य ऊर्जा</span></td></tr>
+              <tr><td class="col-name">generator</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code> — जेनेरेटर</span></td></tr>
+              <tr><td class="col-name">internet</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code></span></td></tr>
+              <tr><td class="col-name">fire_extinguisher</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code> — आगो निभाउने यन्त्र</span></td></tr>
               <tr><td class="col-name">earthquake_safe</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code></span></td></tr>
+              <tr><td class="col-name">evacuation_plan</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code> — निकासी योजना</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -572,6 +629,9 @@ $optVals = function(string $cat, string $fallback = '', int $max = 10) use ($opt
               <tr><td class="col-name">staff_category</td><td class="col-req"><span class="req-dot">●</span></td><td><span class="val-hint"><code>teacher</code> / <code>health_worker</code> / <code>admin</code> / <code>support</code> / <code>security</code></span></td></tr>
               <tr><td class="col-name">male_count</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">पुरुष संख्या</span></td></tr>
               <tr><td class="col-name">female_count</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">महिला संख्या</span></td></tr>
+              <tr><td class="col-name">dalit_count</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">दलित संख्या</span></td></tr>
+              <tr><td class="col-name">janajati_count</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">जनजाति संख्या</span></td></tr>
+              <tr><td class="col-name">other_count</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">अन्य संख्या</span></td></tr>
               <tr><td class="col-name">permanent_count</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">स्थायी संख्या</span></td></tr>
               <tr><td class="col-name">contract_count</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">करार संख्या</span></td></tr>
             </tbody>
@@ -593,6 +653,9 @@ $optVals = function(string $cat, string $fallback = '', int $max = 10) use ($opt
               <tr><td class="col-name">grade</td><td class="col-req"><span class="req-dot">●</span></td><td><span class="val-hint"><code>ecd</code> / <code>grade_1</code> / <code>grade_2</code> … <code>grade_12</code></span></td></tr>
               <tr><td class="col-name">male_students</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">छात्र संख्या</span></td></tr>
               <tr><td class="col-name">female_students</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">छात्रा संख्या</span></td></tr>
+              <tr><td class="col-name">dalit_students</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">दलित विद्यार्थी संख्या</span></td></tr>
+              <tr><td class="col-name">janajati_students</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">जनजाति विद्यार्थी संख्या</span></td></tr>
+              <tr><td class="col-name">scholarship_students</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">छात्रवृत्ति पाउने विद्यार्थी संख्या</span></td></tr>
               <tr><td class="col-name">dropout_count</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">विद्यालय छाड्नेहरू संख्या</span></td></tr>
             </tbody>
           </table>
@@ -613,8 +676,13 @@ $optVals = function(string $cat, string $fallback = '', int $max = 10) use ($opt
               <tr><td class="col-name">bed_count</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">शैयाहरूको संख्या</span></td></tr>
               <tr><td class="col-name">delivery_service</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code> — प्रसूति सेवा</span></td></tr>
               <tr><td class="col-name">emergency_service</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code> — आपतकालीन सेवा</span></td></tr>
+              <tr><td class="col-name">lab_service</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code> — प्रयोगशाला सेवा</span></td></tr>
+              <tr><td class="col-name">xray_service</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code> — X-ray सेवा</span></td></tr>
+              <tr><td class="col-name">ambulance</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code> — एम्बुलेन्स सेवा</span></td></tr>
               <tr><td class="col-name">monthly_outpatient_avg</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">मासिक औसत OPD संख्या</span></td></tr>
+              <tr><td class="col-name">monthly_inpatient_avg</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">मासिक औसत भर्ना संख्या</span></td></tr>
               <tr><td class="col-name">vaccine_service</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code> — खोप सेवा</span></td></tr>
+              <tr><td class="col-name">family_planning</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code> / <code>no</code> — परिवार नियोजन सेवा</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -633,6 +701,9 @@ $optVals = function(string $cat, string $fallback = '', int $max = 10) use ($opt
               <tr><td class="col-name">institution_code</td><td class="col-req"><span class="req-dot">●</span></td><td><span class="val-hint">Institutions शिटसँग मिल्नु पर्छ</span></td></tr>
               <tr><td class="col-name">service_name</td><td class="col-req"><span class="req-dot">●</span></td><td><span class="val-hint">सेवाको नाम (e.g. <code>Primary Education</code>)</span></td></tr>
               <tr><td class="col-name">service_type</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>education</code> / <code>health</code> / <code>financial</code> / <code>social</code> / <code>agriculture</code></span></td></tr>
+              <tr><td class="col-name">capacity</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">सेवा क्षमता (संख्या)</span></td></tr>
+              <tr><td class="col-name">annual_beneficiaries</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">वार्षिक लाभग्राही संख्या</span></td></tr>
+              <tr><td class="col-name">coverage_description</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">सेवा कभरेज विवरण</span></td></tr>
               <tr><td class="col-name">is_free</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>yes</code>=निःशुल्क / <code>no</code>=शुल्क लाग्छ</span></td></tr>
             </tbody>
           </table>
@@ -654,7 +725,10 @@ $optVals = function(string $cat, string $fallback = '', int $max = 10) use ($opt
               <tr><td class="col-name">gender</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>male</code> / <code>female</code> / <code>other</code></span></td></tr>
               <tr><td class="col-name">category</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>permanent</code> / <code>temporary</code> / <code>contract</code> / <code>relief</code></span></td></tr>
               <tr><td class="col-name">qualification</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint"><code>bachelor</code> / <code>master</code> / <code>phd</code></span></td></tr>
+              <tr><td class="col-name">appointment_level</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">नियुक्ति तह (e.g. <code>gazetted_3</code>, <code>non_gazetted_2</code>)</span></td></tr>
+              <tr><td class="col-name">specialization</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">विशेषज्ञता विषय</span></td></tr>
               <tr><td class="col-name">subjects</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">pipe-separated: <code>math|science|nepali</code></span></td></tr>
+              <tr><td class="col-name">enrollment_date</td><td class="col-req"><span class="opt-dot">○</span></td><td><span class="val-hint">नियुक्ति मिति — <code>YYYY-MM-DD</code></span></td></tr>
             </tbody>
           </table>
         </div>
@@ -718,9 +792,14 @@ $optVals = function(string $cat, string $fallback = '', int $max = 10) use ($opt
           <td>एक पटकमा एउटा वडाको डेटा मात्र सिंक गर्नुहोस्</td>
         </tr>
         <tr>
-          <td><span class="err-code">head_gender आवश्यक छ</span></td>
-          <td>Households शिटमा head_gender खाली</td>
-          <td><code>male</code> / <code>female</code> / <code>other</code> भर्नुहोस्</td>
+          <td><span class="err-code">Sheet 'Households' डाउनलोड हुन सकेन</span></td>
+          <td>Sheet tab नाम गलत वा Sheet private छ</td>
+          <td>Tab नाम ठीक मिलाउनुहोस् (case-sensitive) र Share → Anyone with link → Viewer</td>
+        </tr>
+        <tr>
+          <td><span class="err-code">household_code / institution_code मिलेन</span></td>
+          <td>Supporting sheet को code Households sheet सँग मेल खाएन</td>
+          <td>सबै supporting sheets मा household_code / institution_code ठीक copy-paste गर्नुहोस्</td>
         </tr>
       </tbody>
     </table>
@@ -736,7 +815,7 @@ $optVals = function(string $cat, string $fallback = '', int $max = 10) use ($opt
       <li>
         <div>
           <strong>Google Sheet तयार गर्नुहोस् / Prepare Google Sheet</strong><br>
-          <span class="val-hint">सबै ८ ट्याब (घरधुरी) / ७ ट्याब (संस्था) सही नामले बनाउनुहोस्। row 1 = column headers, row 2 = hints (optional), row 3 देखि डेटा।</span>
+          <span class="val-hint">सबै ८ ट्याब (घरधुरी) / ७ ट्याब (संस्था) सही नामले बनाउनुहोस्। <strong>Row 1 = column headers (exact names from this manual), row 2 देखि डेटा</strong> — hints row राख्न पर्दैन।</span>
         </div>
       </li>
       <li>

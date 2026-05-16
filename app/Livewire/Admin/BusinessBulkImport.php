@@ -93,6 +93,29 @@ class BusinessBulkImport extends Component
         }
     }
 
+    public function downloadErrorCsv()
+    {
+        if (empty($this->errorLog)) return;
+
+        $rows   = [['Type', 'Sheet', 'Row', 'Field', 'Invalid Value / Error']];
+        foreach ($this->errorLog as $err) {
+            if (is_array($err) && ($err['type'] ?? '') === 'invalid_option') {
+                $rows[] = ['Invalid Option', $err['sheet'] ?? '', $err['row'] ?? '', $err['field'] ?? '', $err['value'] ?? ''];
+            } else {
+                $msg    = is_array($err) ? ($err['error'] ?? json_encode($err)) : $err;
+                $rows[] = ['Error', '', '', '', $msg];
+            }
+        }
+
+        $filename = 'import_errors_' . date('Ymd_His') . '.csv';
+        return response()->streamDownload(function () use ($rows) {
+            $f = fopen('php://output', 'w');
+            fwrite($f, "\xEF\xBB\xBF");
+            foreach ($rows as $row) fputcsv($f, $row);
+            fclose($f);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
     public function resetImport(): void
     {
         $this->status        = 'idle';

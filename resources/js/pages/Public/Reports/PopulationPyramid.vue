@@ -1,5 +1,5 @@
 <template>
-  <div class="max-w-screen-xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+  <div class="w-full px-4 sm:px-6 py-6 space-y-5">
 
     <!-- Header -->
     <div class="flex flex-wrap items-center justify-between gap-3">

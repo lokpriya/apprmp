@@ -109,19 +109,30 @@ class RolePermissions
                 ],
             ],
             [
+                'key'   => 'google_sync',
+                'label' => 'गुगल शीट सिंक',
+                'icon'  => 'fa-brands fa-google',
+                'perms' => [
+                    'google_sync.view'    => ['label' => 'हेर्ने',       'en' => 'View Sync Page'],
+                    'google_sync.preview' => ['label' => 'पूर्वावलोकन', 'en' => 'Preview Diff'],
+                    'google_sync.apply'   => ['label' => 'लागू गर्ने',  'en' => 'Apply Changes'],
+                ],
+            ],
+            [
                 'key'   => 'settings',
                 'label' => 'सेटिङ्ग',
                 'icon'  => 'fa-solid fa-gear',
                 'perms' => [
-                    'settings.general'           => ['label' => 'सामान्य सेटिङ्ग',      'en' => 'General Settings'],
-                    'settings.wards'             => ['label' => 'वडा व्यवस्थापन',       'en' => 'Ward Management'],
-                    'settings.survey_options'    => ['label' => 'सर्वेक्षण विकल्प',    'en' => 'Survey Options'],
-                    'settings.representatives'   => ['label' => 'जनप्रतिनिधि',         'en' => 'Representatives'],
-                    'settings.employees'         => ['label' => 'कर्मचारी',             'en' => 'Employees'],
-                    'settings.gallery'           => ['label' => 'फोटो ग्यालरी',         'en' => 'Photo Gallery'],
-                    'settings.downloads'         => ['label' => 'डाउनलोड लिंक',        'en' => 'Download Links'],
-                    'settings.content'           => ['label' => 'सामग्री (प्रोफाइल/नक्सा/स्वागत)', 'en' => 'Content (Profile/Map/Welcome)'],
-                    'settings.lock_unlock'       => ['label' => 'लक/अनलक',             'en' => 'Lock / Unlock'],
+                    'settings.general'        => ['label' => 'सामान्य सेटिङ्ग',                  'en' => 'General Settings'],
+                    'settings.wards'          => ['label' => 'वडा व्यवस्थापन',                   'en' => 'Ward Management'],
+                    'settings.survey_options' => ['label' => 'सर्वेक्षण विकल्प',                'en' => 'Survey Options'],
+                    'settings.representatives'=> ['label' => 'जनप्रतिनिधि',                      'en' => 'Representatives'],
+                    'settings.employees'      => ['label' => 'कर्मचारी',                          'en' => 'Employees'],
+                    'settings.gallery'        => ['label' => 'फोटो ग्यालरी',                     'en' => 'Photo Gallery'],
+                    'settings.downloads'      => ['label' => 'डाउनलोड लिंक',                    'en' => 'Download Links'],
+                    'settings.content'        => ['label' => 'सामग्री (प्रोफाइल/नक्सा/स्वागत)', 'en' => 'Content (Profile/Map/Welcome)'],
+                    'settings.maintenance'    => ['label' => 'मर्मत मोड',                        'en' => 'Maintenance Mode'],
+                    'settings.lock_unlock'    => ['label' => 'लक/अनलक',                          'en' => 'Lock / Unlock'],
                 ],
             ],
         ];
@@ -155,10 +166,13 @@ class RolePermissions
                 'reports.view','reports.export',
                 // Import
                 'import.households','import.institutions','import.businesses',
+                // Google Sync
+                'google_sync.view','google_sync.preview','google_sync.apply',
                 // Settings
                 'settings.general','settings.wards','settings.survey_options',
                 'settings.representatives','settings.employees','settings.gallery',
-                'settings.downloads','settings.content','settings.lock_unlock',
+                'settings.downloads','settings.content','settings.maintenance',
+                'settings.lock_unlock',
             ],
 
             'ward_admin' => [
@@ -178,6 +192,8 @@ class RolePermissions
                 'edit_requests.view','edit_requests.approve','edit_requests.reject',
                 // Reports
                 'reports.view','reports.export',
+                // Import (ward-scoped)
+                'import.households','import.institutions','import.businesses',
             ],
 
             'ward_reviewer' => [
@@ -187,7 +203,7 @@ class RolePermissions
                 'institutions.view','institutions.approve','institutions.reject',
                 // Businesses
                 'businesses.view','businesses.approve','businesses.reject',
-                // Review
+                // Review (includes bulk approve/reject via queue)
                 'review.view','review.approve','review.reject','review.escalate',
                 // Edit Requests
                 'edit_requests.view','edit_requests.request',

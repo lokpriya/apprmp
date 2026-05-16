@@ -13,12 +13,28 @@ const dataType    = ref('households')
 const wardId      = ref('')
 const forceLocked = ref(false)
 
+// ── Force-locked confirmation modal ──────────────────────────────────────────
+const showForceLockedModal = ref(false)
+
+function handleApplyClick() {
+  if (forceLocked.value && counts.value.locked > 0) {
+    showForceLockedModal.value = true
+  } else {
+    doApply()
+  }
+}
+
+function confirmForceApply() {
+  showForceLockedModal.value = false
+  doApply()
+}
+
 // ── Preview state ─────────────────────────────────────────────────────────────
 const previewing  = ref(false)
 const applying    = ref(false)
-const previewDone = ref(false)
-const applyDone   = ref(false)
-const errorMsg    = ref('')
+const previewDone  = ref(false)
+const applyDone    = ref(false)
+const errorMsg     = ref('')
 const showCoverage = ref(false)
 
 const counts     = ref({ new: 0, changed: 0, locked: 0, upToDate: 0, errors: 0 })
@@ -26,6 +42,7 @@ const rows       = ref([])
 const errors     = ref([])
 const debug      = ref(null)
 const applyResult = ref(null)
+const diffKey    = ref(null)
 
 // ── Completeness checks — differ by data type ─────────────────────────────────
 // Each entry: [key in _completeness, emoji, Nepali label, is_count (vs boolean)]
@@ -97,6 +114,16 @@ function resetState() {
   errors.value       = []
   debug.value        = null
   counts.value       = { new: 0, changed: 0, locked: 0, upToDate: 0, errors: 0 }
+  diffKey.value     = null
+}
+
+function extractError(e) {
+  const d = e.response?.data
+  if (!d) return `नेटवर्क त्रुटि (HTTP ${e.response?.status ?? 'no response'})`
+  if (d.error)   return d.error
+  if (d.message) return d.message
+  if (d.errors)  return Object.values(d.errors).flat().join(' | ')
+  return `HTTP ${e.response?.status}: ` + JSON.stringify(d).slice(0, 200)
 }
 
 async function doPreview() {
@@ -108,12 +135,13 @@ async function doPreview() {
       ward_id: wardId.value,
     })
     counts.value      = res.data.counts
-    rows.value        = res.data.rows   ?? []
-    errors.value      = res.data.errors ?? []
-    debug.value       = res.data.debug  ?? null
+    rows.value        = res.data.rows     ?? []
+    errors.value      = res.data.errors   ?? []
+    debug.value       = res.data.debug    ?? null
+    diffKey.value     = res.data.diff_key ?? null
     previewDone.value = true
   } catch (e) {
-    errorMsg.value = e.response?.data?.error ?? e.response?.data?.message ?? 'अज्ञात त्रुटि'
+    errorMsg.value = extractError(e)
   } finally {
     previewing.value = false
   }
@@ -127,12 +155,13 @@ async function doApply() {
       type:         dataType.value,
       ward_id:      wardId.value,
       force_locked: forceLocked.value,
+      diff_key:     diffKey.value,
     })
     applyResult.value = res.data
     applyDone.value   = true
     previewDone.value = false
   } catch (e) {
-    errorMsg.value = e.response?.data?.error ?? e.response?.data?.message ?? 'अज्ञात त्रुटि'
+    errorMsg.value = extractError(e)
   } finally {
     applying.value = false
   }
@@ -401,7 +430,7 @@ function actionClass(action) {
           <span class="text-gray-700">सुरक्षित रेकर्डहरू पनि ओभरराइट गर्नुहोस्</span>
           <span class="text-xs text-red-500">(सावधान: म्यानुअल सम्पादन मेटिन्छ)</span>
         </label>
-        <button @click="doApply" :disabled="!canApply"
+        <button @click="handleApplyClick" :disabled="!canApply"
                 class="ml-auto px-5 py-2 rounded-lg text-sm font-medium transition
                        bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
           <i v-if="applying" class="fa-solid fa-spinner fa-spin"></i>
@@ -540,8 +569,68 @@ function actionClass(action) {
          class="text-center py-16 text-gray-400">
       <i class="fa-brands fa-google text-5xl mb-3 block text-gray-300"></i>
       <p class="text-sm">वडा छानेर <strong class="text-gray-500">"प्रिभ्यू हेर्नुहोस्"</strong> थिच्नुहोस्</p>
-      <p class="text-xs mt-1 text-gray-400">Google Sheets बाट सबै ७ शीटहरूको डेटा एकैपटक तुलना हुन्छ।</p>
+      <p class="text-xs mt-1 text-gray-400">Google Sheets बाट सबै ८ शीटहरूको (घरधुरी) / ७ शीटहरूको (संस्था) डेटा एकैपटक तुलना हुन्छ।</p>
     </div>
 
   </div>
+
+  <!-- ── Force-locked confirmation modal ──────────────────────────────────── -->
+  <Teleport to="body">
+    <div v-if="showForceLockedModal"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
+         @click.self="showForceLockedModal = false">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+
+        <!-- Header -->
+        <div class="bg-red-600 px-5 py-4 flex items-center gap-3">
+          <i class="fa-solid fa-triangle-exclamation text-white text-lg"></i>
+          <h3 class="text-white font-semibold text-[15px]">म्यानुअल सम्पादन ओभरराइट हुनेछ</h3>
+        </div>
+
+        <!-- Body -->
+        <div class="px-5 py-4 space-y-3">
+          <p class="text-[13px] text-gray-700">
+            तलका <strong class="text-red-700">{{ counts.locked }} रेकर्डहरू</strong> म्यानुअल रूपमा सम्पादन गरी <em>सुरक्षित</em> गरिएका छन्।
+            Google Sheets को डेटाले ती परिवर्तनहरू <strong class="text-red-700">अधिलेखन (overwrite)</strong> गर्नेछ।
+          </p>
+
+          <!-- List of locked codes (max 10 shown) -->
+          <div class="bg-red-50 border border-red-200 rounded-lg px-3 py-2 max-h-40 overflow-y-auto">
+            <p class="text-[11px] font-semibold text-red-600 mb-1">प्रभावित रेकर्डहरू:</p>
+            <div v-for="row in rows.filter(r => r._action === 'locked').slice(0, 10)"
+                 :key="row.unique_code ?? row.institution_code"
+                 class="text-[12px] text-red-800 font-mono py-0.5 border-b border-red-100 last:border-0">
+              {{ row.unique_code ?? row.institution_code ?? '—' }}
+              <span v-if="row.respondent_name || row.name_np" class="font-sans font-normal text-red-600 ml-2">
+                — {{ row.respondent_name || row.name_np }}
+              </span>
+            </div>
+            <p v-if="counts.locked > 10" class="text-[11px] text-red-500 mt-1 italic">
+              + {{ counts.locked - 10 }} थप रेकर्डहरू…
+            </p>
+          </div>
+
+          <p class="text-[12px] text-gray-500">
+            <i class="fa-solid fa-circle-info mr-1"></i>
+            यो कार्य पूर्ववत गर्न सकिँदैन। जारी राख्नुअघि निश्चित गर्नुहोस्।
+          </p>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-5 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-3">
+          <button @click="showForceLockedModal = false"
+                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+            रद्द गर्नुहोस्
+          </button>
+          <button @click="confirmForceApply"
+                  class="px-5 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition flex items-center gap-2">
+            <i class="fa-solid fa-triangle-exclamation text-xs"></i>
+            ओभरराइट गरी अगाडि बढ्नुहोस्
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </Teleport>
+
 </template>

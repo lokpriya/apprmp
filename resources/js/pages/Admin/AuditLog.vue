@@ -310,16 +310,52 @@ const SKIP = new Set([
   'submitted_at', 'ward_reviewed_at', 'ward_reviewer_id', 'ward_review_comment',
   'published_at', 'published_by', 'data_frozen_at',
   'enumerator_id', 'ward_id', 'settlement_id',
-  'survey_data', 'user_agent',
+  'user_agent',
+  // survey_data is handled separately — expanded into sub-fields below
 ])
+
+// Expand survey_data JSON into flat pseudo-keys for diffing.
+// Object sections → survey_data.{section}.{field}
+// Scalar / array sections → survey_data.{section}
+function flattenSurveyData(sd) {
+  const result = {}
+  if (!sd || typeof sd !== 'object') return result
+  for (const [section, val] of Object.entries(sd)) {
+    if (val === null || val === undefined) continue
+    if (!Array.isArray(val) && typeof val === 'object') {
+      for (const [field, fVal] of Object.entries(val)) {
+        result[`survey_data.${section}.${field}`] = fVal
+      }
+    } else {
+      result[`survey_data.${section}`] = val
+    }
+  }
+  return result
+}
 
 function computedDiff(log) {
   const oldV = log.old_values ?? {}
   const newV = log.new_values ?? {}
   const keys = new Set([...Object.keys(oldV), ...Object.keys(newV)])
   const changes = []
+
   for (const k of keys) {
     if (SKIP.has(k)) continue
+
+    if (k === 'survey_data') {
+      const oldFlat = flattenSurveyData(oldV[k])
+      const newFlat = flattenSurveyData(newV[k])
+      const sdKeys = new Set([...Object.keys(oldFlat), ...Object.keys(newFlat)])
+      for (const sk of sdKeys) {
+        const o = oldFlat[sk]
+        const n = newFlat[sk]
+        if (JSON.stringify(o) !== JSON.stringify(n)) {
+          changes.push({ key: sk, old: o, new: n })
+        }
+      }
+      continue
+    }
+
     const o = oldV[k]
     const n = newV[k]
     if (JSON.stringify(o) !== JSON.stringify(n)) {
@@ -349,15 +385,86 @@ const FIELD_LABELS = {
   tax_amount: 'कर रकम', pan_vat_number: 'PAN/VAT नम्बर',
 }
 
+// Labels for flattened survey_data pseudo-fields
+const SURVEY_DATA_LABELS = {
+  // ── location (step 1)
+  'survey_data.location.house_type':        'घरको बनावट',
+  'survey_data.location.house_purpose':     'घरको उद्देश्य',
+  'survey_data.location.roof_type':         'छानोको प्रकार',
+  'survey_data.location.wall_type':         'भित्ताको प्रकार',
+  'survey_data.location.foundation_type':   'जगको प्रकार',
+  'survey_data.location.ownership_type':    'स्वामित्वको किसिम',
+  'survey_data.location.house_condition':   'घरको अवस्था',
+  'survey_data.location.land_use_type':     'जग्गा उपयोग',
+  'survey_data.location.house_land_type':   'जग्गाको किसिम',
+  'survey_data.location.location_house_built': 'घर बनेको ठाउँ',
+  // ── social (step 2)
+  'survey_data.social.ethnicity':           'जाति/समुदाय',
+  'survey_data.social.religion':            'धर्म',
+  'survey_data.social.language':            'मातृभाषा',
+  'survey_data.social.family_type':         'परिवारको किसिम',
+  'survey_data.social.major_occupation':    'मुख्य पेशा',
+  'survey_data.social.settlement_type':     'बसोबासको प्रकार',
+  'survey_data.social.migration_purpose':   'बसाइसराइको उद्देश्य',
+  // ── wellbeing (step 3)
+  'survey_data.wellbeing.water_source':         'खानेपानी स्रोत',
+  'survey_data.wellbeing.toilet_type':          'शौचालयको किसिम',
+  'survey_data.wellbeing.sanitation_type':      'सरसफाइको प्रकार',
+  'survey_data.wellbeing.handwashing':          'हात धुने सुविधा',
+  'survey_data.wellbeing.electricity_source':   'विद्युतको स्रोत',
+  'survey_data.wellbeing.alt_electricity_source': 'बैकल्पिक विद्युत',
+  'survey_data.wellbeing.cooking_fuel':         'खाना पकाउने इन्धन',
+  'survey_data.wellbeing.cooking_stove':        'चुलोको प्रकार',
+  'survey_data.wellbeing.firewood_source':      'दाउराको स्रोत',
+  'survey_data.wellbeing.waste_management':     'फोहोर व्यवस्थापन',
+  'survey_data.wellbeing.internet_type':        'इन्टरनेट',
+  'survey_data.wellbeing.facilities':           'सुविधाहरू',
+  // ── health (step 3)
+  'survey_data.health.nutrition_diet':      'पोषण तथा आहार',
+  'survey_data.health.treatment_place':     'उपचार स्थान',
+  // ── decisions (step 4)
+  'survey_data.decisions.vehicle_type':       'सवारी साधन',
+  'survey_data.decisions.decision_owner':     'निर्णय स्वामित्व',
+  'survey_data.decisions.residence_perception': 'बसोबास दृष्टिकोण',
+  'survey_data.decisions.family_gathering_freq': 'परिवार भेटघाट',
+  'survey_data.decisions.happiness_activities': 'खुसीका क्रियाकलाप',
+  'survey_data.decisions.neighbor_cooperation': 'छिमेकी सहकार्य',
+  'survey_data.decisions.loan_source':        'ऋणको स्रोत',
+  'survey_data.decisions.loan_purpose':       'ऋणको उद्देश्य',
+  'survey_data.decisions.org_type':           'संस्थाको प्रकार',
+  'survey_data.decisions.income_source':      'आम्दानीको स्रोत',
+  'survey_data.decisions.expense_category':   'खर्च शिर्षक',
+  // ── occupation (step 5)
+  'survey_data.occupation.technical_skill':   'प्राविधिक सीप',
+  'survey_data.occupation.occupation_sector': 'पेशागत क्षेत्र',
+  // ── land
+  'survey_data.hasLandInMunicipality': 'पालिकाभित्र जग्गा',
+  'survey_data.landParcels':           'जग्गाको विवरण',
+  // ── agriculture (step 8–9)
+  'survey_data.cropProduction':        'कृषि उत्पादन',
+  // ── livestock (step 10)
+  'survey_data.livestockDetail':       'पशुपालन विवरण',
+  // ── bee / fish / silk (step 11)
+  'survey_data.beeFishSilk':           'मौरी/माछा/रेशम',
+}
+
 function fieldLabel(key) {
-  return FIELD_LABELS[key] ?? key
+  return SURVEY_DATA_LABELS[key] ?? FIELD_LABELS[key] ?? key
 }
 
 // ── Value display ─────────────────────────────────────────────────────────────
 function display(val) {
   if (val === null || val === undefined) return '(खाली)'
   if (typeof val === 'boolean') return val ? 'छ' : 'छैन'
-  if (typeof val === 'object') return JSON.stringify(val)
+  if (Array.isArray(val)) {
+    if (val.length === 0) return '(खाली सूची)'
+    const s = JSON.stringify(val)
+    return s.length > 200 ? s.slice(0, 200) + '…' : s
+  }
+  if (typeof val === 'object') {
+    const s = JSON.stringify(val)
+    return s.length > 200 ? s.slice(0, 200) + '…' : s
+  }
   return String(val)
 }
 

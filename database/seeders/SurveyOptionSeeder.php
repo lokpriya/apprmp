@@ -45,15 +45,23 @@ class SurveyOptionSeeder extends Seeder
 
             // ── House Details ────────────────────────────────────────────────
             'house_land_type' => [
-                ['Registered',    'दर्ता भएको',         'Registered'],
-                ['NonRegistered', 'दर्ता नभएको',        'Non-Registered'],
-                ['Ailani',        'ऐलानी',               'Ailani/Govt Land'],
-                ['Other',         'अन्य',                'Other'],
+                ['Registered',    'दर्ता भएको',        'Registered'],
+                ['NonRegistered', 'दर्ता नभएको',       'Non-Registered'],
+                ['Ailani',        'ऐलानी',              'Ailani/Govt Land'],
+                ['Other',         'अन्य',               'Other'],
+                ['unregistered',  'दर्ता नभएको',       'Unregistered'],
+                ['leased',        'भाडामा लिएको',      'Leased'],
+                ['guthi',         'गुठी',               'Guthi'],
             ],
             'house_type' => [
-                ['Standard',     'पक्की',      'Standard (Concrete)'],
-                ['SemiStandard', 'अर्धपक्की',  'Semi-Standard'],
-                ['NonStandard',  'कच्ची',      'Non-Standard'],
+                ['Standard',      'पक्की',           'Standard (Concrete)'],
+                ['SemiStandard',  'अर्धपक्की',       'Semi-Standard'],
+                ['NonStandard',   'कच्ची',           'Non-Standard'],
+                ['rcc_building',  'पक्की (ढलान)',    'RCC Building'],
+                ['wooden',        'काठ घर',          'Wooden House'],
+                ['mud_house',     'माटो घर',         'Mud House'],
+                ['temporary',     'अस्थायी',         'Temporary'],
+                ['semi_permanent','अर्धपक्की',       'Semi-Permanent'],
             ],
             'house_purpose' => [
                 ['Residential',  'आवासीय',      'Residential'],
@@ -238,12 +246,19 @@ class SurveyOptionSeeder extends Seeder
                 ['rain',        'वर्षाको पानी',         'Rain Water'],
                 ['jar_water',   'जार पानी',              'Jar Water'],
                 ['other',       'अन्य',                  'Other'],
+                // import/sync aliases
+                ['tap_water',   'धाराको पानी',           'Tap Water'],
+                ['spring',      'मूल/झरना',              'Spring/Natural Source'],
+                ['rainwater',   'वर्षाको पानी',          'Rainwater'],
             ],
             'toilet_type' => [
-                ['flush',       'फ्लस शौचालय', 'Flush Toilet'],
-                ['pit',         'पिट ल्याट्रिन','Pit Latrine'],
-                ['eco_san',     'इको स्यान',   'Eco-San'],
-                ['other',       'अन्य',         'Other'],
+                ['flush',       'फ्लस शौचालय',  'Flush Toilet'],
+                ['pit',         'पिट ल्याट्रिन', 'Pit Latrine'],
+                ['eco_san',     'इको स्यान',    'Eco-San'],
+                ['other',       'अन्य',          'Other'],
+                // import/sync aliases
+                ['open_field',  'खुला दिशा',    'Open Defecation'],
+                ['none',        'छैन',           'None'],
             ],
             'electricity_source' => [
                 ['national_grid','राष्ट्रिय ग्रिड', 'National Grid'],
@@ -252,6 +267,8 @@ class SurveyOptionSeeder extends Seeder
                 ['micro_hydro',  'लघु जलविद्युत',   'Micro Hydro'],
                 ['biogas',       'बायोग्याँस',       'Biogas'],
                 ['none',         'छैन',              'None'],
+                // import/sync alias
+                ['grid',         'राष्ट्रिय ग्रिड', 'Grid (alias)'],
             ],
             'cooking_fuel' => [
                 ['lpg',          'ग्याँस (LPG)',  'LPG/Gas'],
@@ -261,6 +278,8 @@ class SurveyOptionSeeder extends Seeder
                 ['electricity',  'विद्युत',       'Electricity'],
                 ['improved_cook','सुधारिएको चुलो','Improved Cookstove'],
                 ['other',        'अन्य',          'Other'],
+                // import/sync alias
+                ['electric',     'विद्युत',       'Electric (alias)'],
             ],
             'waste_management' => [
                 ['govt_collection','सरकारी संकलन',  'Govt Collection'],
@@ -835,12 +854,15 @@ class SurveyOptionSeeder extends Seeder
 
             // ── Sanitation Type ──────────────────────────────────────────────
             'sanitation_type' => [
-                ['flush_piped',   'फ्लस (पाइप ढल)',       'Flush / Piped Sewer'],
+                ['flush_piped',   'फ्लस (पाइप ढल)',          'Flush / Piped Sewer'],
                 ['flush_septic',  'फ्लस (सेप्टिक ट्याङ्क)', 'Flush / Septic Tank'],
-                ['simple_pit',    'साधारण खाल्टो',         'Simple Pit Latrine'],
-                ['improved_pit',  'सुधारिएको खाल्टो',      'Improved Pit Latrine'],
-                ['open',          'खुला दिशा',             'Open Defecation'],
-                ['other',         'अन्य',                  'Other'],
+                ['simple_pit',    'साधारण खाल्टो',           'Simple Pit Latrine'],
+                ['improved_pit',  'सुधारिएको खाल्टो',        'Improved Pit Latrine'],
+                ['open',          'खुला दिशा',               'Open Defecation'],
+                ['other',         'अन्य',                    'Other'],
+                // import/sync aliases
+                ['sewer',         'ढलान/नाली (पाइप)',        'Sewer/Piped Drain'],
+                ['septic',        'सेप्टिक ट्याङ्क',        'Septic Tank'],
             ],
 
             // ── Handwashing Facility ─────────────────────────────────────────

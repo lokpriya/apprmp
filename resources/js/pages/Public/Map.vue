@@ -57,10 +57,13 @@ import PublicLayout  from '@/layouts/PublicLayout.vue'
 function toRawGithubUrl(url) {
   if (!url) return url
   // Convert GitHub blob URL to raw content URL automatically
-  return url.replace(
+  url = url.replace(
     /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/(.+)$/,
     'https://raw.githubusercontent.com/$1/$2/$3'
   )
+  // Force HTTPS — prevents mixed-content block on HTTPS sites
+  url = url.replace(/^http:\/\//, 'https://')
+  return url
 }
 
 defineOptions({ layout: PublicLayout })

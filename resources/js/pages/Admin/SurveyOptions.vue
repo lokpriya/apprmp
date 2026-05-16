@@ -196,11 +196,10 @@
                 <p v-if="form.id" class="text-[10px] text-amber-600 mt-1">⚠ Value बदल्दा पुरानो सर्वेक्षण डेटामा असर पर्न सक्छ।</p>
                 <p v-if="form.errors.value" class="text-xs text-red-500 mt-1">{{ form.errors.value }}</p>
               </div>
-              <!-- Sort order -->
-              <div>
-                <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">क्रम (Sort Order)</label>
-                <input v-model.number="form.sort_order" type="number" min="0"
-                  class="w-full px-3 py-2 rounded-md border border-gray-200 text-sm focus:ring-2 focus:ring-[#206bc4]/30 focus:border-[#206bc4]" />
+              <!-- Sort order hint -->
+              <div class="flex items-center gap-2 text-xs text-gray-400 bg-gray-50 border border-gray-100 rounded-md px-3 py-2 self-end">
+                <i class="fa-solid fa-grip-lines text-gray-300"></i>
+                क्रम तालिकामा तान्नुहोस् (Drag to reorder)
               </div>
               <!-- Nepali label -->
               <div>
@@ -274,6 +273,9 @@
           <table class="min-w-full divide-y divide-[#e6e7e9]">
             <thead class="bg-gray-50">
               <tr>
+                <th class="px-2 py-3 w-7">
+                  <i class="fa-solid fa-grip-lines text-gray-300 text-xs"></i>
+                </th>
                 <th class="px-3 py-3 w-10">
                   <input type="checkbox" :checked="allSelected" :indeterminate="someSelected"
                     @change="toggleAll"
@@ -283,27 +285,42 @@
                 <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Value</th>
                 <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">नेपाली लेबल</th>
                 <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">English Label</th>
+                <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500 uppercase w-20">उपयोग</th>
                 <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500 uppercase w-24">स्थिति</th>
                 <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500 uppercase w-36">कार्य</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-[#e6e7e9]">
-              <tr v-if="props.options.length === 0">
-                <td colspan="7" class="px-4 py-12 text-center">
+              <tr v-if="orderedOptions.length === 0">
+                <td colspan="9" class="px-4 py-12 text-center">
                   <i class="fa-solid fa-inbox text-3xl text-gray-200 block mb-2"></i>
                   <p class="text-sm text-gray-400">यस श्रेणीमा कुनै विकल्प छैन</p>
                   <p class="text-xs text-gray-300 mt-1">माथि "+ नयाँ विकल्प थप्नुहोस्" क्लिक गर्नुहोस्</p>
                 </td>
               </tr>
-              <tr v-for="opt in props.options" :key="opt.id"
-                class="hover:bg-gray-50/50 transition-colors"
-                :class="[!opt.is_active ? 'opacity-50' : '', selectedIds.includes(opt.id) ? 'bg-red-50/60' : '']">
+              <tr v-for="(opt, idx) in orderedOptions" :key="opt.id"
+                draggable="true"
+                @dragstart="onDragStart(idx)"
+                @dragover.prevent="onDragOver(idx)"
+                @dragleave="onDragLeave"
+                @drop.prevent="onDrop"
+                class="transition-colors"
+                :class="[
+                  !opt.is_active ? 'opacity-50' : '',
+                  selectedIds.includes(opt.id) ? 'bg-red-50/60' : 'hover:bg-gray-50/50',
+                  dragOverIdx === idx && dragFromIdx !== idx ? 'border-t-2 border-[#206bc4]' : '',
+                  dragFromIdx === idx ? 'opacity-40 bg-blue-50/30' : '',
+                ]">
+                <!-- Drag handle -->
+                <td class="px-2 py-2.5 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 text-center">
+                  <i class="fa-solid fa-grip-lines text-xs"></i>
+                </td>
                 <td class="px-3 py-2.5">
                   <input type="checkbox" :checked="selectedIds.includes(opt.id)"
                     @change="toggleSelect(opt.id)"
                     class="w-3.5 h-3.5 rounded border-gray-300 text-[#206bc4] focus:ring-[#206bc4]/30 cursor-pointer" />
                 </td>
-                <td class="px-3 py-2.5 text-xs text-gray-400">{{ opt.sort_order }}</td>
+                <td class="px-3 py-2.5 text-xs text-gray-400">{{ idx + 1 }}</td>
                 <td class="px-3 py-2.5">
                   <code class="text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-mono">{{ opt.value }}</code>
                   <span v-if="opt.local_government_id === null"
@@ -317,6 +334,20 @@
                 </td>
                 <td class="px-3 py-2.5 text-sm text-gray-800">{{ opt.label_ne }}</td>
                 <td class="px-3 py-2.5 text-sm text-gray-500 hidden md:table-cell">{{ opt.label_en ?? '—' }}</td>
+                <td class="px-3 py-2.5 text-center">
+                  <template v-if="opt.usage_known">
+                    <span v-if="opt.usage_count > 0"
+                      class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                      {{ opt.usage_count }}
+                    </span>
+                    <span v-else
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-600"
+                      title="यो विकल्प कुनै रेकर्डमा प्रयोग भएको छैन">
+                      <i class="fa-solid fa-triangle-exclamation text-[9px]"></i> अनुपयोग
+                    </span>
+                  </template>
+                  <span v-else class="text-xs text-gray-300">—</span>
+                </td>
                 <td class="px-3 py-2.5 text-center">
                   <button @click="toggleActive(opt)"
                     class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium transition-colors"
@@ -344,11 +375,17 @@
         </div>
 
         <!-- Footer count -->
-        <div v-if="props.options.length > 0" class="px-5 py-2 bg-gray-50 border-t border-gray-100">
+        <div v-if="orderedOptions.length > 0" class="px-5 py-2 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
           <p class="text-xs text-gray-500">
-            जम्मा {{ props.options.length }} विकल्प —
-            <span class="text-[#206bc4]">{{ props.options.filter(o => o.local_government_id === null).length }} Global</span>,
-            <span class="text-purple-600">{{ props.options.filter(o => o.local_government_id !== null).length }} Local</span>
+            जम्मा {{ orderedOptions.length }} विकल्प —
+            <span class="text-[#206bc4]">{{ orderedOptions.filter(o => o.local_government_id === null).length }} Global</span>,
+            <span class="text-purple-600">{{ orderedOptions.filter(o => o.local_government_id !== null).length }} Local</span>
+          </p>
+          <p v-if="savingOrder" class="text-xs text-[#206bc4] flex items-center gap-1.5">
+            <i class="fa-solid fa-spinner fa-spin text-[10px]"></i> क्रम सुरक्षित हुँदैछ…
+          </p>
+          <p v-else-if="orderSaved" class="text-xs text-green-600 flex items-center gap-1.5">
+            <i class="fa-solid fa-check text-[10px]"></i> क्रम सुरक्षित भयो
           </p>
         </div>
       </div>
@@ -527,6 +564,8 @@
 import { ref, computed, watch } from 'vue'
 import { useForm, router, usePage } from '@inertiajs/vue3'
 
+
+
 const props = defineProps({
   householdCategories:   { type: Object, default: () => ({}) },
   householdSections:     { type: Array,  default: () => [] },
@@ -661,15 +700,60 @@ function doDelete() {
   })
 }
 
+// ── Ordered options (local copy for drag-and-drop) ─────────────────
+const orderedOptions = ref([...props.options])
+watch(() => props.options, (opts) => { orderedOptions.value = [...opts] })
+
+// ── Drag-and-drop reorder ──────────────────────────────────────────
+const dragFromIdx  = ref(null)
+const dragOverIdx  = ref(null)
+const savingOrder  = ref(false)
+const orderSaved   = ref(false)
+let orderSavedTimer = null
+
+function onDragStart(idx) { dragFromIdx.value = idx }
+function onDragOver(idx)  { dragOverIdx.value = idx }
+function onDragLeave()    { /* keep dragOverIdx for drop target */ }
+
+function onDrop() {
+  const from = dragFromIdx.value
+  const to   = dragOverIdx.value
+  dragFromIdx.value = dragOverIdx.value = null
+
+  if (from === null || to === null || from === to) return
+
+  const items = [...orderedOptions.value]
+  const [moved] = items.splice(from, 1)
+  items.splice(to, 0, moved)
+  orderedOptions.value = items
+
+  // Persist new order
+  savingOrder.value = true
+  clearTimeout(orderSavedTimer)
+  router.post('/admin/survey-options/reorder', {
+    category: props.activeCategory,
+    order: items.map((opt, idx) => ({ id: opt.id, sort_order: idx + 1 })),
+  }, {
+    preserveState: true,
+    preserveScroll: true,
+    onSuccess: () => {
+      savingOrder.value = false
+      orderSaved.value  = true
+      orderSavedTimer   = setTimeout(() => { orderSaved.value = false }, 2000)
+    },
+    onError: () => { savingOrder.value = false },
+  })
+}
+
 // ── Bulk delete ────────────────────────────────────────────────────
 const selectedIds      = ref([])
 const bulkDeleteConfirm = ref(false)
 
-const allSelected  = computed(() => props.options.length > 0 && selectedIds.value.length === props.options.length)
-const someSelected = computed(() => selectedIds.value.length > 0 && selectedIds.value.length < props.options.length)
+const allSelected  = computed(() => orderedOptions.value.length > 0 && selectedIds.value.length === orderedOptions.value.length)
+const someSelected = computed(() => selectedIds.value.length > 0 && selectedIds.value.length < orderedOptions.value.length)
 
 const bulkDeletePreview = computed(() =>
-  props.options.filter(o => selectedIds.value.includes(o.id)).slice(0, 5)
+  orderedOptions.value.filter(o => selectedIds.value.includes(o.id)).slice(0, 5)
 )
 
 function toggleSelect(id) {
@@ -682,7 +766,7 @@ function toggleAll() {
   if (allSelected.value) {
     selectedIds.value = []
   } else {
-    selectedIds.value = props.options.map(o => o.id)
+    selectedIds.value = orderedOptions.value.map(o => o.id)
   }
 }
 

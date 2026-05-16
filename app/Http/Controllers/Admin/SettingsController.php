@@ -23,6 +23,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Inertia\Inertia;
@@ -41,8 +42,8 @@ class SettingsController extends Controller
     public function index(): \Inertia\Response
     {
         $lg        = $this->lg();
-        $provinces = Province::orderBy('name_en')->get(['id','name_en','name_np']);
-        $districts = District::orderBy('name_en')->get(['id','name_en','name_np','province_id']);
+        $provinces = Province::where('code', '!=', 'P1')->orderBy('name_en')->get(['id','name_en','name_np']);
+        $districts = District::where('code', '!=', 'ILA')->orderBy('name_en')->get(['id','name_en','name_np','province_id']);
         $wards     = Ward::where('local_government_id', $lg->id)
             ->withCount('settlements')
             ->with('settlements:id,ward_id,name_np,name_en,settlement_type')
@@ -276,6 +277,51 @@ class SettingsController extends Controller
 
         return redirect()->route('admin.settings.index', ['tab' => 'map'])
             ->with('success', 'Map settings saved.');
+    }
+
+    public function uploadMapGeojson(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $this->abortIfLocked();
+        $request->validate([
+            'geojson' => 'required|file|mimes:json,geojson,txt|max:10240',
+        ]);
+
+        $lg   = $this->lg();
+        $file = $request->file('geojson');
+
+        // Validate it is actually valid JSON/GeoJSON
+        $content = file_get_contents($file->getRealPath());
+        $parsed  = json_decode($content, true);
+        if (!$parsed || !isset($parsed['type'])) {
+            return response()->json(['error' => 'अमान्य GeoJSON फाइल। Valid JSON फाइल मात्र अपलोड गर्नुहोस्।'], 422);
+        }
+
+        // Store in public storage and update map_config
+        $path     = "map/ward-boundary-{$lg->id}.geojson";
+        Storage::disk('public')->put($path, $content);
+        $publicUrl = Storage::disk('public')->url($path);
+
+        $cfg = $lg->map_config ?? [];
+        $cfg['geojson_url'] = $publicUrl;
+        $lg->update(['map_config' => $cfg]);
+        Cache::forget('active_lg_full');
+
+        return response()->json(['url' => $publicUrl]);
+    }
+
+    public function deleteMapGeojson(): \Illuminate\Http\JsonResponse
+    {
+        $this->abortIfLocked();
+        $lg   = $this->lg();
+        $path = "map/ward-boundary-{$lg->id}.geojson";
+        Storage::disk('public')->delete($path);
+
+        $cfg = $lg->map_config ?? [];
+        $cfg['geojson_url'] = null;
+        $lg->update(['map_config' => $cfg]);
+        Cache::forget('active_lg_full');
+
+        return response()->json(['ok' => true]);
     }
 
     // ── Photo directory ───────────────────────────────────────────────────────
@@ -665,9 +711,23 @@ class SettingsController extends Controller
                 $skipped++;
                 continue;
             }
-            $ward->settlements()->delete();
-            $ward->delete();
-            $deleted++;
+            try {
+                // Clean up all child records before deleting the ward
+                $ward->settlements()->delete();
+                DB::table('user_ward_assignments')->where('ward_id', $ward->id)->delete();
+                $ward->delete();
+                $deleted++;
+            } catch (\Illuminate\Database\QueryException $e) {
+                if ($e->getCode() === 'HY000') {
+                    DB::reconnect();
+                    $ward->settlements()->delete();
+                    DB::table('user_ward_assignments')->where('ward_id', $ward->id)->delete();
+                    $ward->delete();
+                    $deleted++;
+                } else {
+                    $skipped++;
+                }
+            }
         }
 
         // Recalculate ward_count

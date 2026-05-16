@@ -148,10 +148,16 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
         Route::post('households/bulk-reject',  [HouseholdController::class, 'bulkReject']) ->name('households.bulk-reject');
         Route::resource('households', HouseholdController::class);
         Route::post('households/{household}/submit', [HouseholdController::class, 'submit'])->name('households.submit');
+        Route::post('institutions/bulk-submit',  [InstitutionController::class, 'bulkSubmit']) ->name('institutions.bulk-submit');
+        Route::post('institutions/bulk-approve', [InstitutionController::class, 'bulkApprove'])->name('institutions.bulk-approve');
+        Route::post('institutions/bulk-reject',  [InstitutionController::class, 'bulkReject']) ->name('institutions.bulk-reject');
         Route::resource('institutions', InstitutionController::class);
         Route::post('institutions/{institution}/submit', [InstitutionController::class, 'submit'])->name('institutions.submit');
 
         // ── Business ──────────────────────────────────────────────────────
+        Route::post('businesses/bulk-submit',    [BusinessController::class, 'bulkSubmit'])   ->name('businesses.bulk-submit');
+        Route::post('businesses/bulk-approve',   [BusinessController::class, 'bulkApprove'])  ->name('businesses.bulk-approve');
+        Route::post('businesses/bulk-reject',    [BusinessController::class, 'bulkReject'])   ->name('businesses.bulk-reject');
         Route::resource('businesses', BusinessController::class);
         Route::post('businesses/{business}/submit', [BusinessController::class, 'submit'])->name('businesses.submit');
         Route::get('api/businesses/households',         [BusinessController::class, 'householdsForWard'])    ->name('businesses.api.households');
@@ -209,9 +215,13 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
             Route::patch('/institutions/{institution}/approve',  [ReviewController::class, 'approveInstitution']) ->name('institutions.approve');
             Route::patch('/institutions/{institution}/reject',  [ReviewController::class, 'rejectInstitution']) ->name('institutions.reject');
             Route::patch('/institutions/{institution}/escalate',[ReviewController::class, 'escalateInstitution'])->name('institutions.escalate');
+            Route::post('/institutions/bulk-approve',           [ReviewController::class, 'bulkApproveInstitutions'])->name('institutions.bulk-approve');
+            Route::post('/institutions/bulk-reject',            [ReviewController::class, 'bulkRejectInstitutions']) ->name('institutions.bulk-reject');
             Route::patch('/businesses/{business}/approve',      [ReviewController::class, 'approveBusiness'])   ->name('businesses.approve');
             Route::patch('/businesses/{business}/reject',       [ReviewController::class, 'rejectBusiness'])    ->name('businesses.reject');
             Route::patch('/businesses/{business}/escalate',     [ReviewController::class, 'escalateBusiness'])  ->name('businesses.escalate');
+            Route::post('/businesses/bulk-approve',             [ReviewController::class, 'bulkApproveBusinesses'])->name('businesses.bulk-approve');
+            Route::post('/businesses/bulk-reject',              [ReviewController::class, 'bulkRejectBusinesses']) ->name('businesses.bulk-reject');
         });
 
     // ─── Ward Admin + Municipal Admin shared routes ──────────────────────────
@@ -229,6 +239,13 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
             Route::patch('/publish-queue/institutions/{institution}/reject',  [PublishQueueController::class, 'rejectInstitution'])  ->name('publish-queue.institutions.reject');
             Route::patch('/publish-queue/businesses/{business}/publish',      [PublishQueueController::class, 'publishBusiness'])    ->name('publish-queue.businesses.publish');
             Route::patch('/publish-queue/businesses/{business}/reject',       [PublishQueueController::class, 'rejectBusiness'])     ->name('publish-queue.businesses.reject');
+
+            Route::post('/publish-queue/households/bulk-publish',     [PublishQueueController::class, 'bulkPublishHouseholds'])   ->name('publish-queue.households.bulk-publish');
+            Route::post('/publish-queue/households/bulk-reject',      [PublishQueueController::class, 'bulkRejectHouseholds'])    ->name('publish-queue.households.bulk-reject');
+            Route::post('/publish-queue/institutions/bulk-publish',   [PublishQueueController::class, 'bulkPublishInstitutions']) ->name('publish-queue.institutions.bulk-publish');
+            Route::post('/publish-queue/institutions/bulk-reject',    [PublishQueueController::class, 'bulkRejectInstitutions'])  ->name('publish-queue.institutions.bulk-reject');
+            Route::post('/publish-queue/businesses/bulk-publish',     [PublishQueueController::class, 'bulkPublishBusinesses'])   ->name('publish-queue.businesses.bulk-publish');
+            Route::post('/publish-queue/businesses/bulk-reject',      [PublishQueueController::class, 'bulkRejectBusinesses'])    ->name('publish-queue.businesses.bulk-reject');
 
             Route::get('/edit-requests',                         [EditRequestController::class, 'index'])  ->name('edit-requests.index');
             Route::patch('/edit-requests/{editRequest}/approve', [EditRequestController::class, 'approve'])->name('edit-requests.approve');
@@ -257,12 +274,13 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
             Route::get('/survey-options/template',               [SurveyOptionsController::class, 'downloadTemplate'])->name('survey-options.template');
             Route::post('/survey-options/import',                [SurveyOptionsController::class, 'import'])          ->name('survey-options.import');
             Route::post('/survey-options/bulk-delete',           [SurveyOptionsController::class, 'bulkDestroy'])     ->name('survey-options.bulk-destroy');
+            Route::post('/survey-options/reorder',               [SurveyOptionsController::class, 'reorder'])         ->name('survey-options.reorder');
             Route::put('/survey-options/{surveyOption}',         [SurveyOptionsController::class, 'update'])          ->name('survey-options.update');
             Route::patch('/survey-options/{surveyOption}/toggle',[SurveyOptionsController::class, 'toggle'])          ->name('survey-options.toggle');
             Route::delete('/survey-options/{surveyOption}',      [SurveyOptionsController::class, 'destroy'])         ->name('survey-options.destroy');
 
             // Google Sheets Sync
-            Route::get('/google-sync',         [GoogleSyncController::class, 'index'])  ->name('google-sync');
+            Route::get('/google-sync',          [GoogleSyncController::class, 'index'])  ->name('google-sync');
             Route::get('/google-sync/manual',   [GoogleSyncController::class, 'manual']) ->name('google-sync.manual');
             Route::post('/google-sync/preview', [GoogleSyncController::class, 'preview'])->name('google-sync.preview');
             Route::post('/google-sync/apply',   [GoogleSyncController::class, 'apply'])  ->name('google-sync.apply');
@@ -293,7 +311,9 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
             Route::patch('/settings/general', [SettingsController::class, 'updateGeneral'])->name('settings.general');
             Route::post('/settings/logo', [SettingsController::class, 'uploadLogo'])->name('settings.logo');
             Route::patch('/settings/profile', [SettingsController::class, 'updateProfile'])->name('settings.profile');
-            Route::patch('/settings/map', [SettingsController::class, 'updateMap'])->name('settings.map');
+            Route::patch('/settings/map',          [SettingsController::class, 'updateMap'])         ->name('settings.map');
+            Route::post('/settings/map-geojson',   [SettingsController::class, 'uploadMapGeojson']) ->name('settings.map-geojson');
+            Route::delete('/settings/map-geojson', [SettingsController::class, 'deleteMapGeojson']) ->name('settings.map-geojson.delete');
             Route::patch('/settings/photo-dir',  [SettingsController::class, 'updatePhotoDir'])   ->name('settings.photo-dir');
             Route::patch('/settings/welcome',           [SettingsController::class, 'updateWelcome'])       ->name('settings.welcome');
             Route::patch('/settings/login-branding',    [SettingsController::class, 'updateLoginBranding'])->name('settings.login-branding');
@@ -303,13 +323,13 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
             Route::post('/settings/map-image',    [SettingsController::class, 'uploadMapImage'])   ->name('settings.map-image');
             Route::delete('/settings/map-image',  [SettingsController::class, 'deleteMapImage'])   ->name('settings.map-image.delete');
             Route::post('/settings/wards', [SettingsController::class, 'storeWard'])->name('settings.wards.store');
-            Route::patch('/settings/wards/{ward}', [SettingsController::class, 'updateWard'])->name('settings.wards.update');
-            Route::delete('/settings/wards/{ward}', [SettingsController::class, 'destroyWard'])->name('settings.wards.destroy');
+            Route::delete('/settings/wards/bulk',                [SettingsController::class, 'bulkDestroyWards'])           ->name('settings.wards.bulk-destroy');
             Route::get('/settings/wards/template',               [SettingsController::class, 'downloadWardsTemplate'])           ->name('settings.wards.template');
             Route::post('/settings/wards/import',                [SettingsController::class, 'importWards'])                     ->name('settings.wards.import');
+            Route::patch('/settings/wards/{ward}', [SettingsController::class, 'updateWard'])->name('settings.wards.update');
+            Route::delete('/settings/wards/{ward}', [SettingsController::class, 'destroyWard'])->name('settings.wards.destroy');
             Route::get('/settings/wards-settlements/template',   [SettingsController::class, 'downloadWardSettlementsTemplate'])  ->name('settings.wards-settlements.template');
             Route::post('/settings/wards-settlements/import',    [SettingsController::class, 'importWardsAndSettlements'])        ->name('settings.wards-settlements.import');
-            Route::delete('/settings/wards/bulk',                [SettingsController::class, 'bulkDestroyWards'])           ->name('settings.wards.bulk-destroy');
             Route::delete('/settings/settlements/bulk',          [SettingsController::class, 'bulkDestroySettlements'])       ->name('settings.settlements.bulk-destroy');
             Route::post('/settings/wards/{ward}/settlements',   [SettingsController::class, 'storeSettlement'])          ->name('settings.settlements.store');
             Route::patch('/settings/settlements/{settlement}',   [SettingsController::class, 'updateSettlement'])         ->name('settings.settlements.update');

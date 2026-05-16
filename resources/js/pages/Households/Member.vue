@@ -386,7 +386,7 @@
                   {{ memberBusiness.unique_code }}
                 </span>
                 <p class="text-sm font-semibold text-gray-800 mt-1.5">{{ memberBusiness.business_name }}</p>
-                <p v-if="memberBusiness.business_field" class="text-xs text-gray-500 mt-0.5">{{ memberBusiness.business_field }}</p>
+                <p v-if="memberBusiness.business_field" class="text-xs text-gray-500 mt-0.5">{{ label('business_field', memberBusiness.business_field) }}</p>
               </div>
               <span :class="['text-[11px] px-2 py-0.5 rounded-full font-semibold shrink-0', bizStatusBadge(memberBusiness.status)]">
                 {{ bizStatusLabel(memberBusiness.status) }}
@@ -460,7 +460,8 @@ const genderMap = { male: 'पुरुष', female: 'महिला', other: '
 function label(category, value) {
   if (!value) return null
   const opts = props.surveyOptions[category] ?? []
-  const found = opts.find(o => o.value === String(value))
+  const lower = String(value).toLowerCase()
+  const found = opts.find(o => o.value === value || String(o.value).toLowerCase() === lower)
   return found ? found.label : value
 }
 

@@ -341,6 +341,66 @@ class InstitutionController extends Controller
         }
     }
 
+    public function bulkSubmit(Request $request)
+    {
+        $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer']);
+        $user    = auth()->user();
+        $wardIds = $user->isAdmin() ? null : $user->assignedWards()->pluck('wards.id')->toArray();
+
+        $count = 0; $skipped = 0;
+        foreach ($request->ids as $id) {
+            $inst = Institution::find($id);
+            if (!$inst || $inst->status !== 'draft') { $skipped++; continue; }
+            if (!$user->isAdmin() && !in_array($inst->ward_id, $wardIds)) { $skipped++; continue; }
+            try { $this->workflow->submit($inst, $user); $count++; }
+            catch (\Throwable) { $skipped++; }
+        }
+
+        return back()->with('success', "{$count} संस्था पेस भयो।" . ($skipped ? " ({$skipped} छोडियो)" : ''));
+    }
+
+    public function bulkApprove(Request $request)
+    {
+        abort_unless(auth()->user()->isReviewer() || auth()->user()->isWardAdmin() || auth()->user()->isAdmin(), 403);
+        $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer']);
+        $user    = auth()->user();
+        $wardIds = $user->isAdmin() ? null : $user->assignedWards()->pluck('wards.id')->toArray();
+
+        $count = 0; $skipped = 0;
+        foreach ($request->ids as $id) {
+            $inst = Institution::find($id);
+            if (!$inst || $inst->status !== 'submitted') { $skipped++; continue; }
+            if (!$user->isAdmin() && !in_array($inst->ward_id, $wardIds)) { $skipped++; continue; }
+            try { $this->workflow->wardApprove($inst, $user); $count++; }
+            catch (\Throwable) { $skipped++; }
+        }
+
+        return back()->with('success', "{$count} संस्था अनुमोदन भयो।" . ($skipped ? " ({$skipped} छोडियो)" : ''));
+    }
+
+    public function bulkReject(Request $request)
+    {
+        abort_unless(auth()->user()->isReviewer() || auth()->user()->isWardAdmin() || auth()->user()->isAdmin(), 403);
+        $request->validate([
+            'ids'    => 'required|array|min:1',
+            'ids.*'  => 'integer',
+            'reason' => 'required|string|max:500',
+        ]);
+        $user    = auth()->user();
+        $wardIds = $user->isAdmin() ? null : $user->assignedWards()->pluck('wards.id')->toArray();
+
+        $count = 0; $skipped = 0;
+        foreach ($request->ids as $id) {
+            $inst = Institution::find($id);
+            if (!$inst || !in_array($inst->status, ['submitted', 'ward_approved'])) { $skipped++; continue; }
+            if (!$user->isAdmin() && !in_array($inst->ward_id, $wardIds)) { $skipped++; continue; }
+            try { $this->workflow->reject($inst, $user, $request->reason); $count++; }
+            catch (\Throwable) { $skipped++; }
+        }
+
+        return back()->with('success', "{$count} संस्था अस्वीकार भयो।" . ($skipped ? " ({$skipped} छोडियो)" : ''));
+    }
+
     private function buildSurveyData(array $data): ?array
     {
         // When the Vue/Inertia form sends fields flat (no survey_data wrapper),

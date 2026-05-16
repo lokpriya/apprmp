@@ -77,6 +77,10 @@ class HousingSheet implements ToCollection, WithChunkReading, WithHeadingRow, Wi
                             'risk_types'              => $riskTypes ?: null,
                             'land_measurement_unit'   => trim($row['land_measurement_unit'] ?? '') ?: null,
                             'house_land_type'         => trim($row['house_land_type'] ?? '') ?: null,
+                            'house_purpose'           => trim($row['house_purpose'] ?? '') ?: null,
+                            'location_house_built'    => trim($row['location_house_built'] ?? '') ?: null,
+                            'distance_to_mainroad'    => is_numeric($row['distance_to_mainroad'] ?? '') ? (int)$row['distance_to_mainroad'] : null,
+                            'distance_to_school'      => is_numeric($row['distance_to_school'] ?? '') ? (int)$row['distance_to_school'] : null,
                         ]
                     );
                     $this->imported++;

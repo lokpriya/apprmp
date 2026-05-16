@@ -426,6 +426,66 @@ class BusinessController extends Controller
         return back()->with('success', "व्यवसाय {$business->unique_code} प्रकाशित गरियो।");
     }
 
+    public function bulkSubmit(Request $request)
+    {
+        $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer']);
+        $user    = auth()->user();
+        $wardIds = $user->isAdmin() ? null : $user->assignedWards()->pluck('wards.id')->toArray();
+
+        $count = 0; $skipped = 0;
+        foreach ($request->ids as $id) {
+            $biz = MemberBusiness::find($id);
+            if (!$biz || $biz->status !== 'draft') { $skipped++; continue; }
+            if (!$user->isAdmin() && !in_array($biz->ward_id, $wardIds)) { $skipped++; continue; }
+            try { $this->workflow->submit($biz, $user); $count++; }
+            catch (\Throwable) { $skipped++; }
+        }
+
+        return back()->with('success', "{$count} व्यवसाय पेस भयो।" . ($skipped ? " ({$skipped} छोडियो)" : ''));
+    }
+
+    public function bulkApprove(Request $request)
+    {
+        abort_unless(auth()->user()->isReviewer() || auth()->user()->isWardAdmin() || auth()->user()->isAdmin(), 403);
+        $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer']);
+        $user    = auth()->user();
+        $wardIds = $user->isAdmin() ? null : $user->assignedWards()->pluck('wards.id')->toArray();
+
+        $count = 0; $skipped = 0;
+        foreach ($request->ids as $id) {
+            $biz = MemberBusiness::find($id);
+            if (!$biz || $biz->status !== 'submitted') { $skipped++; continue; }
+            if (!$user->isAdmin() && !in_array($biz->ward_id, $wardIds)) { $skipped++; continue; }
+            try { $this->workflow->wardApprove($biz, $user); $count++; }
+            catch (\Throwable) { $skipped++; }
+        }
+
+        return back()->with('success', "{$count} व्यवसाय अनुमोदन भयो।" . ($skipped ? " ({$skipped} छोडियो)" : ''));
+    }
+
+    public function bulkReject(Request $request)
+    {
+        abort_unless(auth()->user()->isReviewer() || auth()->user()->isWardAdmin() || auth()->user()->isAdmin(), 403);
+        $request->validate([
+            'ids'    => 'required|array|min:1',
+            'ids.*'  => 'integer',
+            'reason' => 'required|string|max:500',
+        ]);
+        $user    = auth()->user();
+        $wardIds = $user->isAdmin() ? null : $user->assignedWards()->pluck('wards.id')->toArray();
+
+        $count = 0; $skipped = 0;
+        foreach ($request->ids as $id) {
+            $biz = MemberBusiness::find($id);
+            if (!$biz || !in_array($biz->status, ['submitted', 'ward_approved'])) { $skipped++; continue; }
+            if (!$user->isAdmin() && !in_array($biz->ward_id, $wardIds)) { $skipped++; continue; }
+            try { $this->workflow->reject($biz, $user, $request->reason); $count++; }
+            catch (\Throwable) { $skipped++; }
+        }
+
+        return back()->with('success', "{$count} व्यवसाय अस्वीकार भयो।" . ($skipped ? " ({$skipped} छोडियो)" : ''));
+    }
+
     /* ── Auth helper ──────────────────────────────────────────────────────── */
 
     private function authorizeWard(int $wardId): void
