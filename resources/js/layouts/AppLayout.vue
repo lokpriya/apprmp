@@ -440,6 +440,24 @@
 
       <!-- Flash toasts rendered via Teleport at end of template -->
 
+      <!-- Impersonation banner -->
+      <div
+        v-if="impersonating"
+        class="flex items-center gap-2.5 px-4 py-2 bg-rose-600 text-white text-[13px] font-semibold shrink-0"
+      >
+        <i class="fa-solid fa-user-secret text-white/80 text-sm"></i>
+        <span class="flex-1">
+          <strong>{{ impersonating.by_name }}</strong> — तपाईं अहिले
+          <strong>{{ impersonating.as_name }}</strong> ({{ impersonating.as_role }}) को रूपमा काम गर्दै हुनुहुन्छ।
+        </span>
+        <form @submit.prevent="stopImpersonating">
+          <button type="submit"
+            class="bg-white/20 hover:bg-white/30 text-white text-[11px] font-bold px-3 py-1 rounded-full transition-colors">
+            Admin मा फर्कनुहोस्
+          </button>
+        </form>
+      </div>
+
       <!-- Offline banner -->
       <div
         v-if="isOffline"
@@ -987,6 +1005,13 @@ const collapsed = ref(localStorage.getItem('sidebar_collapsed') === 'true')
 function toggleCollapse() {
   collapsed.value = !collapsed.value
   localStorage.setItem('sidebar_collapsed', String(collapsed.value))
+}
+
+// ── Impersonation ──────────────────────────────────────────────────
+const impersonating = computed(() => page.props.impersonating ?? null)
+
+function stopImpersonating() {
+  router.post('/admin/impersonate/stop')
 }
 
 // ── Role ───────────────────────────────────────────────────────────

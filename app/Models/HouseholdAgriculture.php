@@ -12,7 +12,7 @@ class HouseholdAgriculture extends Model
         'use_of_chem_fertilizer','chem_fertilizer_types','chem_fertilizer_kg','fertilizer_sources',
         'use_of_chem_pesticide','chem_pesticide_types','chem_pesticide_cost',
         'Farm_Challenges',
-        'owns_land','land_area_ropani','irrigated_area_ropani',
+        'owns_land','land_area_ropani','irrigated_area_ropani','irrigation_source',
         'annual_agri_income',
     ];
     protected $casts = [

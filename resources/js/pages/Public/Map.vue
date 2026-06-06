@@ -193,9 +193,48 @@ async function initMap() {
           onEachFeature: (feature, layer) => {
             const wNum  = String(feature.properties?.[wardProp] ?? '')
             const count = wardNumToCount[wNum] ?? 0
-            layer.bindPopup(`<b>वडा नं. ${wNum}</b><br>GPS घरधुरी: ${count.toLocaleString()}`)
+            const pct   = maxCount > 0 ? ((count / maxCount) * 100).toFixed(0) : 0
+
+            // Hover tooltip — appears on mouseover, follows cursor
+            layer.bindTooltip(
+              `<div style="font-family:sans-serif;padding:2px 4px;min-width:130px;">
+                <div style="font-weight:700;font-size:13px;color:#1d273b;margin-bottom:4px;">
+                  वडा नं. ${wNum}
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#626976;">
+                  <span style="color:#206bc4;font-size:14px;">⌂</span>
+                  <span>घरधुरी: <b style="color:#1d273b;">${count.toLocaleString()}</b></span>
+                </div>
+                <div style="margin-top:4px;height:4px;border-radius:2px;background:#e8f0fb;">
+                  <div style="height:100%;border-radius:2px;background:#206bc4;width:${pct}%;"></div>
+                </div>
+                <div style="font-size:10px;color:#9aa0ac;margin-top:2px;text-align:right;">${pct}% of max</div>
+              </div>`,
+              { sticky: true, opacity: 0.97, className: 'ward-tooltip' }
+            )
+
+            // Click popup with fuller info
+            layer.bindPopup(
+              `<div style="font-family:sans-serif;font-size:13px;min-width:150px;">
+                <div style="font-weight:700;color:#1d273b;font-size:14px;margin-bottom:6px;">
+                  वडा नं. ${wNum}
+                </div>
+                <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                  <tr>
+                    <td style="color:#9aa0ac;padding:2px 8px 2px 0;">GPS घरधुरी</td>
+                    <td style="font-weight:600;color:#206bc4;">${count.toLocaleString()}</td>
+                  </tr>
+                  <tr>
+                    <td style="color:#9aa0ac;padding:2px 8px 2px 0;">अधिकतम भन्दा</td>
+                    <td style="font-weight:600;">${pct}%</td>
+                  </tr>
+                </table>
+              </div>`,
+              { maxWidth: 220 }
+            )
+
             layer.on({
-              mouseover: e => { e.target.setStyle({ weight: 2.5, fillOpacity: 0.8 }); e.target.bringToFront() },
+              mouseover: e => { e.target.setStyle({ weight: 2.5, fillOpacity: 0.85 }); e.target.bringToFront() },
               mouseout:  e => { e.target.setStyle({ weight: 1.5, fillOpacity: 0.55 }) },
             })
           },
@@ -275,3 +314,18 @@ onUnmounted(() => {
   if (map) { map.remove(); map = null }
 })
 </script>
+
+<style>
+/* Ward choropleth hover tooltip */
+.ward-tooltip .leaflet-tooltip {
+  background: #ffffff;
+  border: 1px solid #e6e7e9;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  padding: 8px 10px;
+  pointer-events: none;
+}
+.ward-tooltip .leaflet-tooltip::before {
+  display: none;
+}
+</style>

@@ -166,16 +166,21 @@ function filteredHref(base) {
 
 // ── Category metadata (icon + bg) ─────────────────────────────────────────────
 const CAT_META = {
-  'demographics': { icon: '👥', bg: '#206bc4/10', bgRaw: '#eef2f8' },
-  'age-groups':   { icon: '📅', bg: '#0ca678/10', bgRaw: '#ecfdf5' },
-  'education':    { icon: '🎓', bg: '#ae3ec9/10', bgRaw: '#f9f0ff' },
-  'health':       { icon: '🏥', bg: '#d63939/10', bgRaw: '#fff5f5' },
-  'employment':   { icon: '💼', bg: '#f76707/10', bgRaw: '#fff4e6' },
-  'housing':      { icon: '🏠', bg: '#f59f00/10', bgRaw: '#fffbe6' },
-  'utilities':    { icon: '💧', bg: '#4299e1/10', bgRaw: '#ebf8ff' },
-  'economics':    { icon: '💰', bg: '#2fb344/10', bgRaw: '#f0fff4' },
+  'demographics':     { icon: '👥', bgRaw: '#eef2f8' },
+  'age-groups':       { icon: '📅', bgRaw: '#ecfdf5' },
+  'education':        { icon: '🎓', bgRaw: '#f9f0ff' },
+  'health':           { icon: '🏥', bgRaw: '#fff5f5' },
+  'employment':       { icon: '💼', bgRaw: '#fff4e6' },
+  'housing':          { icon: '🏠', bgRaw: '#fffbe6' },
+  'utilities':        { icon: '💧', bgRaw: '#ebf8ff' },
+  'economics':        { icon: '💰', bgRaw: '#f0fff4' },
+  'agriculture':      { icon: '🌾', bgRaw: '#f4f9f0' },
+  'migration':        { icon: '✈️',  bgRaw: '#f0f4ff' },
+  'child-development':{ icon: '👶', bgRaw: '#ecfdf5' },
+  'documents':        { icon: '🪪', bgRaw: '#fff8f0' },
+  'disaster':         { icon: '🔴', bgRaw: '#fff5f5' },
 }
-const catMeta = computed(() => CAT_META[props.category] ?? { icon: '📊', bg: '#f8f9fb', bgRaw: '#f8f9fb' })
+const catMeta = computed(() => CAT_META[props.category] ?? { icon: '📊', bgRaw: '#f8f9fb' })
 
 // ── Filter helpers ──────────────────────────────────────────────────────────
 const hasFilters = computed(() =>
@@ -239,16 +244,19 @@ onUnmounted(() => observer?.disconnect())
 
 // ── Other category links ──────────────────────────────────────────────────────
 const ALL_CATEGORIES = [
-  { route: 'demographics', href: '/public/reports/demographics', icon: '👥', labelKey: 'reports.cat.demographics' },
-  { route: 'age-groups',   href: '/public/reports/age-groups',   icon: '📅', labelKey: 'reports.cat.ageGroups'    },
-  { route: 'education',    href: '/public/reports/education',     icon: '🎓', labelKey: 'reports.cat.education'    },
-  { route: 'health',       href: '/public/reports/health',        icon: '🏥', labelKey: 'reports.cat.health'       },
-  { route: 'employment',   href: '/public/reports/employment',    icon: '💼', labelKey: 'reports.cat.employment'   },
-  { route: 'housing',      href: '/public/reports/housing',       icon: '🏠', labelKey: 'reports.cat.housing'      },
-  { route: 'utilities',    href: '/public/reports/utilities',     icon: '💧', labelKey: 'reports.cat.utilities'    },
-  { route: 'economics',    href: '/public/reports/economics',     icon: '💰', labelKey: 'reports.cat.economics'    },
-  { route: 'agriculture',  href: '/public/reports/agriculture',   icon: '🌾', labelKey: 'reports.cat.agriculture'  },
-  { route: 'migration',    href: '/public/reports/migration',     icon: '✈️',  labelKey: 'reports.cat.migration'    },
+  { route: 'demographics',     href: '/public/reports/demographics',      icon: '👥', labelKey: 'reports.cat.demographics'    },
+  { route: 'age-groups',       href: '/public/reports/age-groups',        icon: '📅', labelKey: 'reports.cat.ageGroups'        },
+  { route: 'education',        href: '/public/reports/education',          icon: '🎓', labelKey: 'reports.cat.education'        },
+  { route: 'health',           href: '/public/reports/health',             icon: '🏥', labelKey: 'reports.cat.health'           },
+  { route: 'employment',       href: '/public/reports/employment',         icon: '💼', labelKey: 'reports.cat.employment'       },
+  { route: 'housing',          href: '/public/reports/housing',            icon: '🏠', labelKey: 'reports.cat.housing'          },
+  { route: 'utilities',        href: '/public/reports/utilities',          icon: '💧', labelKey: 'reports.cat.utilities'        },
+  { route: 'economics',        href: '/public/reports/economics',          icon: '💰', labelKey: 'reports.cat.economics'        },
+  { route: 'agriculture',      href: '/public/reports/agriculture',        icon: '🌾', labelKey: 'reports.cat.agriculture'      },
+  { route: 'migration',        href: '/public/reports/migration',          icon: '✈️',  labelKey: 'reports.cat.migration'         },
+  { route: 'child-development',href: '/public/reports/child-development',  icon: '👶', labelKey: 'reports.cat.childDevelopment' },
+  { route: 'documents',        href: '/public/reports/documents',          icon: '🪪', labelKey: 'reports.cat.documents'        },
+  { route: 'disaster',         href: '/public/reports/disaster',           icon: '🔴', labelKey: 'reports.cat.disaster'         },
 ]
 
 const otherCategories = computed(() =>

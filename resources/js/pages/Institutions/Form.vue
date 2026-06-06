@@ -66,17 +66,39 @@
       </div>
     </Teleport>
 
-    <!-- Page heading -->
-    <div class="flex items-center gap-3">
-      <div class="w-11 h-11 rounded-md bg-[#206bc4] flex items-center justify-center text-white shrink-0 shadow-md shadow-[#206bc4]/25">
-        <i class="fa-solid fa-building text-sm"></i>
+    <!-- Page heading — sticky master save bar -->
+    <div class="sticky top-0 z-30 bg-white rounded-md border border-[#e6e7e9] shadow-sm px-5 py-3 flex items-center gap-4">
+      <!-- Icon + title -->
+      <div class="flex items-center gap-3 flex-1 min-w-0">
+        <div class="w-10 h-10 rounded-md bg-[#206bc4] flex items-center justify-center text-white shrink-0 shadow-md shadow-[#206bc4]/25">
+          <i class="fa-solid fa-building text-sm"></i>
+        </div>
+        <div class="min-w-0">
+          <h2 class="text-[15px] font-semibold text-[#1d273b] truncate">{{ pageTitle }}</h2>
+          <p class="text-[11px] text-[#9aa0ac]">
+            {{ isEdit ? 'विद्यमान संस्था अद्यावधिक गर्नुहोस्' : 'नयाँ संस्थाको विवरण भर्नुहोस्' }}
+          </p>
+        </div>
       </div>
-      <div>
-        <h2 class="text-[15px] font-semibold text-[#1d273b]">{{ pageTitle }}</h2>
-        <p class="text-[11px] text-[#9aa0ac]">
-          {{ isEdit ? 'विद्यमान संस्था अद्यावधिक गर्नुहोस्' : 'नयाँ संस्थाको विवरण भर्नुहोस्' }}
-        </p>
-      </div>
+
+      <!-- Step counter -->
+      <span class="text-[11px] font-medium text-gray-400 shrink-0">{{ step }} / {{ totalSteps }}</span>
+
+      <!-- Validation warning -->
+      <span v-if="hasValidationErrors"
+        class="hidden sm:flex items-center gap-1 text-[11px] text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full shrink-0">
+        <i class="fa-solid fa-triangle-exclamation text-[9px]"></i>
+        {{ validationErrorCount }} खाली
+      </span>
+
+      <!-- Master Save button -->
+      <button type="button" @click="submitForm" :disabled="form.processing"
+        class="flex items-center gap-2 px-4 py-2 rounded-md bg-[#206bc4] text-white text-sm font-semibold
+               hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shrink-0">
+        <i v-if="form.processing" class="fa-solid fa-spinner fa-spin text-xs"></i>
+        <i v-else class="fa-solid fa-floppy-disk text-xs"></i>
+        <span class="hidden sm:inline">{{ isEdit ? 'अद्यावधिक गर्नुहोस्' : 'सुरक्षित गर्नुहोस्' }}</span>
+      </button>
     </div>
 
     <!-- Draft restore banner -->
@@ -110,11 +132,18 @@
 
     <!-- Step indicator -->
     <div class="bg-white rounded-md border border-[#e6e7e9] p-4">
+      <div v-if="isEdit" class="flex items-center gap-1.5 mb-3">
+        <i class="fa-solid fa-pen-to-square text-[#206bc4] text-[11px]"></i>
+        <span class="text-[11px] text-gray-400">सम्पादन मोड — जुनसुकै चरणमा सिधै जानुहोस्</span>
+      </div>
       <div class="flex items-center gap-1 overflow-x-auto">
         <template v-for="(label, idx) in stepLabels" :key="idx">
           <div
             @click="goToStep(idx + 1)"
-            class="flex items-center gap-1.5 shrink-0 cursor-pointer"
+            :class="[
+              'flex items-center gap-1.5 shrink-0 group transition-opacity',
+              isEdit || idx + 1 <= step ? 'cursor-pointer' : 'cursor-default opacity-50',
+            ]"
           >
             <div class="relative">
               <div :class="[
@@ -123,18 +152,26 @@
                   ? 'bg-[#206bc4] text-white shadow-md shadow-[#206bc4]/20'
                   : idx + 1 < step
                     ? (stepsWithErrors.has(idx + 1) ? 'bg-red-100 text-red-600' : 'bg-[#206bc4]/10 text-[#206bc4]')
-                    : 'bg-gray-100 text-gray-400',
+                    : isEdit
+                      ? 'bg-gray-100 text-gray-500 group-hover:bg-[#206bc4]/10 group-hover:text-[#206bc4]'
+                      : 'bg-gray-100 text-gray-400',
               ]">
                 <i v-if="idx + 1 < step && !stepsWithErrors.has(idx + 1)" class="fa-solid fa-check text-[10px]"></i>
                 <i v-else-if="idx + 1 < step && stepsWithErrors.has(idx + 1)" class="fa-solid fa-exclamation text-[10px]"></i>
                 <span v-else>{{ idx + 1 }}</span>
               </div>
               <span v-if="stepsWithErrors.has(idx + 1)"
-                class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 border border-white"></span>
+                class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-white"></span>
             </div>
             <span :class="[
-              'text-xs font-medium hidden sm:block',
-              idx + 1 === step ? 'text-[#206bc4]' : idx + 1 < step ? 'text-[#206bc4]' : 'text-gray-400',
+              'text-xs font-medium hidden sm:block transition-colors',
+              idx + 1 === step
+                ? 'text-[#206bc4]'
+                : idx + 1 < step
+                  ? 'text-[#206bc4]'
+                  : isEdit
+                    ? 'text-gray-400 group-hover:text-[#206bc4]'
+                    : 'text-gray-400',
             ]">{{ label }}</span>
           </div>
           <div v-if="idx < stepLabels.length - 1" class="flex-1 min-w-[8px] h-px bg-gray-200 shrink-0"></div>
@@ -315,28 +352,51 @@
 
       <!-- Buildings (repeatable by type) -->
       <div>
-        <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center justify-between mb-3">
           <h4 class="text-[14px] font-semibold text-[#1d273b] flex items-center gap-2">
             <i class="fa-solid fa-building text-[#206bc4]"></i> भवन विवरण
+            <span v-if="isBuildingLocked"
+              class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5
+                     rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+              <i class="fa-solid fa-lock text-[9px]"></i> प्रकाशित
+            </span>
           </h4>
-          <button type="button" @click="addBuilding"
+          <button v-if="!isBuildingLocked" type="button" @click="addBuilding"
             class="flex items-center gap-2 px-4 py-2 bg-[#206bc4] text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors">
             <i class="fa-solid fa-plus text-xs"></i> भवन थप्नुहोस्
           </button>
         </div>
 
+        <!-- Published lock notice -->
+        <div v-if="isBuildingLocked"
+          class="mb-4 flex items-start gap-2.5 px-4 py-3 bg-amber-50 border border-amber-200
+                 rounded-md text-[13px] text-amber-800">
+          <i class="fa-solid fa-triangle-exclamation text-amber-500 mt-0.5 shrink-0"></i>
+          <span>
+            यो अभिलेख <b>प्रकाशित</b> भइसकेको छ — भवन थप्न वा हटाउन मिल्दैन।
+            परिवर्तन आवश्यक छ भने प्रशासकसँग सम्पर्क गर्नुहोस्।
+          </span>
+        </div>
+
         <div v-if="form.buildings.length > 0" class="space-y-4">
-          <div v-for="(b, idx) in form.buildings" :key="idx"
-            class="bg-gray-50 border border-[#e6e7e9] rounded-md p-5">
+          <div v-for="(b, idx) in form.buildings" :key="b._key ?? idx"
+            class="bg-gray-50 border border-[#e6e7e9] rounded-md p-5"
+            :class="isBuildingLocked ? 'opacity-90' : ''">
             <div class="flex items-center justify-between mb-4">
               <span class="text-[14px] font-semibold text-[#206bc4] flex items-center gap-2">
                 <span class="w-7 h-7 rounded-full bg-[#206bc4] text-white flex items-center justify-center text-xs font-bold">{{ idx + 1 }}</span>
                 भवन {{ idx + 1 }}
               </span>
-              <button type="button" @click="removeBuilding(idx)"
+              <!-- Delete button — hidden when record is published -->
+              <button v-if="!isBuildingLocked" type="button" @click="removeBuilding(idx)"
                 class="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-500 border border-red-200 rounded-md hover:bg-red-50 transition-colors">
                 <i class="fa-solid fa-trash text-xs"></i> हटाउनुहोस्
               </button>
+              <span v-else
+                class="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium
+                       text-amber-600 bg-amber-50 border border-amber-200 rounded-md">
+                <i class="fa-solid fa-lock text-[9px]"></i> लक
+              </span>
             </div>
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-x-6 gap-y-4">
               <div class="flex flex-col gap-1">
@@ -765,8 +825,12 @@
               <thead>
                 <tr class="bg-gray-50">
                   <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 rounded-l-md">कक्षा / तह</th>
-                  <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500">छात्र संख्या</th>
-                  <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500">छात्रा संख्या</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500">छात्र</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500">छात्रा</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500">दलित</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500">जनजाति</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500">छात्रवृत्ति</th>
+                  <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500">विद्यालय छोडेका</th>
                   <th class="px-3 py-2 rounded-r-md"></th>
                 </tr>
               </thead>
@@ -780,10 +844,22 @@
                     </select>
                   </td>
                   <td class="px-3 py-2">
-                    <input v-model="row.male_students" type="number" min="0" placeholder="0" class="w-28 rounded-md border border-[#e6e7e9] px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#206bc4]/25" />
+                    <input v-model="row.male_students" type="number" min="0" placeholder="0" class="w-20 rounded-md border border-[#e6e7e9] px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#206bc4]/25" />
                   </td>
                   <td class="px-3 py-2">
-                    <input v-model="row.female_students" type="number" min="0" placeholder="0" class="w-28 rounded-md border border-[#e6e7e9] px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#206bc4]/25" />
+                    <input v-model="row.female_students" type="number" min="0" placeholder="0" class="w-20 rounded-md border border-[#e6e7e9] px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#206bc4]/25" />
+                  </td>
+                  <td class="px-3 py-2">
+                    <input v-model="row.dalit_students" type="number" min="0" placeholder="0" class="w-20 rounded-md border border-[#e6e7e9] px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#206bc4]/25" />
+                  </td>
+                  <td class="px-3 py-2">
+                    <input v-model="row.janajati_students" type="number" min="0" placeholder="0" class="w-20 rounded-md border border-[#e6e7e9] px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#206bc4]/25" />
+                  </td>
+                  <td class="px-3 py-2">
+                    <input v-model="row.scholarship_students" type="number" min="0" placeholder="0" class="w-20 rounded-md border border-[#e6e7e9] px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#206bc4]/25" />
+                  </td>
+                  <td class="px-3 py-2">
+                    <input v-model="row.dropout_count" type="number" min="0" placeholder="0" class="w-20 rounded-md border border-[#e6e7e9] px-2 py-1.5 text-sm focus:ring-2 focus:ring-[#206bc4]/25" />
                   </td>
                   <td class="px-3 py-2">
                     <button type="button" @click="removeEducationRow(idx)" class="text-red-400 hover:text-red-600 transition-colors">
@@ -2314,14 +2390,15 @@ const { refreshCount: syncRefreshCount } = useSyncManager()
 
 // ── Props ──────────────────────────────────────────────────────────
 const props = defineProps({
-  institution:      { type: Object, default: null },
-  wards:            { type: Array,  default: () => [] },
-  settlements:      { type: Array,  default: () => [] },
-  institutionTypes: { type: Array,  default: () => [] },
-  buildingTypes:    { type: Array,  default: () => [] },
-  surveyOpts:       { type: Object, default: () => ({}) },
-  initialWardId:    { type: Number, default: null },
-  mapConfig:        { type: Object, default: () => ({}) },
+  institution:      { type: Object,   default: null },
+  wards:            { type: Array,    default: () => [] },
+  settlements:      { type: Array,    default: () => [] },
+  institutionTypes: { type: Array,    default: () => [] },
+  buildingTypes:    { type: Array,    default: () => [] },
+  surveyOpts:       { type: Object,   default: () => ({}) },
+  initialWardId:    { type: Number,   default: null },
+  mapConfig:        { type: Object,   default: () => ({}) },
+  canEditBuildings: { type: Boolean,  default: true },
 })
 
 // ── Steps ──────────────────────────────────────────────────────────
@@ -2382,14 +2459,20 @@ const stepLabels = computed(() => [
   typespecificLabel.value, 'समीक्षा',
 ])
 
+function scrollTop() { window.scrollTo({ top: 0, behavior: 'smooth' }) }
 function goToStep(n) {
-  if (n >= 1 && n <= totalSteps && n <= step.value) step.value = n
+  if (n >= 1 && n <= totalSteps && (isEdit.value || n <= step.value)) { step.value = n; scrollTop() }
 }
-function nextStep() { if (step.value < totalSteps) step.value++ }
-function prevStep() { if (step.value > 1) step.value-- }
+function nextStep() { if (step.value < totalSteps) { step.value++; scrollTop() } }
+function prevStep() { if (step.value > 1) { step.value--; scrollTop() } }
 
 // ── Form state ─────────────────────────────────────────────────────
 const existing = props.institution
+
+// Lock building add/delete for non-admins on published records
+const isBuildingLocked = computed(() =>
+  existing?.status === 'published' && !props.canEditBuildings
+)
 
 const form = useForm({
   ward_id:             existing?.ward_id            ?? '',
@@ -2409,7 +2492,7 @@ const form = useForm({
   gps_accuracy:        existing?.gps_accuracy       ?? '',
   gps_altitude:        existing?.gps_altitude       ?? '',
   photo_number:        existing?.photo_number       ?? '',
-  buildings: existing?.infrastructure?.buildings ?? [],
+  buildings: (Array.isArray(existing?.infrastructure?.buildings) ? existing.infrastructure.buildings : []).map((b, i) => ({ ...b, _key: Date.now() + i })),
   infrastructure: {
     total_area:        existing?.infrastructure?.total_area        ?? '',
     has_electricity:   existing?.infrastructure?.has_electricity   ?? false,
@@ -2623,9 +2706,11 @@ function removeStaff(idx) {
 
 // ── Building helpers ───────────────────────────────────────────────
 function addBuilding() {
-  form.buildings.push({ building_type: '', building_count: '', room_count: '' })
+  form.buildings = [...form.buildings, { _key: Date.now(), building_type: '', building_count: '', room_count: '' }]
 }
-function removeBuilding(idx) { form.buildings.splice(idx, 1) }
+function removeBuilding(idx) {
+  form.buildings = form.buildings.filter((_, i) => i !== idx)
+}
 
 // ── Committee helpers ──────────────────────────────────────────────
 function addCommitteeMember() {
@@ -2643,7 +2728,7 @@ function removeCommitteeMember(idx) {
 
 // ── Education helpers ──────────────────────────────────────────────
 function addEducationRow() {
-  form.education.push({ grade: '', male_students: '', female_students: '' })
+  form.education.push({ grade: '', male_students: '', female_students: '', dalit_students: '', janajati_students: '', scholarship_students: '', dropout_count: '' })
 }
 function removeEducationRow(idx) { form.education.splice(idx, 1) }
 
@@ -2819,7 +2904,7 @@ async function submitForm() {
       teachers:            form.teachers,
       health_staff:        form.health_staff,
     },
-    infrastructure: { ...form.infrastructure, buildings: form.buildings },
+    infrastructure: { ...form.infrastructure, buildings: form.buildings.map(({ _key, ...b }) => b) },
     services: form.services.map(v => ({ service_name: v })),
   }
 

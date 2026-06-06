@@ -25,9 +25,10 @@ class InstitutionImportTemplate implements WithMultipleSheets
             new InfrastructureTemplateSheet($grouped),
             new StaffTemplateSheet($grouped),
             new EducationTemplateSheet($grouped),
-            new HealthTemplateSheet(),
+            new HealthTemplateSheet($grouped),
             new ServicesTemplateSheet($grouped),
             new TeachersTemplateSheet($grouped),
+            new TypeSpecificTemplateSheet($grouped),
             new InstDynamicValidValuesSheet($grouped),
         ];
     }
@@ -160,7 +161,7 @@ class InfrastructureTemplateSheet implements FromArray, WithTitle, WithStyles, S
     protected function headerColor(): string { return 'FF7C3AED'; }
     protected function lightColor(): string  { return 'FFF5F3FF'; }
     protected function sampleColor(): string { return 'FFEDE9FE'; }
-    protected function lastCol(): string     { return 'T'; }
+    protected function lastCol(): string     { return 'W'; }
 
     public function array(): array
     {
@@ -172,6 +173,7 @@ class InfrastructureTemplateSheet implements FromArray, WithTitle, WithStyles, S
                 'toilet_count', 'female_toilet', 'male_toilet', 'disabled_toilet',
                 'accessible_ramp', 'drinking_water', 'electricity', 'solar',
                 'generator', 'internet', 'fire_extinguisher', 'earthquake_safe', 'evacuation_plan',
+                'total_classrooms', 'has_library', 'has_lab',
             ],
             [
                 'Matches institution_code from Institutions sheet',
@@ -194,10 +196,14 @@ class InfrastructureTemplateSheet implements FromArray, WithTitle, WithStyles, S
                 'yes/no — fire extinguisher present',
                 'yes/no — earthquake-safe construction',
                 'yes/no — evacuation plan exists',
+                'Total classrooms (schools only)',
+                'yes/no — library available (schools only)',
+                'yes/no — science lab available (schools only)',
             ],
             [
                 'IN-0001-W01-00001', 'concrete', 'good', '12', '2', '5000',
                 'yes', '4', '2', '2', '0', 'yes', 'yes', 'yes', 'no', 'no', 'yes', 'yes', 'yes', 'no',
+                '10', 'yes', 'yes',
             ],
         ];
     }
@@ -280,40 +286,74 @@ class EducationTemplateSheet implements FromArray, WithTitle, WithStyles, Should
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HEALTH SHEET  (static — health fields are fixed indicators)
+// HEALTH SHEET
 // ─────────────────────────────────────────────────────────────────────────────
 class HealthTemplateSheet implements FromArray, WithTitle, WithStyles, ShouldAutoSize
 {
     use InstTemplateSheetStyles;
+    public function __construct(private array $grouped) {}
     public function title(): string { return 'Health'; }
     protected function headerColor(): string { return 'FF9F1239'; }
     protected function lightColor(): string  { return 'FFFFF1F2'; }
     protected function sampleColor(): string { return 'FFFECDD3'; }
-    protected function lastCol(): string     { return 'K'; }
+    protected function lastCol(): string     { return 'AE'; }
 
     public function array(): array
     {
+        $g = $this->grouped;
         return [
             [
-                'institution_code', 'bed_count',
+                'institution_code', 'health_type',
+                'bed_count', 'male_ward_beds', 'female_ward_beds', 'children_ward_beds',
+                'maternity_beds', 'icu_beds', 'emergency_beds',
                 'delivery_service', 'emergency_service', 'lab_service',
-                'xray_service', 'ambulance', 'monthly_outpatient_avg',
-                'monthly_inpatient_avg', 'vaccine_service', 'family_planning',
+                'xray_service', 'ambulance', 'vaccine_service', 'family_planning',
+                'opd_daily', 'monthly_outpatient_avg', 'monthly_inpatient_avg',
+                'has_ultrasound', 'has_ecg', 'has_icu', 'has_operation_theatre',
+                'has_blood_bank', 'has_dialysis', 'has_dental', 'has_physiotherapy', 'has_oxygen_plant',
+                'health_services', 'equipment', 'lab_services',
             ],
             [
                 'Matches institution_code from Institutions sheet (health institutions only)',
-                'Number of beds (0 if outpatient only)',
+                instOptHint($g, 'inst_health_type', 'health_post / hospital / clinic / ayurvedic / pharmacy'),
+                'Total beds (0 if outpatient only)',
+                'Male ward beds',
+                'Female ward beds',
+                'Children ward beds',
+                'Maternity / delivery ward beds',
+                'ICU beds',
+                'Emergency ward beds',
                 'yes/no — delivery / maternity service',
                 'yes/no — 24hr emergency service',
                 'yes/no — laboratory service',
                 'yes/no — X-ray service',
                 'yes/no — ambulance available',
-                'Average monthly outpatient visits',
-                'Average monthly inpatient admissions',
                 'yes/no — vaccination service',
                 'yes/no — family planning service',
+                'Daily OPD patient average',
+                'Monthly outpatient average',
+                'Monthly inpatient average',
+                'yes/no — ultrasound machine',
+                'yes/no — ECG machine',
+                'yes/no — ICU facility',
+                'yes/no — operation theatre',
+                'yes/no — blood bank',
+                'yes/no — dialysis unit',
+                'yes/no — dental unit',
+                'yes/no — physiotherapy unit',
+                'yes/no — oxygen plant',
+                instOptHint($g, 'inst_health_service', 'comma-separated values from Valid Values sheet'),
+                instOptHint($g, 'inst_health_equipment', 'comma-separated equipment codes'),
+                instOptHint($g, 'inst_lab_service', 'comma-separated lab service codes'),
             ],
-            ['IN-0001-W01-00001', '10', 'yes', 'yes', 'yes', 'no', 'yes', '250', '15', 'yes', 'yes'],
+            [
+                'IN-0001-W01-00001', 'health_post',
+                '10', '4', '4', '0', '2', '0', '2',
+                'yes', 'yes', 'yes', 'no', 'yes', 'yes', 'yes',
+                '50', '250', '15',
+                'no', 'yes', 'no', 'no', 'no', 'no', 'no', 'no', 'no',
+                'antenatal,immunization', 'weighing_scale,bp_machine', 'blood_test,urine_test',
+            ],
         ];
     }
 }
@@ -393,6 +433,143 @@ class TeachersTemplateSheet implements FromArray, WithTitle, WithStyles, ShouldA
             [
                 'IN-0001-W01-00001', 'Sita Devi Thapa', 'female', 'permanent',
                 'master', 'secondary_11_12', 'nepali', 'nepali|literature_arts', '2060-07-22',
+            ],
+        ];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TYPE-SPECIFIC SHEET  (school / cooperative / bank / NGO / market / industry / media / forest)
+// ─────────────────────────────────────────────────────────────────────────────
+class TypeSpecificTemplateSheet implements FromArray, WithTitle, WithStyles, ShouldAutoSize
+{
+    use InstTemplateSheetStyles;
+    public function __construct(private array $grouped) {}
+    public function title(): string { return 'TypeSpecific'; }
+    protected function headerColor(): string { return 'FF065F46'; }
+    protected function lightColor(): string  { return 'FFECFDF5'; }
+    protected function sampleColor(): string { return 'FFD1FAE5'; }
+    protected function lastCol(): string     { return 'AU'; }
+
+    public function array(): array
+    {
+        $g = $this->grouped;
+        return [
+            // ── Header row
+            [
+                'institution_code', 'institution_type',
+                // School
+                'school_level', 'management_type', 'medium',
+                // Cooperative
+                'coop_type', 'share_capital', 'loan_outstanding',
+                'male_members', 'female_members', 'other_members',
+                // Bank
+                'bank_type', 'branch_count', 'total_deposits', 'total_loans',
+                // Government
+                'office_level', 'department',
+                // NGO / INGO
+                'registration_type', 'donor', 'beneficiaries_m', 'beneficiaries_f', 'working_areas',
+                // Religious
+                'religion_type', 'daily_visitors', 'has_trust',
+                // Market / Haat
+                'shop_count', 'goods_types', 'market_days',
+                // Industry
+                'industry_type', 'annual_production', 'male_workers', 'female_workers',
+                // Media
+                'media_type', 'coverage_area', 'frequency',
+                // Forest / CFUG
+                'forest_type', 'forest_area_hectare', 'forest_covered_wards',
+                'consumer_households', 'total_trees', 'annual_budget', 'annual_income',
+                'member_count_m', 'member_count_f', 'committee_chairperson',
+                'tree_types', 'herb_types',
+            ],
+            // ── Hints row
+            [
+                'Matches institution_code from Institutions sheet',
+                instOptHint($g, 'inst_institution_type', 'school / health_post / cooperative / bank / government / ngo / religious / market / industry / media / forest'),
+                // School hints
+                instOptHint($g, 'inst_school_level', 'basic / secondary'),
+                instOptHint($g, 'inst_management_type', 'community / institutional / government'),
+                instOptHint($g, 'inst_medium', 'nepali / english / both'),
+                // Cooperative hints
+                instOptHint($g, 'inst_coop_type', 'savings / multipurpose / agriculture / consumer'),
+                'Share capital in NPR',
+                'Outstanding loan amount in NPR',
+                'Male member count',
+                'Female member count',
+                'Other gender member count',
+                // Bank hints
+                instOptHint($g, 'inst_bank_type', 'commercial / development / finance / microfinance / cooperative'),
+                'Number of branches',
+                'Total deposits in NPR',
+                'Total loans outstanding in NPR',
+                // Government hints
+                instOptHint($g, 'inst_office_level', 'federal / provincial / local'),
+                'Department or ministry name',
+                // NGO hints
+                instOptHint($g, 'inst_registration_type', 'ngo / ingo / club / network'),
+                'Donor / partner organization name',
+                'Male beneficiaries count',
+                'Female beneficiaries count',
+                'Comma-separated working areas  ← See Valid Values',
+                // Religious hints
+                instOptHint($g, 'inst_religion_type', 'hindu / buddhist / christian / muslim / kirant / other'),
+                'Average daily visitors',
+                'yes/no — has registered trust/guthi',
+                // Market hints
+                'Number of shops',
+                'Types of goods (free text)',
+                'Comma-separated market days  (e.g. monday,thursday)',
+                // Industry hints
+                instOptHint($g, 'inst_industry_type', 'agro / food / textile / metal / wood / chemical / other'),
+                'Annual production value in NPR',
+                'Male worker count',
+                'Female worker count',
+                // Media hints
+                instOptHint($g, 'inst_media_type', 'newspaper / radio / television / online / fm'),
+                'Coverage area description',
+                'Publication/broadcast frequency',
+                // Forest hints
+                instOptHint($g, 'inst_forest_type', 'community / leasehold / government / religious / buffer_zone'),
+                'Forest area in hectares',
+                'Comma-separated ward numbers covered',
+                'Consumer household count',
+                'Total trees count',
+                'Annual budget in NPR',
+                'Annual income in NPR',
+                'Male committee member count',
+                'Female committee member count',
+                'Chairperson full name',
+                'Comma-separated tree species codes  ← See Valid Values',
+                'Comma-separated herb/plant codes  ← See Valid Values',
+            ],
+            // ── Sample row (school)
+            [
+                'IN-0001-W01-00001', 'school',
+                'basic', 'community', 'nepali',
+                '', '', '', '', '', '',
+                '', '', '', '',
+                '', '',
+                '', '', '', '', '',
+                '', '', '',
+                '', '', '',
+                '', '', '', '',
+                '', '', '',
+                '', '', '', '', '', '', '', '', '', '', '', '',
+            ],
+            // ── Sample row (cooperative)
+            [
+                'IN-0001-W01-00002', 'cooperative',
+                '', '', '',
+                'multipurpose', '5000000', '2000000', '120', '85', '5',
+                '', '', '', '',
+                '', '',
+                '', '', '', '', '',
+                '', '', '',
+                '', '', '',
+                '', '', '', '',
+                '', '', '',
+                '', '', '', '', '', '', '', '', '', '', '', '',
             ],
         ];
     }

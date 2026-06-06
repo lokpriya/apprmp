@@ -15,14 +15,19 @@ class AuditLogController extends Controller
         'App\\Models\\Household'      => 'घरधुरी',
         'App\\Models\\Institution'    => 'संस्था',
         'App\\Models\\MemberBusiness' => 'व्यवसाय',
+        'App\\Models\\Ward'           => 'वडा',
+        'App\\Models\\User'           => 'प्रयोगकर्ता',
     ];
 
     private const EVENT_LABELS = [
-        'published_edit' => 'प्रकाशित सम्पादन',
-        'created'        => 'सिर्जना',
-        'updated'        => 'अद्यावधिक',
-        'deleted'        => 'मेटाउने',
-        'status_change'  => 'स्थिति परिवर्तन',
+        'published_edit'      => 'प्रकाशित सम्पादन',
+        'created'             => 'सिर्जना',
+        'updated'             => 'अद्यावधिक',
+        'deleted'             => 'मेटाउने',
+        'status_change'       => 'स्थिति परिवर्तन',
+        'impersonation_start' => 'प्रयोगकर्ता स्विच (सुरु)',
+        'impersonation_stop'  => 'प्रयोगकर्ता स्विच (अन्त्य)',
+        'google_sync'         => 'Google Sheets सिंक',
     ];
 
     public function index(Request $request)

@@ -66,8 +66,8 @@
           </h2>
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <DetailRow label="व्यवसायको नाम" :value="business.business_name" />
-            <DetailRow label="व्यवसाय स्थान" :value="business.business_location" />
-            <DetailRow label="व्यवसायको किसिम" :value="business.business_type === 'other' ? business.business_type_other : business.business_type" />
+            <DetailRow label="व्यवसाय स्थान" :value="optLabel('business_location', business.business_location)" />
+            <DetailRow label="व्यवसायको किसिम" :value="business.business_type === 'other' ? business.business_type_other : optLabel('business_type', business.business_type)" />
           </div>
         </section>
 
@@ -82,9 +82,9 @@
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <DetailRow
               label="व्यवसाय क्षेत्र"
-              :value="business.business_field === 'other' ? business.business_field_other : business.business_field"
+              :value="business.business_field === 'other' ? business.business_field_other : optLabel('business_field', business.business_field)"
             />
-            <DetailRow label="उप-वर्ग" :value="business.business_sub_category" />
+            <DetailRow label="उप-वर्ग" :value="optLabel(subCatKey, business.business_sub_category)" />
           </div>
         </section>
 
@@ -113,7 +113,7 @@
                 v-for="place in regPlaces"
                 :key="place"
                 class="bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full border border-purple-100 font-medium"
-              >{{ place }}</span>
+              >{{ optLabel('business_registration_place', place) }}</span>
             </div>
           </div>
 
@@ -448,6 +448,32 @@ const hasRegNumbers = computed(() =>
   || props.business.reg_no_govt_office
   || props.business.place_of_registration_other
 )
+
+// Map business_field code → sub-category survey option key
+const subCatKeyMap = {
+  ProductionIndustry:          'sub_ProductionIndustry',
+  AgricultureAnimalHusbandary: 'sub_AgricultureAnimalHusbandary',
+  Suppliers:                   'sub_Suppliers',
+  InformationAndCommunication: 'sub_InformationAndCommunication',
+  HotelAndRestaurant:          'sub_HotelAndRestaurant',
+  VehicleAndTransportation:    'sub_VehicleAndTransportation',
+  EducationalInstutions:       'sub_EducationalInstutions',
+  ConsultancyBusiness:         'sub_ConsultancyBusiness',
+  MechinaryMaintenance:        'sub_MechinaryMaintenance',
+  HospitalandClinc:            'sub_HospitalandClinc',
+  FinancialInstutions:         'sub_FinancialInstutions',
+  AbroadjobsSecurity:          'sub_AbroadjobsSecurity',
+  FancyBusiness:               'sub_FancyBusiness',
+  OtherShopBusiness:           'sub_OtherShopBusiness',
+}
+const subCatKey = computed(() => subCatKeyMap[props.business.business_field] ?? 'business_field')
+
+function optLabel(cat, val) {
+  if (!val) return null
+  const opts = props.surveyOptions[cat] ?? []
+  const found = opts.find(o => o.value === val)
+  return found?.label ?? val
+}
 
 // ── Inline sub-components ─────────────────────────────────────────────────────
 

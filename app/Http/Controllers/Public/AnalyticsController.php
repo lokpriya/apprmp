@@ -85,7 +85,38 @@ class AnalyticsController extends Controller
 
         $activeWardIds = $selectedWardId ? [$selectedWardId] : $allWardIds;
 
-        $hhBase     = fn($q) => $q->whereIn('ward_id', $activeWardIds)
+        $wards       = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
+        $settlements = $selectedWardId
+            ? Settlement::where('ward_id', $selectedWardId)->orderBy('name_en')->get()
+                ->map(fn($s) => ['id' => $s->id, 'name_en' => $s->name_en, 'name_np' => $s->name_np])
+                ->values()
+            : collect();
+
+        $ck = 'analytics_dashboard.' . $lg->id . '.' . ($selectedWardId ?? '0') . '.' . ($selectedSettlementId ?? '0');
+        $d  = Cache::remember($ck, 1800, fn() => $this->computeDashboardData(
+            $activeWardIds, $allWardIds, $selectedSettlementId, $wards, $lg
+        ));
+
+        return Inertia::render('Public/Dashboard', [
+            'lg'                   => $this->lgProps($lg),
+            'wards'                => $wards->map(fn($w) => ['id' => $w->id, 'ward_number' => $w->ward_number])->values(),
+            'settlements'          => $settlements,
+            ...$d,
+            'selectedWardId'       => $selectedWardId,
+            'selectedSettlementId' => $selectedSettlementId,
+            'welcomeConfig'        => $lg->welcome_config ?? [],
+        ]);
+    }
+
+    // ── Dashboard aggregate computation (cached by index()) ──────────────
+    private function computeDashboardData(
+        array $activeWardIds,
+        array $allWardIds,
+        ?int $selectedSettlementId,
+        \Illuminate\Support\Collection $wards,
+        LocalGovernment $lg
+    ): array {
+        $hhBase = fn($q) => $q->whereIn('ward_id', $activeWardIds)
             ->where('status', 'published')
             ->when($selectedSettlementId, fn($q2) => $q2->where('settlement_id', $selectedSettlementId));
 
@@ -125,7 +156,6 @@ class AnalyticsController extends Controller
             ->pluck('count', 'age_group')
             ->toArray();
 
-        // Population pyramid — 5-year age bands × gender (oldest first for top-to-bottom chart display)
         $pyramidBands = ['80+','75-79','70-74','65-69','60-64','55-59','50-54','45-49','40-44','35-39','30-34','25-29','20-24','15-19','10-14','5-9','0-4'];
         $rawPyramid = HouseholdMember::alive()->whereHas('household', $hhBase)
             ->whereNotNull('age')->whereNotNull('gender')
@@ -196,15 +226,6 @@ class AnalyticsController extends Controller
             ->map(fn($r) => ['label_ne' => $r->label_ne, 'label_en' => $r->label_en, 'count' => (int)$r->count])
             ->values()->toArray();
 
-        $wards = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
-
-        $settlements = $selectedWardId
-            ? Settlement::where('ward_id', $selectedWardId)->orderBy('name_en')->get()
-                ->map(fn($s) => ['id' => $s->id, 'name_en' => $s->name_en, 'name_np' => $s->name_np])
-                ->values()
-            : collect();
-
-        // Ward summary (kept lightweight — used by choropleth map)
         $wardHouseholds = DB::table('households')
             ->whereIn('ward_id', $allWardIds)->where('status', 'published')
             ->select('ward_id', DB::raw('count(*) as hh'))->groupBy('ward_id')->pluck('hh', 'ward_id');
@@ -223,7 +244,6 @@ class AnalyticsController extends Controller
             'total'       => $wardGender->get($ward->id, collect())->sum('cnt'),
         ])->values();
 
-        // ── Key metrics ────────────────────────────────────────────────
         $litRow = HouseholdMember::alive()->whereHas('household', $hhBase)
             ->whereNotNull('is_literate')
             ->select(DB::raw('SUM(CASE WHEN is_literate=1 THEN 1 ELSE 0 END) as lit'), DB::raw('count(*) as tot'))
@@ -247,7 +267,6 @@ class AnalyticsController extends Controller
             'bank_account_pct' => $bankPct,
         ];
 
-        // ── Survey option labels (Nepali + English) for all chart datasets ─
         $surveyLabels = SurveyOption::whereIn('category', [
             'water_source', 'toilet_type', 'electricity_source', 'cooking_fuel',
             'income_source', 'occupation_type', 'education_level', 'business_type',
@@ -264,13 +283,11 @@ class AnalyticsController extends Controller
             }, $rows);
         };
 
-        // ── Basic services ─────────────────────────────────────────────
         $waterData       = $attachLabels($this->utilityBreakdown($activeWardIds, $selectedSettlementId, 'water_source'), 'water_source');
         $toiletData      = $attachLabels($this->utilityBreakdown($activeWardIds, $selectedSettlementId, 'toilet_type'), 'toilet_type');
         $electricityData = $attachLabels($this->utilityBreakdown($activeWardIds, $selectedSettlementId, 'electricity_source'), 'electricity_source');
         $cookingData     = $attachLabels($this->utilityBreakdown($activeWardIds, $selectedSettlementId, 'cooking_fuel'), 'cooking_fuel');
 
-        // ── Economy ────────────────────────────────────────────────────
         $incomeData = $attachLabels(DB::table('household_economic')
             ->join('households', 'household_economic.household_id', '=', 'households.id')
             ->whereIn('households.ward_id', $activeWardIds)->where('households.status', 'published')
@@ -287,7 +304,6 @@ class AnalyticsController extends Controller
             ->groupBy('value')->orderByDesc('count')->get()
             ->map(fn($r) => ['value' => $r->value, 'count' => (int)$r->count])->toArray(), 'occupation_type');
 
-        // ── Education ──────────────────────────────────────────────────
         $educationData = $attachLabels(HouseholdMember::alive()->whereHas('household', $hhBase)
             ->whereNotNull('education_level')->where('education_level', '!=', '')
             ->select('education_level as value', DB::raw('count(*) as count'))
@@ -300,7 +316,6 @@ class AnalyticsController extends Controller
             ->groupBy('gender')->get()
             ->map(fn($r) => ['gender' => $r->gender, 'lit' => (int)$r->lit, 'tot' => (int)$r->tot])->toArray();
 
-        // ── Businesses ─────────────────────────────────────────────────
         $businessData = $attachLabels(DB::table('member_businesses')
             ->join('households', 'member_businesses.household_id', '=', 'households.id')
             ->whereIn('households.ward_id', $activeWardIds)->where('households.status', 'published')
@@ -310,7 +325,6 @@ class AnalyticsController extends Controller
             ->groupBy('value')->orderByDesc('count')->limit(8)->get()
             ->map(fn($r) => ['value' => $r->value, 'count' => (int)$r->count])->toArray(), 'business_type');
 
-        // ── Migration summary (abroad / internal) ──────────────────────
         $migCounts = DB::table('member_migration')
             ->join('household_members', 'member_migration.member_id', '=', 'household_members.id')
             ->join('households', 'household_members.household_id', '=', 'households.id')
@@ -327,7 +341,6 @@ class AnalyticsController extends Controller
             'internal' => (int) ($migCounts->get('internal', 0)),
         ];
 
-        // ── Training participation ─────────────────────────────────────
         $trainRow = HouseholdMember::alive()->whereHas('household', $hhBase)
             ->select(
                 DB::raw('SUM(CASE WHEN vocational_training=1 THEN 1 ELSE 0 END) as voc'),
@@ -344,7 +357,6 @@ class AnalyticsController extends Controller
             'technical_pct'    => $trainTot > 0 ? round($trainRow->tech / $trainTot * 100, 1) : 0,
         ];
 
-        // ── Decision-making breakdown (survey_data→decisions JSON) ─────
         $decisionKeys = [
             'decisioninHHWork'     => 'घरेलु काम',
             'decisioninProperty'   => 'सम्पत्ति',
@@ -376,41 +388,19 @@ class AnalyticsController extends Controller
             }
         }
 
-        $profileContent  = $lg->profile_content ?? [];
-        $profileSections = LocalGovernment::profileSections();
+        $profileContent     = $lg->profile_content ?? [];
+        $profileSections    = LocalGovernment::profileSections();
         $profileFilledCount = collect($profileSections)->filter(fn($l, $k) => !empty($profileContent[$k]))->count();
 
-        return Inertia::render('Public/Dashboard', [
-            'lg'                  => $this->lgProps($lg),
-            'wards'               => $wards->map(fn($w) => ['id' => $w->id, 'ward_number' => $w->ward_number])->values(),
-            'settlements'         => $settlements,
-            'stats'               => $stats,
-            'genderData'          => $genderData,
-            'ageData'             => $ageData,
-            'pyramidData'         => $pyramidData,
-            'ethnicityData'       => $ethnicityData,
-            'religionData'        => $religionData,
-            'motherTongueData'    => $motherTongueData,
-            'institutionData'     => $institutionData,
-            'wardSummary'         => $wardSummary,
-            'keyMetrics'          => $keyMetrics,
-            'waterData'           => $waterData,
-            'toiletData'          => $toiletData,
-            'electricityData'     => $electricityData,
-            'cookingData'         => $cookingData,
-            'incomeData'          => $incomeData,
-            'occupationData'      => $occupationData,
-            'educationData'       => $educationData,
-            'litByGender'         => $litByGender,
-            'businessData'        => $businessData,
-            'migrationData'       => $migrationData,
-            'trainingData'        => $trainingData,
-            'decisionData'        => $decisionData,
-            'selectedWardId'      => $selectedWardId,
-            'selectedSettlementId' => $selectedSettlementId,
-            'profileFilledCount'  => $profileFilledCount,
-            'welcomeConfig'       => $lg->welcome_config ?? [],
-        ]);
+        return compact(
+            'stats', 'genderData', 'ageData', 'pyramidData',
+            'ethnicityData', 'religionData', 'motherTongueData',
+            'institutionData', 'wardSummary', 'keyMetrics',
+            'waterData', 'toiletData', 'electricityData', 'cookingData',
+            'incomeData', 'occupationData', 'educationData', 'litByGender',
+            'businessData', 'migrationData', 'trainingData', 'decisionData',
+            'profileFilledCount'
+        );
     }
 
     // ── Utility breakdown helper ──────────────────────────────────────────

@@ -6,7 +6,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class HouseholdLivestock extends Model
 {
     protected $table = 'household_livestock';
-    protected $fillable = ['household_id','livestock_type','count','vet_service_access','insurance'];
+    protected $fillable = [
+        'household_id','livestock_type','count',
+        'breed','rearing_method','annual_production','production_unit',
+        'vet_service_access','insurance',
+    ];
     protected $casts = ['vet_service_access'=>'boolean','insurance'=>'boolean'];
     public function household(): BelongsTo { return $this->belongsTo(Household::class); }
 }

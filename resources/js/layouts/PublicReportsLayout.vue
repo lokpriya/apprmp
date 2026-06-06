@@ -32,27 +32,29 @@
         </a>
       </div>
 
-      <!-- Section label -->
-      <div class="px-4 pt-4 pb-1 shrink-0">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/35">
-          {{ t('reports.sidebarLabel') }}
-        </p>
-      </div>
-
       <!-- Report category nav -->
-      <nav class="flex-1 px-2 pb-2 overflow-y-auto scrollbar-hide space-y-0.5">
-        <a v-for="cat in reportCategories" :key="cat.route"
-          :href="cat.href"
-          class="w-full flex items-center gap-2.5 px-3 py-2 rounded text-left
-                 text-[13px] transition-colors no-underline"
-          :class="isActive(cat)
-            ? 'bg-white/12 text-white ring-1 ring-white/10'
-            : 'text-white/65 hover:bg-white/6 hover:text-white/90'">
-          <span class="shrink-0 w-5 text-center leading-none text-[14px]">{{ cat.icon }}</span>
-          <span class="truncate flex-1 font-medium">{{ t(cat.labelKey) }}</span>
-          <div v-if="isActive(cat)"
-            class="w-1 h-4 rounded-full shrink-0 bg-[#206bc4]"></div>
-        </a>
+      <nav class="flex-1 px-2 pb-2 pt-2 overflow-y-auto scrollbar-hide">
+        <template v-for="item in reportCategories" :key="item.route ?? item.labelKey">
+          <!-- Group divider -->
+          <div v-if="item.type === 'divider'"
+            class="px-3 pt-3.5 pb-1">
+            <p class="text-[9px] font-bold uppercase tracking-[0.18em] text-white/28 select-none">
+              {{ t(item.labelKey) }}
+            </p>
+          </div>
+          <!-- Nav link -->
+          <a v-else
+            :href="item.href"
+            class="w-full flex items-center gap-2.5 px-3 py-2 rounded text-left
+                   text-[13px] transition-colors no-underline"
+            :class="isActive(item)
+              ? 'bg-white/12 text-white ring-1 ring-white/10'
+              : 'text-white/65 hover:bg-white/6 hover:text-white/90'">
+            <span class="shrink-0 w-5 text-center leading-none text-[14px]">{{ item.icon }}</span>
+            <span class="truncate flex-1 font-medium">{{ t(item.labelKey) }}</span>
+            <div v-if="isActive(item)" class="w-1 h-4 rounded-full shrink-0 bg-[#206bc4]"></div>
+          </a>
+        </template>
       </nav>
 
       <!-- Sidebar footer — back to main nav -->
@@ -146,7 +148,7 @@
 
           <!-- Ward -->
           <div class="min-w-[180px] flex-1 max-w-[260px]">
-            <label class="block text-[10px] font-semibold uppercase tracking-[0.12em]
+            <label class="block text-[11px] font-semibold uppercase tracking-[0.12em]
                           text-[#9aa0ac] mb-1.5">
               {{ t('filter.ward') }}
             </label>
@@ -163,7 +165,7 @@
 
           <!-- Tole / Settlement -->
           <div class="min-w-[180px] flex-1 max-w-[260px]">
-            <label class="block text-[10px] font-semibold uppercase tracking-[0.12em]
+            <label class="block text-[11px] font-semibold uppercase tracking-[0.12em]
                           text-[#9aa0ac] mb-1.5">
               {{ t('filter.tole') }}
             </label>
@@ -249,17 +251,24 @@
               <i class="fa-solid fa-xmark text-sm"></i>
             </button>
           </div>
-          <nav class="flex-1 px-2 pt-2 overflow-y-auto space-y-0.5">
-            <a v-for="cat in reportCategories" :key="cat.route"
-              :href="cat.href"
-              class="flex items-center gap-2.5 px-3 py-2 rounded text-[13px]
-                     transition-colors no-underline"
-              :class="isActive(cat)
-                ? 'bg-white/12 text-white'
-                : 'text-white/65 hover:bg-white/6 hover:text-white/90'">
-              <span class="shrink-0 w-5 text-center text-[14px]">{{ cat.icon }}</span>
-              <span class="font-medium">{{ t(cat.labelKey) }}</span>
-            </a>
+          <nav class="flex-1 px-2 pt-2 overflow-y-auto">
+            <template v-for="item in reportCategories" :key="item.route ?? item.labelKey">
+              <div v-if="item.type === 'divider'" class="px-3 pt-3 pb-1">
+                <p class="text-[9px] font-bold uppercase tracking-[0.18em] text-white/28 select-none">
+                  {{ t(item.labelKey) }}
+                </p>
+              </div>
+              <a v-else
+                :href="item.href"
+                class="flex items-center gap-2.5 px-3 py-2 rounded text-[13px]
+                       transition-colors no-underline"
+                :class="isActive(item)
+                  ? 'bg-white/12 text-white'
+                  : 'text-white/65 hover:bg-white/6 hover:text-white/90'">
+                <span class="shrink-0 w-5 text-center text-[14px]">{{ item.icon }}</span>
+                <span class="font-medium">{{ t(item.labelKey) }}</span>
+              </a>
+            </template>
           </nav>
         </div>
       </div>
@@ -284,29 +293,38 @@ const mobileOpen  = ref(false)
 
 // ── Report category definitions ──────────────────────────────────────────────
 const reportCategories = [
-  { route: 'public.reports.index',        href: '/public/reports',            icon: '📊', labelKey: 'reports.cat.overview'     },
-  { route: 'public.reports.demographics', href: '/public/reports/demographics', icon: '👥', labelKey: 'reports.cat.demographics' },
-  { route: 'public.reports.age-groups',   href: '/public/reports/age-groups',  icon: '📅', labelKey: 'reports.cat.ageGroups'    },
-  { route: 'public.reports.education',    href: '/public/reports/education',   icon: '🎓', labelKey: 'reports.cat.education'    },
-  { route: 'public.reports.health',       href: '/public/reports/health',      icon: '🏥', labelKey: 'reports.cat.health'       },
-  { route: 'public.reports.employment',   href: '/public/reports/employment',  icon: '💼', labelKey: 'reports.cat.employment'   },
-  { route: 'public.reports.housing',      href: '/public/reports/housing',     icon: '🏠', labelKey: 'reports.cat.housing'      },
-  { route: 'public.reports.utilities',    href: '/public/reports/utilities',   icon: '💧', labelKey: 'reports.cat.utilities'    },
-  { route: 'public.reports.economics',    href: '/public/reports/economics',   icon: '💰', labelKey: 'reports.cat.economics'    },
-  { route: 'public.reports.agriculture', href: '/public/reports/agriculture', icon: '🌾', labelKey: 'reports.cat.agriculture'  },
-  { route: 'public.reports.migration',   href: '/public/reports/migration',   icon: '✈️',  labelKey: 'reports.cat.migration'    },
+  { type: 'nav',     route: 'public.reports.index',            href: '/public/reports',                    icon: '📊', labelKey: 'reports.cat.overview'          },
+  { type: 'divider', labelKey: 'reports.group.population' },
+  { type: 'nav',     route: 'public.reports.demographics',     href: '/public/reports/demographics',       icon: '👥', labelKey: 'reports.cat.demographics'      },
+  { type: 'nav',     route: 'public.reports.age-groups',       href: '/public/reports/age-groups',         icon: '📅', labelKey: 'reports.cat.ageGroups'          },
+  { type: 'divider', labelKey: 'reports.group.social' },
+  { type: 'nav',     route: 'public.reports.education',        href: '/public/reports/education',          icon: '🎓', labelKey: 'reports.cat.education'          },
+  { type: 'nav',     route: 'public.reports.health',           href: '/public/reports/health',             icon: '🏥', labelKey: 'reports.cat.health'             },
+  { type: 'nav',     route: 'public.reports.child-development',href: '/public/reports/child-development',  icon: '👶', labelKey: 'reports.cat.childDevelopment'   },
+  { type: 'nav',     route: 'public.reports.migration',        href: '/public/reports/migration',          icon: '✈️',  labelKey: 'reports.cat.migration'           },
+  { type: 'nav',     route: 'public.reports.documents',        href: '/public/reports/documents',          icon: '🪪', labelKey: 'reports.cat.documents'          },
+  { type: 'divider', labelKey: 'reports.group.economic' },
+  { type: 'nav',     route: 'public.reports.employment',       href: '/public/reports/employment',         icon: '💼', labelKey: 'reports.cat.employment'         },
+  { type: 'nav',     route: 'public.reports.economics',        href: '/public/reports/economics',          icon: '💰', labelKey: 'reports.cat.economics'          },
+  { type: 'nav',     route: 'public.reports.agriculture',      href: '/public/reports/agriculture',        icon: '🌾', labelKey: 'reports.cat.agriculture'        },
+  { type: 'divider', labelKey: 'reports.group.living' },
+  { type: 'nav',     route: 'public.reports.housing',          href: '/public/reports/housing',            icon: '🏠', labelKey: 'reports.cat.housing'            },
+  { type: 'nav',     route: 'public.reports.utilities',        href: '/public/reports/utilities',          icon: '💧', labelKey: 'reports.cat.utilities'          },
+  { type: 'divider', labelKey: 'reports.group.disaster' },
+  { type: 'nav',     route: 'public.reports.disaster',         href: '/public/reports/disaster',           icon: '🔴', labelKey: 'reports.cat.disaster'           },
 ]
 
-function isActive(cat) {
+function isActive(item) {
+  if (item.type !== 'nav') return false
   const url = page.url ?? ''
-  if (cat.href === '/public/reports') {
+  if (item.href === '/public/reports') {
     return url === '/public/reports' || url.startsWith('/public/reports?')
   }
-  return url.startsWith(cat.href)
+  return url.startsWith(item.href)
 }
 
 const activeCategory = computed(() =>
-  reportCategories.find(cat => isActive(cat)) ?? null
+  reportCategories.filter(c => c.type === 'nav').find(cat => isActive(cat)) ?? null
 )
 
 // ── Parent nav tabs (topbar) ──────────────────────────────────────────────────

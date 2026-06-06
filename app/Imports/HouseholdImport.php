@@ -9,6 +9,8 @@ use App\Imports\Sheets\UtilitiesSheet;
 use App\Imports\Sheets\EconomicSheet;
 use App\Imports\Sheets\AgricultureSheet;
 use App\Imports\Sheets\LivestockSheet;
+use App\Imports\Sheets\ChildHealthSheet;
+use App\Imports\Sheets\DisasterSheet;
 use App\Services\SurveyValueValidator;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
@@ -26,11 +28,13 @@ class HouseholdImport implements WithMultipleSheets
 
         $this->dependentSheets = [
             'Members'     => new MembersSheet($this->householdsSheet,    $this->validator),
+            'ChildHealth' => new ChildHealthSheet($this->householdsSheet,$this->validator),
             'Housing'     => new HousingSheet($this->householdsSheet,    $this->validator),
             'Utilities'   => new UtilitiesSheet($this->householdsSheet,  $this->validator),
             'Economic'    => new EconomicSheet($this->householdsSheet,   $this->validator),
             'Agriculture' => new AgricultureSheet($this->householdsSheet),
             'Livestock'   => new LivestockSheet($this->householdsSheet),
+            'Disaster'    => new DisasterSheet($this->householdsSheet),
         ];
     }
 

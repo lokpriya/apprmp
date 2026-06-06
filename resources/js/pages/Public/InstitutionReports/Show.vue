@@ -88,13 +88,13 @@
     <template v-else-if="category === 'services'">
       <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div class="bg-white border border-[#e6e7e9] rounded-lg px-4 py-3.5 border-l-4 border-l-[#6366f1]">
-          <span class="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9aa0ac]">
+          <span class="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#9aa0ac]">
             {{ t('instReports.totalServices') }}
           </span>
           <div class="text-[22px] font-bold text-[#6366f1] mt-1">{{ (totalServices ?? 0).toLocaleString() }}</div>
         </div>
         <div class="bg-white border border-[#e6e7e9] rounded-lg px-4 py-3.5 border-l-4 border-l-[#0ca678]">
-          <span class="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9aa0ac]">
+          <span class="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#9aa0ac]">
             {{ t('instReports.totalBeneficiaries') }}
           </span>
           <div class="text-[22px] font-bold text-[#0ca678] mt-1">{{ (totalBeneficiaries ?? 0).toLocaleString() }}</div>
@@ -133,7 +133,7 @@
         <div v-for="card in staffCards" :key="card.key"
           class="bg-white border border-[#e6e7e9] rounded-lg px-3 py-3 border-l-4"
           :style="`border-left-color:${card.color}`">
-          <span class="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#9aa0ac]">
+          <span class="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#9aa0ac]">
             {{ card.label }}
           </span>
           <div class="text-[20px] font-bold mt-0.5" :style="`color:${card.color}`">
@@ -163,7 +163,7 @@
             <tbody>
               <tr v-for="row in byCategory" :key="row.category"
                 class="border-b border-[#f0f0f0] hover:bg-gray-50 transition">
-                <td class="px-4 py-2.5 font-medium text-[#1d273b] capitalize">{{ row.category }}</td>
+                <td class="px-4 py-2.5 font-medium text-[#1d273b]">{{ row.category_lbl || row.category }}</td>
                 <td class="px-4 py-2.5 text-right text-[#626976]">{{ row.male.toLocaleString() }}</td>
                 <td class="px-4 py-2.5 text-right text-[#626976]">{{ row.female.toLocaleString() }}</td>
                 <td class="px-4 py-2.5 text-right text-[#626976]">{{ row.permanent.toLocaleString() }}</td>
@@ -186,6 +186,112 @@
       </div>
 
       <div v-if="!byCategory?.length"
+        class="bg-white border border-[#e6e7e9] rounded-xl p-8 text-center text-[#9aa0ac] text-[14px]">
+        {{ t('reports.noData') }}
+      </div>
+    </template>
+
+    <!-- ═══════════════════════════════════════════
+         EDUCATION
+    ═══════════════════════════════════════════ -->
+    <!-- ═══════════════════════════════════════════
+         HEALTH
+    ═══════════════════════════════════════════ -->
+    <template v-else-if="category === 'health'">
+      <!-- Summary cards -->
+      <div v-if="healthSummary" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div v-for="card in healthCards" :key="card.key"
+          class="bg-white border border-[#e6e7e9] rounded-lg px-4 py-3.5 border-l-4"
+          :style="`border-left-color:${card.color}`">
+          <span class="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#9aa0ac]">
+            {{ card.label }}
+          </span>
+          <div class="text-[20px] font-bold mt-0.5" :style="`color:${card.color}`">
+            {{ (healthSummary[card.key] ?? 0).toLocaleString() }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Bed breakdown -->
+      <div v-if="bedBreakdown" class="bg-white border border-[#e6e7e9] rounded-xl p-5">
+        <h2 class="text-[14px] font-semibold text-[#1d273b] mb-4">{{ t('instReports.bedBreakdownTitle') }}</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div v-for="bed in bedCards" :key="bed.key"
+            class="flex flex-col items-center justify-center bg-red-50 rounded-lg py-3 px-2 text-center">
+            <span class="text-[12px] font-medium text-red-500 mb-0.5">{{ bed.label }}</span>
+            <span class="text-[20px] font-bold text-[#d63939]">{{ (bedBreakdown[bed.key] ?? 0).toLocaleString() }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Service availability -->
+      <div v-if="serviceData?.length" class="bg-white border border-[#e6e7e9] rounded-xl p-5">
+        <h2 class="text-[14px] font-semibold text-[#1d273b] mb-1">
+          {{ t('instReports.serviceAvailability') }}
+        </h2>
+        <p class="text-[12px] text-[#9aa0ac] mb-4">
+          {{ t('instReports.outOf', { n: healthSummary?.total_facilities ?? 0 }) }}
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div v-for="row in serviceData" :key="row.field"
+            class="flex items-center gap-3 p-3 rounded-lg border border-[#e6e7e9]">
+            <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+              :class="row.percentage >= 70 ? 'bg-green-50' : row.percentage >= 40 ? 'bg-amber-50' : 'bg-red-50'">
+              <i :class="['fa-solid', healthServiceIcons[row.field] ?? 'fa-check', 'text-[13px]',
+                          row.percentage >= 70 ? 'text-green-600' : row.percentage >= 40 ? 'text-amber-600' : 'text-red-500']">
+              </i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-[12px] font-medium text-[#1d273b] leading-tight">
+                {{ locale === 'ne' ? row.label_np : row.label_en }}
+              </div>
+              <div class="mt-1 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                <div class="h-1.5 rounded-full transition-all"
+                  :class="row.percentage >= 70 ? 'bg-green-500' : row.percentage >= 40 ? 'bg-amber-500' : 'bg-red-400'"
+                  :style="`width:${row.percentage}%`">
+                </div>
+              </div>
+              <div class="text-[11px] text-[#9aa0ac] mt-0.5">
+                {{ row.count }} — {{ row.percentage }}%
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- By health type -->
+      <div v-if="byHealthType?.length" class="bg-white border border-[#e6e7e9] rounded-xl overflow-hidden">
+        <div class="px-5 py-3.5 border-b border-[#e6e7e9]">
+          <h2 class="text-[14px] font-semibold text-[#1d273b]">{{ t('instReports.byHealthTypeTitle') }}</h2>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-[13px]">
+            <thead>
+              <tr class="bg-gray-50 border-b border-[#e6e7e9]">
+                <th class="text-left px-4 py-2.5 font-semibold text-[#626976] text-[11px] uppercase tracking-wide">
+                  {{ locale === 'ne' ? 'प्रकार' : 'Health Type' }}
+                </th>
+                <th class="text-right px-4 py-2.5 font-semibold text-[#626976] text-[11px] uppercase tracking-wide">
+                  {{ locale === 'ne' ? 'संस्था' : 'Facilities' }}
+                </th>
+                <th class="text-right px-4 py-2.5 font-semibold text-[#626976] text-[11px] uppercase tracking-wide">
+                  {{ t('instReports.totalBeds') }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in byHealthType" :key="row.type"
+                class="border-b border-[#f0f0f0] hover:bg-gray-50 transition">
+                <td class="px-4 py-2.5 font-medium text-[#1d273b]">{{ row.type_lbl || row.type }}</td>
+                <td class="px-4 py-2.5 text-right text-[#626976]">{{ row.count.toLocaleString() }}</td>
+                <td class="px-4 py-2.5 text-right font-bold text-[#d63939]">{{ row.beds.toLocaleString() }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div v-if="!serviceData?.length && !byHealthType?.length"
         class="bg-white border border-[#e6e7e9] rounded-xl p-8 text-center text-[#9aa0ac] text-[14px]">
         {{ t('reports.noData') }}
       </div>
@@ -272,6 +378,10 @@ const props = defineProps({
   totalBeneficiaries:  { type: Number,  default: 0 },
   staffSummary:        { type: Object,  default: null },
   byCategory:          { type: Array,   default: null },
+  healthSummary:       { type: Object,  default: null },
+  serviceData:         { type: Array,   default: null },
+  byHealthType:        { type: Array,   default: null },
+  bedBreakdown:        { type: Object,  default: null },
 })
 
 const catMetaMap = {
@@ -280,6 +390,7 @@ const catMetaMap = {
   'infrastructure': { icon: '⚡', bg: '#fefce8' },
   'services':       { icon: '🤝', bg: '#f0f9ff' },
   'staff':          { icon: '👤', bg: '#fdf4ff' },
+  'health':         { icon: '🏥', bg: '#fff1f2' },
 }
 
 const catMeta = computed(() => catMetaMap[props.category] ?? { icon: '🏛️', bg: '#eef2ff' })
@@ -313,12 +424,48 @@ const facilityIcons = {
   has_lab:            'fa-solid fa-flask',
 }
 
+const healthCards = [
+  { key: 'total_facilities', label: t('instReports.totalFacilities'), color: '#d63939' },
+  { key: 'total_beds',       label: t('instReports.totalBeds'),       color: '#f59f00' },
+  { key: 'opd_daily',        label: t('instReports.opdDaily'),        color: '#0ca678' },
+  { key: 'opd_monthly',      label: t('instReports.opdMonthly'),      color: '#6366f1' },
+]
+
+const bedCards = [
+  { key: 'male_ward',   label: t('instReports.bedMaleWard') },
+  { key: 'female_ward', label: t('instReports.bedFemaleWard') },
+  { key: 'children',    label: t('instReports.bedChildren') },
+  { key: 'maternity',   label: t('instReports.bedMaternity') },
+  { key: 'icu',         label: t('instReports.bedIcu') },
+  { key: 'emergency',   label: t('instReports.bedEmergency') },
+]
+
+const healthServiceIcons = {
+  delivery_service:       'fa-baby',
+  emergency_service:      'fa-truck-medical',
+  has_lab:                'fa-flask',
+  has_xray:               'fa-radiation',
+  has_ambulance:          'fa-ambulance',
+  vaccine_service:        'fa-syringe',
+  family_planning:        'fa-heart',
+  has_ultrasound:         'fa-wave-square',
+  has_ecg:                'fa-heartbeat',
+  has_icu:                'fa-bed-pulse',
+  has_operation_theatre:  'fa-scalpel',
+  has_blood_bank:         'fa-droplet',
+  has_dialysis:           'fa-circle-nodes',
+  has_dental:             'fa-tooth',
+  has_physiotherapy:      'fa-person-walking',
+  has_oxygen_plant:       'fa-wind',
+}
+
 const ALL_CATEGORIES = [
   { href: '/public/institution-reports/by-type',        icon: '📋', labelKey: 'instReports.cat.byType',       route: 'by-type' },
   { href: '/public/institution-reports/by-ownership',   icon: '🏢', labelKey: 'instReports.cat.byOwnership',  route: 'by-ownership' },
   { href: '/public/institution-reports/infrastructure', icon: '⚡', labelKey: 'instReports.cat.infrastructure',route: 'infrastructure' },
   { href: '/public/institution-reports/services',       icon: '🤝', labelKey: 'instReports.cat.services',     route: 'services' },
   { href: '/public/institution-reports/staff',          icon: '👤', labelKey: 'instReports.cat.staff',        route: 'staff' },
+  { href: '/public/institution-reports/health',         icon: '🏥', labelKey: 'instReports.cat.health',       route: 'health' },
 ]
 
 const otherCategories = computed(() => ALL_CATEGORIES.filter(c => c.route !== props.category))

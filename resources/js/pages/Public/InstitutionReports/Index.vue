@@ -7,7 +7,7 @@
         class="bg-white border border-[#e6e7e9] rounded-lg px-4 py-3.5
                flex flex-col gap-1 border-l-4"
         :style="`border-left-color:${card.color}`">
-        <span class="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9aa0ac]">
+        <span class="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#9aa0ac]">
           {{ card.label }}
         </span>
         <span class="text-[22px] font-bold leading-tight" :style="`color:${card.color}`">
@@ -159,5 +159,9 @@ const categories = [
     labelKey: 'instReports.cat.services',     descKey: 'instReports.desc.services' },
   { href: '/public/institution-reports/staff',         icon: '👤', bg: '#fdf4ff',
     labelKey: 'instReports.cat.staff',        descKey: 'instReports.desc.staff' },
+  { href: '/public/institution-reports/health',        icon: '🏥', bg: '#fff1f2',
+    labelKey: 'instReports.cat.health',       descKey: 'instReports.desc.health' },
+  { href: '/public/institution-reports/school',        icon: '🎓', bg: '#eff6ff',
+    labelKey: 'instReports.cat.school',       descKey: 'instReports.desc.school' },
 ]
 </script>

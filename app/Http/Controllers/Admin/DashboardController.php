@@ -194,7 +194,7 @@ class DashboardController extends Controller
                 'url'         => route('institutions.show', $i),
             ]);
 
-        $recentActivity = $recentHouseholds
+        $recentActivity = collect($recentHouseholds)
             ->merge($recentInstitutions)
             ->sortByDesc('updated_at')
             ->take(10)

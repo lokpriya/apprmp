@@ -40,13 +40,13 @@ class EconomicSheet implements ToCollection, WithChunkReading, WithHeadingRow, W
                         continue;
                     }
 
-                    $loanSources = $this->parseArray($row['loan_sources'] ?? null);
+                    $loanSources = $this->parseArray($row['loan_source'] ?? null);
                     $householdId = $codeMap[$code];
 
                     // ── Survey option validation ──────────────────────────────
                     if ($this->validator) {
                         $errs = $this->validator->checkFields([
-                            'primary_income_source'    => trim($row['primary_income_source']    ?? ''),
+                            'income_source'            => trim($row['income_source']            ?? ''),
                             'annual_income_range'       => trim($row['annual_income_range']      ?? ''),
                             'annual_expenditure_range'  => trim($row['annual_expenditure_range'] ?? ''),
                         ], $rowNum);
@@ -59,16 +59,21 @@ class EconomicSheet implements ToCollection, WithChunkReading, WithHeadingRow, W
                     HouseholdEconomic::updateOrCreate(
                         ['household_id' => $householdId],
                         [
-                            'primary_income_source'     => trim($row['primary_income_source'] ?? '') ?: null,
-                            'annual_income_range'        => trim($row['annual_income_range'] ?? '') ?: null,
-                            'annual_expenditure_range'   => trim($row['annual_expenditure_range'] ?? '') ?: null,
-                            'remittance_amount'          => is_numeric($row['remittance_amount'] ?? '') ? $row['remittance_amount'] : null,
-                            'loan_sources'               => $loanSources ?: null,
-                            'total_loan_amount'          => is_numeric($row['total_loan_amount'] ?? '') ? $row['total_loan_amount'] : null,
-                            'has_bank_account'           => (bool)($this->bool($row['has_bank_account'] ?? 0)),
-                            'has_insurance'              => (bool)($this->bool($row['has_insurance'] ?? 0)),
-                            'poverty_card'               => (bool)($this->bool($row['poverty_card'] ?? 0)),
-                            // social_security_allowance is per-person — now in Members sheet (ss_allowance)
+                            'primary_income_source'    => trim($row['income_source'] ?? '') ?: null,
+                            'annual_income_range'      => trim($row['annual_income_range']   ?? '') ?: null,
+                            'annual_expenditure_range' => trim($row['annual_expenditure_range'] ?? '') ?: null,
+                            'remittance_amount'        => is_numeric($row['remittance_amount']  ?? '') ? $row['remittance_amount'] : null,
+                            'loan_sources'             => $loanSources ?: null,
+                            'total_loan_amount'        => is_numeric($row['total_loan_amount']  ?? '') ? $row['total_loan_amount'] : null,
+                            'has_bank_account'         => (bool)($this->bool($row['has_bank_account'] ?? 0)),
+                            'has_insurance'            => (bool)($this->bool($row['has_insurance']    ?? 0)),
+                            'poverty_card'             => (bool)($this->bool($row['poverty_card']     ?? 0)),
+                            // Expense breakdown columns
+                            'food_expense'             => is_numeric($row['food_expense']      ?? '') ? $row['food_expense']      : null,
+                            'clothes_expense'          => is_numeric($row['clothes_expense']   ?? '') ? $row['clothes_expense']   : null,
+                            'education_expense'        => is_numeric($row['education_expense'] ?? '') ? $row['education_expense'] : null,
+                            'treatment_expense'        => is_numeric($row['treatment_expense'] ?? '') ? $row['treatment_expense'] : null,
+                            'other_expense'            => is_numeric($row['other_expense']     ?? '') ? $row['other_expense']     : null,
                         ]
                     );
 

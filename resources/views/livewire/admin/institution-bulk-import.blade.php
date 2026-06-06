@@ -179,19 +179,21 @@
     </div>
     @endif
 
-    {{-- ─── Processing ───────────────────────────────────────────────────────── --}}
+    {{-- ─── Processing (polls every 3 s until job completes) ─────────────────── --}}
     @if($status === 'uploading')
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-10 flex flex-col items-center gap-4">
+    <div wire:poll.3s="pollStatus"
+         class="bg-white rounded-xl shadow-sm border border-gray-200 p-10 flex flex-col items-center gap-4">
         <div class="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center">
             <i class="fa-solid fa-spinner fa-spin text-indigo-600 text-2xl"></i>
         </div>
         <div class="text-center">
             <p class="text-base font-semibold text-gray-700">डेटा आयात हुँदैछ…</p>
-            <p class="text-sm text-gray-400 mt-1">Processing all sheets. This may take a moment for large files.</p>
+            <p class="text-sm text-gray-400 mt-1">Import queued — processing in the background. This page will update automatically.</p>
         </div>
         <div class="w-48 h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div class="h-full bg-indigo-500 rounded-full animate-pulse w-3/4"></div>
         </div>
+        <p class="text-xs text-gray-300">Batch #{{ $batchId }}</p>
     </div>
     @endif
 
@@ -399,12 +401,14 @@
                         'completed'  => 'bg-emerald-100 text-emerald-700',
                         'failed'     => 'bg-red-100 text-red-600',
                         'processing' => 'bg-blue-100 text-blue-700',
+                        'queued'     => 'bg-amber-100 text-amber-700',
                         default      => 'bg-gray-100 text-gray-500',
                     };
                     $si = match($batch['status']) {
                         'completed'  => 'fa-circle-check',
                         'failed'     => 'fa-circle-xmark',
                         'processing' => 'fa-spinner fa-spin',
+                        'queued'     => 'fa-hourglass-half',
                         default      => 'fa-clock',
                     };
                     @endphp

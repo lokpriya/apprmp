@@ -58,6 +58,9 @@ class InfrastructureSheet implements ToCollection, WithChunkReading, WithHeading
                             'fire_extinguisher'  => $this->parseBool($row['fire_extinguisher'] ?? null),
                             'earthquake_safe'    => $this->parseBool($row['earthquake_safe'] ?? null),
                             'evacuation_plan'    => $this->parseBool($row['evacuation_plan'] ?? null),
+                            'total_classrooms'   => is_numeric($row['total_classrooms'] ?? '') ? (int)$row['total_classrooms'] : null,
+                            'has_library'        => $this->parseBool($row['has_library'] ?? null),
+                            'has_lab'            => $this->parseBool($row['has_lab'] ?? null),
                         ]
                     );
                 } catch (\Throwable $e) {

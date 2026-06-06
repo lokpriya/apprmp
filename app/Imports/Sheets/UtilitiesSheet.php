@@ -47,7 +47,7 @@ class UtilitiesSheet implements ToCollection, WithChunkReading, WithHeadingRow, 
                             'sanitation_type'        => trim($row['sanitation_type']        ?? ''),
                             'electricity_source'     => trim($row['electricity_source']     ?? ''),
                             'cooking_fuel'           => trim($row['cooking_fuel']           ?? ''),
-                            'solid_waste_management' => trim($row['solid_waste_management'] ?? ''),
+                            'waste_management'       => trim($row['waste_management']       ?? ''),
                             'internet_type'          => trim($row['internet_type']          ?? ''),
                         ], $rowNum);
                         if ($errs) {
@@ -76,17 +76,24 @@ class UtilitiesSheet implements ToCollection, WithChunkReading, WithHeadingRow, 
                         [
                             'water_source'              => trim($row['water_source'] ?? '') ?: null,
                             'water_distance_minutes'    => is_numeric($row['water_distance_minutes'] ?? '') ? (int)$row['water_distance_minutes'] : null,
+                            'uses_firewood'             => $this->yesNo($row['uses_firewood'] ?? ''),
+                            'firewood_source'           => $this->parseArr($row['firewood_source'] ?? '') ?: null,
+                            'cooking_stove'             => trim($row['cooking_stove'] ?? '') ?: null,
+                            'cooking_fuel_arr'          => $this->parseArr($row['cooking_fuel_arr'] ?? '') ?: null,
+                            'cooking_fuel'              => trim($row['cooking_fuel'] ?? '') ?: null,
+                            'has_biogas'                => $this->bool($row['has_biogas'] ?? 0),
+                            'has_alt_electricity'       => $this->yesNo($row['has_alt_electricity'] ?? ''),
+                            'alt_electricity_sources'   => $this->parseArr($row['alt_electricity_source'] ?? '') ?: null,
+                            'electricity_source'        => trim($row['electricity_source'] ?? '') ?: null,
+                            'monthly_electricity_units' => is_numeric($row['monthly_electricity_units'] ?? '') ? (int)$row['monthly_electricity_units'] : null,
+                            'solid_waste_management'    => trim($row['waste_management'] ?? '') ?: null,
                             'has_toilet'                => $this->bool($row['has_toilet'] ?? 0),
                             'toilet_type'               => trim($row['toilet_type'] ?? '') ?: null,
                             'sanitation_type'           => trim($row['sanitation_type'] ?? '') ?: null,
-                            'electricity_source'        => trim($row['electricity_source'] ?? '') ?: null,
-                            'monthly_electricity_units' => is_numeric($row['monthly_electricity_units'] ?? '') ? (int)$row['monthly_electricity_units'] : null,
-                            'cooking_fuel'              => trim($row['cooking_fuel'] ?? '') ?: null,
-                            'has_biogas'                => $this->bool($row['has_biogas'] ?? 0),
-                            'solid_waste_management'    => trim($row['solid_waste_management'] ?? '') ?: null,
+                            'handwashing'               => trim($row['handwashing'] ?? '') ?: null,
+                            'access_to_facilities'      => $this->parseArr($row['facilities'] ?? '') ?: null,
                             'has_internet'              => $this->bool($row['has_internet'] ?? 0),
                             'internet_type'             => trim($row['internet_type'] ?? '') ?: null,
-                            'handwashing'               => trim($row['handwashing'] ?? '') ?: null,
                             'vehicle'                   => $hasVehicle ? 'Yes' : 'No',
                             'vehicles'                  => $vehiclesArr ?: null,
                         ]
@@ -102,6 +109,21 @@ class UtilitiesSheet implements ToCollection, WithChunkReading, WithHeadingRow, 
     private function bool(mixed $val): bool
     {
         return in_array(strtolower((string)$val), ['1', 'yes', 'true', 'y'], true);
+    }
+
+    private function yesNo(mixed $val): ?string
+    {
+        $s = strtolower(trim((string)$val));
+        if (in_array($s, ['1', 'yes', 'true', 'y'])) return 'yes';
+        if (in_array($s, ['0', 'no', 'false', 'n'])) return 'no';
+        return null;
+    }
+
+    private function parseArr(mixed $val): array
+    {
+        $str = trim((string)($val ?? ''));
+        if ($str === '') return [];
+        return array_values(array_filter(array_map('trim', explode(',', $str))));
     }
 
     public function getErrors(): array      { return $this->errors; }

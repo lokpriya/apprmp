@@ -144,6 +144,13 @@
             <!-- Actions -->
             <td class="px-4 py-3 text-right">
               <div class="flex items-center justify-end gap-1">
+                <!-- Switch User (impersonate) -->
+                <button v-if="canImpersonate(user)"
+                  @click="startImpersonate(user)"
+                  class="w-8 h-8 flex items-center justify-center rounded border border-[#e6e7e9] text-[#626976] hover:bg-green-600 hover:text-white hover:border-green-600 transition-colors"
+                  title="यस प्रयोगकर्ताको रूपमा काम गर्नुहोस्">
+                  <i class="fa-solid fa-user-secret text-[11px]"></i>
+                </button>
                 <!-- Edit -->
                 <Link :href="`/admin/users/${user.id}/edit`"
                   class="w-8 h-8 flex items-center justify-center rounded border border-[#e6e7e9] text-[#626976] hover:bg-[#206bc4] hover:text-white hover:border-[#206bc4] transition-colors"
@@ -380,6 +387,19 @@ function doResetPwd() {
     password: pwdForm.password,
     password_confirmation: pwdForm.password_confirmation,
   }, { onSuccess: closeResetPwd })
+}
+
+// ── Impersonate ────────────────────────────────────────────────────
+function canImpersonate(user) {
+  if (user.id === currentUserId) return false
+  if (['super_admin', 'municipal_admin'].includes(user.role)) return false
+  if (!user.is_active) return false
+  // municipal_admin can only impersonate within same LG (server enforces; hide cross-LG button)
+  return true
+}
+
+function startImpersonate(user) {
+  router.post(`/admin/impersonate/${user.id}`)
 }
 
 // ── Delete ─────────────────────────────────────────────────────────

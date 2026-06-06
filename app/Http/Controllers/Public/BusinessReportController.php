@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Models\LocalGovernment;
 use App\Models\MemberBusiness;
+use App\Models\SurveyOption;
 use App\Models\Ward;
 use App\Services\CrossTabService;
 use Illuminate\Http\Request;
@@ -56,6 +57,11 @@ class BusinessReportController extends Controller
             'wards'   => $wards,
             'filters' => ['ward_id' => $request->input('ward_id')],
         ];
+    }
+
+    private function optLabels(int $lgId, string $category): array
+    {
+        return SurveyOption::allGrouped($lgId)->all()[$category] ?? [];
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -126,12 +132,7 @@ class BusinessReportController extends Controller
         $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
         $ck      = CrossTabService::cacheKey('biz_type', $lg->id, $request->only(['ward_id']));
 
-        $typeLabels = [
-            'Single'        => 'एकल स्वामित्व / Single Owner',
-            'Partnership'   => 'साझेदारी / Partnership',
-            'PublicCompany' => 'सार्वजनिक कम्पनी / Public Company',
-            'other'         => 'अन्य / Other',
-        ];
+        $typeLabels = $this->optLabels($lg->id, 'business_type');
 
         $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
         $wardColDef = CrossTabService::wardColDef($wards);
@@ -189,6 +190,8 @@ class BusinessReportController extends Controller
         $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
         $ck      = CrossTabService::cacheKey('biz_field', $lg->id, $request->only(['ward_id']));
 
+        $fieldLabels = $this->optLabels($lg->id, 'business_field');
+
         $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
         $wardColDef = CrossTabService::wardColDef($wards);
 
@@ -200,7 +203,7 @@ class BusinessReportController extends Controller
                 ->join('wards', 'member_businesses.ward_id', '=', 'wards.id'),
             'member_businesses.business_field',
             'wards.ward_number',
-            [],
+            $fieldLabels,
             $wardColDef,
             $ck . '_fieldxward'
         );
@@ -211,11 +214,11 @@ class BusinessReportController extends Controller
                 ->whereNotNull('business_field')
                 ->where('business_field', '!=', ''),
             'business_field',
-            [],
+            $fieldLabels,
             $ck . '_field'
         );
 
-        // Sub-category frequency
+        // Sub-category frequency (show raw codes — sub-cats vary per field)
         $subCatFreq = CrossTabService::freq(
             MemberBusiness::whereIn('ward_id', $wardIds)
                 ->where('status', 'published')
@@ -267,11 +270,7 @@ class BusinessReportController extends Controller
         $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
         $ck      = CrossTabService::cacheKey('biz_loc', $lg->id, $request->only(['ward_id']));
 
-        $locationLabels = [
-            'UrbanArea'  => 'शहरी क्षेत्र / Urban Area',
-            'MarketArea' => 'बजार क्षेत्र / Market Area',
-            'RuralArea'  => 'ग्रामीण क्षेत्र / Rural Area',
-        ];
+        $locationLabels = $this->optLabels($lg->id, 'business_location');
 
         $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
         $wardColDef = CrossTabService::wardColDef($wards);
@@ -300,12 +299,7 @@ class BusinessReportController extends Controller
             'business_location',
             'business_type',
             $locationLabels,
-            [
-                'Single'        => 'एकल / Single',
-                'Partnership'   => 'साझेदारी / Partnership',
-                'PublicCompany' => 'कम्पनी / Company',
-                'other'         => 'अन्य / Other',
-            ],
+            $this->optLabels($lg->id, 'business_type'),
             $ck . '_locxtype'
         );
 

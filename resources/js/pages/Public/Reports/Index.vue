@@ -181,5 +181,23 @@ const categories = [
     labelKey: 'reports.cat.migration',
     descKey:  'reports.desc.migration',
   },
+  {
+    href: '/public/reports/child-development',
+    icon: '👶', bgRaw: '#ecfdf5',
+    labelKey: 'reports.cat.childDevelopment',
+    descKey:  'reports.desc.childDevelopment',
+  },
+  {
+    href: '/public/reports/documents',
+    icon: '🪪', bgRaw: '#fff8f0',
+    labelKey: 'reports.cat.documents',
+    descKey:  'reports.desc.documents',
+  },
+  {
+    href: '/public/reports/disaster',
+    icon: '🔴', bgRaw: '#fff5f5',
+    labelKey: 'reports.cat.disaster',
+    descKey:  'reports.desc.disaster',
+  },
 ]
 </script>

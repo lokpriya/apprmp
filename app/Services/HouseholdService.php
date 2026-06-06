@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Household;
 use App\Models\Ward;
 use App\Models\User;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 class HouseholdService
@@ -124,11 +125,20 @@ class HouseholdService
 
     private function syncLivestock(Household $household, array $items): void
     {
-        $household->livestock()->delete();
-        foreach ($items as $item) {
-            if (!empty($item['livestock_type'])) {
-                $household->livestock()->create($this->nullifyEmpty($item));
-            }
+        $incoming   = collect($items)->filter(fn($i) => !empty($i['livestock_type']));
+        $keepTypes  = $incoming->pluck('livestock_type')->all();
+
+        // Delete rows removed from the form
+        $household->livestock()
+            ->when(!empty($keepTypes), fn($q) => $q->whereNotIn('livestock_type', $keepTypes))
+            ->delete();
+
+        // Update existing / insert new rows by livestock_type
+        foreach ($incoming as $item) {
+            $household->livestock()->updateOrCreate(
+                ['livestock_type' => $item['livestock_type']],
+                $this->nullifyEmpty(Arr::except($item, ['livestock_type']))
+            );
         }
     }
 

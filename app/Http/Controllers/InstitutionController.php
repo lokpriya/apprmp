@@ -98,6 +98,7 @@ class InstitutionController extends Controller
                                        ? $user->assignedWards()->first()?->id
                                        : null,
             'mapConfig'        => \App\Models\LocalGovernment::getCached($lgId)?->map_config ?? [],
+            'canEditBuildings'  => $user->isAdmin(),
         ]);
     }
 
@@ -205,6 +206,7 @@ class InstitutionController extends Controller
                                                 ->groupBy('category'),
             'initialWardId'    => null,
             'mapConfig'        => \App\Models\LocalGovernment::getCached($lgId)?->map_config ?? [],
+            'canEditBuildings'  => $user->isAdmin(),
         ]);
     }
 

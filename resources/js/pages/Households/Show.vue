@@ -149,14 +149,24 @@
             <DetailRow label="बिजुलीको स्रोत"         :value="label('electricity_source', household.utilities.electricity_source)" />
             <DetailRow label="मासिक एकाइ (kWh)"      :value="str(household.utilities.monthly_electricity_units)" />
             <DetailRow label="वैकल्पिक ऊर्जा"         :value="yesNo(household.utilities.has_alt_electricity)" />
+            <DetailRow v-if="household.utilities.alt_electricity_sources?.length"
+              label="वैकल्पिक ऊर्जाको स्रोत"
+              :value="labels('alt_electricity_source', household.utilities.alt_electricity_sources)" />
             <DetailRow label="खाना पकाउने इन्धन"     :value="labels('cooking_fuel', household.utilities.cooking_fuel_arr)" />
             <DetailRow label="चुलोको प्रकार"          :value="label('cooking_stove', household.utilities.cooking_stove)" />
             <DetailRow label="दाउरा प्रयोग?"          :value="yesNo(household.utilities.uses_firewood)" />
+            <DetailRow v-if="household.utilities.firewood_source?.length"
+              label="दाउराको स्रोत"
+              :value="labels('firewood_source', household.utilities.firewood_source)" />
             <DetailRow label="बायोग्यास छ?"           :value="bool(household.utilities.has_biogas)" />
             <DetailRow label="फोहोर व्यवस्थापन"      :value="label('solid_waste_management', household.utilities.solid_waste_management)" />
             <DetailRow label="इन्टरनेट छ?"            :value="bool(household.utilities.has_internet)" />
             <DetailRow label="इन्टरनेट प्रकार"        :value="label('internet_type', household.utilities.internet_type)" />
             <DetailRow label="हात धुने सुविधा"        :value="label('handwashing', household.utilities.handwashing)" />
+            <DetailRow v-if="household.utilities.access_to_facilities?.length"
+              label="उपलब्ध सुविधाहरू"
+              :value="labels('facilities', household.utilities.access_to_facilities)"
+              class="col-span-full" />
           </div>
         </section>
 
@@ -169,8 +179,15 @@
             <DetailRow label="उपचार स्थान"              :value="label('treatment_place', household.survey_data.health.treatment_place)" />
             <DetailRow label="स्वास्थ्य केन्द्र दूरी"   :value="label('time_to_health_center', household.survey_data.health.time_to_health_center)" />
             <DetailRow label="गर्भवती महिला?"           :value="yesNo(household.survey_data.health.has_pregnant_woman)" />
+            <DetailRow v-if="household.survey_data.health.has_pregnant_woman === 'yes'"
+              label="गर्भ महिना"
+              :value="str(household.survey_data.health.pregnancy_months)" />
+            <DetailRow v-if="household.survey_data.health.has_pregnant_woman === 'yes'"
+              label="गर्भवतीको उमेर"
+              :value="str(household.survey_data.health.pregnant_age)" />
             <DetailRow label="हात धुने जानकारी"         :value="yesNo(household.survey_data.health.aware_handwashing)" />
             <DetailRow label="पोषण जानकारी"             :value="yesNo(household.survey_data.health.aware_nutrition)" />
+            <DetailRow label="गर्भवती पोषण जानकारी"    :value="yesNo(household.survey_data.health.aware_pregnant_nutrition)" />
             <DetailRow label="आइरन चक्की जानकारी"  :value="yesNo(household.survey_data.health.aware_iron_capsule)" />
           </div>
           <template v-if="household.survey_data?.wellbeing">
@@ -179,8 +196,13 @@
               <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5">
                 <DetailRow label="बसोबासमा खुशी?"       :value="yesNo(household.survey_data.wellbeing.happy_with_location)" />
                 <DetailRow label="बसोबास धारणा"          :value="label('residence_perception', household.survey_data.wellbeing.residence_perception)" />
+                <DetailRow label="छिमेकी राम्रा?"        :value="household.survey_data.wellbeing.neighbors_nice === 'yes' ? 'हुन्' : household.survey_data.wellbeing.neighbors_nice === 'no' ? 'होइनन्' : household.survey_data.wellbeing.neighbors_nice === 'neutral' ? 'त्यस्तो लाग्दैन' : null" />
                 <DetailRow label="छिमेकी मिलन"           :value="label('neighbor_cooperation', household.survey_data.wellbeing.neighbor_cooperation)" />
                 <DetailRow label="पारिवारिक भेलाघर"      :value="label('family_gathering_freq', household.survey_data.wellbeing.family_gathering_freq)" />
+                <DetailRow v-if="household.survey_data.wellbeing.happiness_activities?.length"
+                  label="खुशीका गतिविधि"
+                  :value="labels('happiness_activities', household.survey_data.wellbeing.happiness_activities)"
+                  class="col-span-full" />
               </div>
             </div>
           </template>
@@ -216,6 +238,9 @@
             <DetailRow label="खाडी विदेश"  :value="str(household.survey_data.occupation.foreign_gulf)" />
             <DetailRow label="अन्य विदेश"  :value="str(household.survey_data.occupation.foreign_others)" />
             <DetailRow label="सीप तालिम"   :value="yesNo(household.survey_data.occupation.skill_training)" />
+            <DetailRow v-if="household.survey_data.occupation.skill_rows?.length"
+              label="सीप विवरण"
+              :value="household.survey_data.occupation.skill_rows.length + ' प्रकार'" />
             <DetailRow v-if="household.survey_data.occupation.occupation_rows?.length"
               label="व्यवसाय विवरण"
               :value="household.survey_data.occupation.occupation_rows.length + ' पङ्क्ति'" />

@@ -252,12 +252,14 @@ const wards = computed(() => page.props.wards ?? [])
 const mobileOpen = ref(false)
 
 const reportCategories = [
-  { href: '/public/institution-reports',              icon: '🏛️', labelKey: 'instReports.cat.overview'     },
-  { href: '/public/institution-reports/by-type',      icon: '📋', labelKey: 'instReports.cat.byType'       },
-  { href: '/public/institution-reports/by-ownership', icon: '🏢', labelKey: 'instReports.cat.byOwnership'  },
-  { href: '/public/institution-reports/infrastructure',icon: '⚡', labelKey: 'instReports.cat.infrastructure'},
-  { href: '/public/institution-reports/services',     icon: '🤝', labelKey: 'instReports.cat.services'     },
-  { href: '/public/institution-reports/staff',        icon: '👤', labelKey: 'instReports.cat.staff'        },
+  { href: '/public/institution-reports',               icon: '🏛️', labelKey: 'instReports.cat.overview'      },
+  { href: '/public/institution-reports/by-type',       icon: '📋', labelKey: 'instReports.cat.byType'        },
+  { href: '/public/institution-reports/by-ownership',  icon: '🏢', labelKey: 'instReports.cat.byOwnership'   },
+  { href: '/public/institution-reports/infrastructure', icon: '⚡', labelKey: 'instReports.cat.infrastructure' },
+  { href: '/public/institution-reports/services',      icon: '🤝', labelKey: 'instReports.cat.services'      },
+  { href: '/public/institution-reports/staff',         icon: '👤', labelKey: 'instReports.cat.staff'         },
+  { href: '/public/institution-reports/health',        icon: '🏥', labelKey: 'instReports.cat.health'        },
+  { href: '/public/institution-reports/school',        icon: '🎓', labelKey: 'instReports.cat.school'        },
 ]
 
 function isActive(cat) {

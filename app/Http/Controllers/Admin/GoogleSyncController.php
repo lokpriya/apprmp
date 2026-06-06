@@ -92,10 +92,11 @@ class GoogleSyncController extends Controller
                 'upToDate' => count($diff['upToDate']),
                 'errors'   => count($diff['errors']),
             ],
-            'rows'     => array_map($stripInternal, $previewRows),
-            'errors'   => $cleanErrors,
-            'debug'    => $diff['debug'] ?? null,
-            'diff_key' => $diff['_diff_key'] ?? null,
+            'rows'           => array_map($stripInternal, $previewRows),
+            'errors'         => $cleanErrors,
+            'unmappedValues' => $diff['unmappedValues'] ?? [],
+            'debug'          => $diff['debug'] ?? null,
+            'diff_key'       => $diff['_diff_key'] ?? null,
         ]);
     }
 

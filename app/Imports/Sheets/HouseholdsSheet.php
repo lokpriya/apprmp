@@ -139,9 +139,12 @@ class HouseholdsSheet implements ToCollection, WithChunkReading, WithHeadingRow,
         }
 
         $socialSnap = array_filter([
-            'family_head' => trim($row['family_head'] ?? '') ?: null,
-            'family_type' => trim($row['family_type'] ?? '') ?: null,
-            'head_gender' => trim($row['head_gender'] ?? '') ?: null,
+            'family_head'  => trim($row['family_head']  ?? '') ?: null,
+            'family_type'  => trim($row['family_type']  ?? '') ?: null,
+            'head_gender'  => trim($row['head_gender']  ?? '') ?: null,
+            'total_male'   => is_numeric($row['total_male']   ?? '') ? (int)$row['total_male']   : null,
+            'total_female' => is_numeric($row['total_female'] ?? '') ? (int)$row['total_female'] : null,
+            'total_other'  => is_numeric($row['total_other']  ?? '') ? (int)$row['total_other']  : null,
         ]);
 
         [$gpsLat, $gpsLng] = $this->parseGps($row, $rowNum);

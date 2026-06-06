@@ -10,6 +10,7 @@ use App\Models\Ward;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use Maatwebsite\Excel\Concerns\WithCustomChunkSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
@@ -215,7 +216,7 @@ class DataSummarySheet implements FromArray, WithTitle, WithStyles, ShouldAutoSi
 // Households sheet
 // ─────────────────────────────────────────────────────────────────────────────
 
-class HouseholdsDataSheet implements FromQuery, WithMapping, WithHeadings, WithTitle, WithStyles, WithColumnWidths
+class HouseholdsDataSheet implements FromQuery, WithMapping, WithHeadings, WithTitle, WithStyles, WithColumnWidths, WithCustomChunkSize
 {
     use DataSheetStyles;
 
@@ -224,6 +225,7 @@ class HouseholdsDataSheet implements FromQuery, WithMapping, WithHeadings, WithT
         private array $statuses,
     ) {}
 
+    public function chunkSize(): int { return 500; }
     public function title(): string { return 'घरधुरी'; }
 
     public function query()
@@ -299,7 +301,7 @@ class HouseholdsDataSheet implements FromQuery, WithMapping, WithHeadings, WithT
 // Members sheet
 // ─────────────────────────────────────────────────────────────────────────────
 
-class MembersDataSheet implements FromQuery, WithMapping, WithHeadings, WithTitle, WithStyles, WithColumnWidths
+class MembersDataSheet implements FromQuery, WithMapping, WithHeadings, WithTitle, WithStyles, WithColumnWidths, WithCustomChunkSize
 {
     use DataSheetStyles;
 
@@ -308,6 +310,7 @@ class MembersDataSheet implements FromQuery, WithMapping, WithHeadings, WithTitl
         private array $statuses,
     ) {}
 
+    public function chunkSize(): int { return 500; }
     public function title(): string { return 'सदस्यहरू'; }
 
     public function query()

@@ -89,6 +89,13 @@ class HandleInertiaRequests extends Middleware
 
             'twoFactorEnabled' => fn () => (bool) $request->user()?->hasTwoFactorEnabled(),
 
+            'impersonating' => fn () => $request->session()->has('impersonator_id') ? [
+                'by_id'   => $request->session()->get('impersonator_id'),
+                'by_name' => \App\Models\User::find($request->session()->get('impersonator_id'))?->name,
+                'as_name' => $request->user()?->name,
+                'as_role' => $request->user()?->role,
+            ] : null,
+
             'flash' => [
                 'success'                         => fn () => $request->session()->get('success'),
                 'error'                           => fn () => $request->session()->get('error'),

@@ -35,6 +35,23 @@
             : 'border-[#e6e7e9] text-[#9aa0ac] hover:text-orange-400'">
           <i class="fa-solid fa-fire-flame-simple"></i>
         </button>
+        <!-- Municipal avg toggle (only when avgTotals provided) -->
+        <button v-if="hasMunicipalAvg" @click="showAvgLine = !showAvgLine"
+          :title="showAvgLine ? 'Hide municipal average' : 'Show municipal average'"
+          class="h-7 px-2 flex items-center gap-1 rounded border text-[11px] font-medium transition"
+          :class="showAvgLine
+            ? 'border-orange-400 bg-orange-50 text-orange-600'
+            : 'border-[#e6e7e9] text-[#9aa0ac] hover:text-orange-500'">
+          <i class="fa-solid fa-chart-line text-[10px]"></i>
+          Avg
+        </button>
+        <!-- Export PNG (only when chart visible) -->
+        <button v-if="chartVisible && hasData" @click="exportPng"
+          title="Export chart as PNG"
+          class="h-7 w-7 flex items-center justify-center rounded border border-[#e6e7e9]
+                 text-[12px] text-[#9aa0ac] hover:text-violet-600 hover:border-violet-300 transition">
+          <i class="fa-solid fa-image"></i>
+        </button>
         <!-- Export CSV -->
         <button @click="exportCsv"
           title="Export CSV"
@@ -68,16 +85,16 @@
           <tr class="bg-[#f8f9fb]">
             <!-- Row label header -->
             <th class="sticky left-0 z-10 bg-[#f8f9fb] text-left px-4 py-2.5
-                       text-[11px] font-semibold uppercase tracking-[0.1em] text-[#9aa0ac]
-                       border-b border-r border-[#e6e7e9] min-w-[140px]">
+                       text-[12px] font-semibold uppercase tracking-[0.1em] text-[#626976]
+                       border-b border-r border-[#e6e7e9] min-w-[150px]">
               {{ rowLabel }}
             </th>
             <!-- Column headers -->
             <th v-for="col in data.cols" :key="col"
               @click="toggleSort(col)"
-              class="px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-[0.08em]
+              class="px-3 py-2.5 text-center text-[12px] font-semibold uppercase tracking-[0.08em]
                      border-b border-r border-[#e6e7e9] cursor-pointer whitespace-nowrap
-                     select-none hover:bg-[#eef2f8] transition min-w-[72px]"
+                     select-none hover:bg-[#eef2f8] transition min-w-[80px]"
               :class="sortCol === col ? 'text-[#206bc4] bg-[#eef2f8]' : 'text-[#626976]'">
               <span class="inline-flex items-center gap-1">
                 {{ data.col_labels[col] ?? col }}
@@ -90,9 +107,9 @@
               </span>
             </th>
             <!-- Total header -->
-            <th class="px-3 py-2.5 text-center text-[11px] font-semibold uppercase
-                       tracking-[0.08em] text-[#9aa0ac] border-b border-[#e6e7e9]
-                       whitespace-nowrap min-w-[72px]"
+            <th class="px-3 py-2.5 text-center text-[12px] font-semibold uppercase
+                       tracking-[0.08em] text-[#626976] border-b border-[#e6e7e9]
+                       whitespace-nowrap min-w-[80px]"
               @click="toggleSort('__total__')"
               :class="sortCol === '__total__' ? 'text-[#206bc4] bg-[#eef2f8] cursor-pointer' : 'cursor-pointer hover:bg-[#eef2f8]'">
               <span class="inline-flex items-center gap-1">
@@ -106,24 +123,24 @@
         </thead>
 
         <tbody>
-          <tr v-for="(row, idx) in sortedRows" :key="row"
+          <tr v-for="row in sortedRows" :key="row"
             class="border-b border-[#f0f1f3] hover:bg-[#fafbfc] transition group">
             <!-- Row label -->
             <td class="sticky left-0 z-10 bg-white group-hover:bg-[#fafbfc]
-                       px-4 py-2 font-medium text-[#1d273b] border-r border-[#e6e7e9]
-                       whitespace-nowrap transition">
+                       px-4 py-2.5 font-medium text-[#1d273b] border-r border-[#e6e7e9]
+                       whitespace-nowrap transition text-[13px]">
               {{ data.row_labels[row] ?? row }}
             </td>
             <!-- Data cells -->
             <td v-for="col in data.cols" :key="col"
-              class="px-3 py-2 text-center border-r border-[#f0f1f3] transition"
+              class="px-3 py-2.5 text-center border-r border-[#f0f1f3] transition text-[13px]"
               :style="heatmap ? heatStyle(row, col) : ''">
               <span :class="cellClass(row, col)">
                 {{ displayCell(row, col) }}
               </span>
             </td>
             <!-- Row total -->
-            <td class="px-3 py-2 text-center font-semibold text-[#1d273b]
+            <td class="px-3 py-2.5 text-center font-semibold text-[#1d273b] text-[13px]
                        bg-[#f8f9fb] border-l border-[#e6e7e9]">
               {{ showPct
                   ? pctFmt(data.row_totals[row], data.grand_total)
@@ -134,19 +151,19 @@
 
         <tfoot>
           <tr class="bg-[#f0f4fa] font-semibold border-t-2 border-[#dde3ed]">
-            <td class="sticky left-0 z-10 bg-[#f0f4fa] px-4 py-2.5
-                       text-[12px] font-bold text-[#1d273b] border-r border-[#dde3ed]
+            <td class="sticky left-0 z-10 bg-[#f0f4fa] px-4 py-3
+                       text-[13px] font-bold text-[#1d273b] border-r border-[#dde3ed]
                        uppercase tracking-[0.06em]">
               {{ t('reports.grandTotal') }}
             </td>
             <td v-for="col in data.cols" :key="col"
-              class="px-3 py-2.5 text-center text-[12px] font-bold text-[#1d273b]
+              class="px-3 py-3 text-center text-[13px] font-bold text-[#1d273b]
                      border-r border-[#dde3ed]">
               {{ showPct
                   ? pctFmt(data.col_totals[col], data.grand_total)
                   : fmt(data.col_totals[col]) }}
             </td>
-            <td class="px-3 py-2.5 text-center text-[12px] font-bold text-[#206bc4]">
+            <td class="px-3 py-3 text-center text-[13px] font-bold text-[#206bc4]">
               {{ fmt(data.grand_total) }}
             </td>
           </tr>
@@ -176,17 +193,25 @@ const props = defineProps({
   titleEn:   { type: String, default: '' },
   rowLabel:  { type: String, default: '' },
   chartType: { type: String, default: 'bar' }, // 'bar' | 'pyramid'
+  // Optional: municipal-level col totals for comparison line on chart
+  // Format: { col_key: count, ... } — same keys as data.cols
+  avgTotals: { type: Object, default: () => ({}) },
 })
 
 // ── UI state ──────────────────────────────────────────────────────────────────
 const chartVisible = ref(true)
 const showPct      = ref(false)
 const heatmap      = ref(false)
+const showAvgLine  = ref(true)     // toggle municipal average line on chart
 const sortCol      = ref(null)      // null = original order
 const sortDir      = ref('desc')    // 'asc' | 'desc'
 
 const chartCanvas  = ref(null)
 let   chartInstance = null
+
+const hasMunicipalAvg = computed(() =>
+  props.avgTotals && Object.keys(props.avgTotals).length > 0
+)
 
 // ── Derived ───────────────────────────────────────────────────────────────────
 const hasData = computed(() =>
@@ -321,18 +346,40 @@ function buildChartData() {
   // Default: grouped bar chart — cols on X, rows as datasets
   // Limit to first 12 rows for readability
   const visibleRows = sortedRows.value.slice(0, 12)
+  const datasets = visibleRows.map((row, i) => ({
+    label:           props.data.row_labels[row] ?? row,
+    data:            props.data.cols.map(col => props.data.matrix[row]?.[col] ?? 0),
+    backgroundColor: PALETTE[i % PALETTE.length] + 'cc',
+    borderColor:     PALETTE[i % PALETTE.length],
+    borderWidth:     1,
+    borderRadius:    3,
+  }))
+
+  // Municipal average overlay line (when avgTotals provided and toggle is on)
+  if (hasMunicipalAvg.value && showAvgLine.value) {
+    const avgTotal = Object.values(props.avgTotals).reduce((s, v) => s + v, 0)
+    // Scale avg to the same total as the current data's grand total for fair comparison
+    const scale = avgTotal > 0 ? (props.data.grand_total / avgTotal) : 1
+    datasets.push({
+      type:        'line',
+      label:       'नगर औसत (Municipal Avg)',
+      data:        props.data.cols.map(col => Math.round((props.avgTotals[col] ?? 0) * scale)),
+      borderColor: '#f76707',
+      borderWidth: 2,
+      borderDash:  [5, 3],
+      pointRadius: 4,
+      pointBackgroundColor: '#f76707',
+      fill:        false,
+      tension:     0.1,
+      order:       0, // draw on top
+    })
+  }
+
   return {
     type: 'bar',
     data: {
       labels: props.data.cols.map(c => props.data.col_labels[c] ?? c),
-      datasets: visibleRows.map((row, i) => ({
-        label:           props.data.row_labels[row] ?? row,
-        data:            props.data.cols.map(col => props.data.matrix[row]?.[col] ?? 0),
-        backgroundColor: PALETTE[i % PALETTE.length] + 'cc',
-        borderColor:     PALETTE[i % PALETTE.length],
-        borderWidth:     1,
-        borderRadius:    3,
-      })),
+      datasets,
     },
     options: {
       responsive: true,
@@ -372,8 +419,8 @@ async function renderChart() {
   chartInstance = new Chart(chartCanvas.value, cfg)
 }
 
-// Re-render chart when data or visibility changes
-watch(() => [props.data, chartVisible.value, sortedRows.value], () => {
+// Re-render chart when data, visibility, or avg toggle changes
+watch(() => [props.data, chartVisible.value, sortedRows.value, showAvgLine.value], () => {
   if (chartVisible.value) renderChart()
 }, { deep: true })
 
@@ -384,6 +431,49 @@ onMounted(() => {
 onUnmounted(() => {
   chartInstance?.destroy()
 })
+
+// ── PNG Export ────────────────────────────────────────────────────────────────
+function exportPng() {
+  if (!chartCanvas.value || !chartVisible.value) return
+
+  // Build a new canvas: title block + chart canvas
+  const DPR    = Math.min(window.devicePixelRatio || 1, 2)
+  const TITLE_H = 50
+  const src    = chartCanvas.value
+  const W      = src.width
+  const H      = src.height + TITLE_H * DPR
+
+  const out    = document.createElement('canvas')
+  out.width    = W
+  out.height   = H
+  const ctx    = out.getContext('2d')
+
+  // White background
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, W, H)
+
+  // Title (scaled for DPR)
+  ctx.save()
+  ctx.scale(DPR, DPR)
+  ctx.fillStyle = '#1d273b'
+  ctx.font      = `bold 14px sans-serif`
+  ctx.fillText(props.title || '', 16, 22)
+  if (props.titleEn) {
+    ctx.fillStyle = '#9aa0ac'
+    ctx.font      = '11px sans-serif'
+    ctx.fillText(props.titleEn, 16, 38)
+  }
+  ctx.restore()
+
+  // Chart image below title
+  ctx.drawImage(src, 0, TITLE_H * DPR)
+
+  const url = out.toDataURL('image/png')
+  const a   = document.createElement('a')
+  a.href     = url
+  a.download = (props.title || 'chart') + '.png'
+  a.click()
+}
 
 // ── CSV Export ────────────────────────────────────────────────────────────────
 function exportCsv() {

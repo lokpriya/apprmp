@@ -145,7 +145,7 @@ function ins_writeEnv(string $root, array $d): bool {
     $env .= "DB_DATABASE={$d['db_name']}\n";
     $env .= "DB_USERNAME={$d['db_user']}\n";
     $env .= "DB_PASSWORD=" . $esc($d['db_pass']) . "\n\n";
-    $env .= "BROADCAST_CONNECTION=log\nCACHE_STORE=file\nQUEUE_CONNECTION=sync\n";
+    $env .= "BROADCAST_CONNECTION=log\nCACHE_STORE=file\nQUEUE_CONNECTION=database\n";
     $env .= "SESSION_DRIVER=file\nSESSION_LIFETIME=120\nSESSION_ENCRYPT=false\n\n";
     $env .= "MAIL_MAILER=smtp\nMAIL_HOST=127.0.0.1\nMAIL_PORT=1025\n";
     $env .= "MAIL_USERNAME=null\nMAIL_PASSWORD=null\nMAIL_ENCRYPTION=null\n";
@@ -968,6 +968,7 @@ php artisan optimize</pre>
         </h3>
         <ul class="space-y-1.5 text-[12px] text-amber-700">
           <li class="flex gap-2"><i class="fa-solid fa-trash-can mt-0.5 shrink-0"></i><span><strong>Delete install.php</strong> — Remove this file from your server immediately</span></li>
+          <li class="flex gap-2"><i class="fa-solid fa-clock mt-0.5 shrink-0"></i><span><strong>Set up Queue Worker cron</strong> — In cPanel → Cron Jobs, add:<br><code class="bg-amber-100 text-amber-900 text-[10px] px-1 rounded">* * * * * /usr/local/bin/ea-php84 /home2/prayasne/apprmp/artisan queue:work --stop-when-empty --max-time=55 --tries=1 2&gt;/dev/null</code><br>This runs bulk imports in the background.</span></li>
           <li class="flex gap-2"><i class="fa-solid fa-building-columns mt-0.5 shrink-0"></i><span>Go to <strong>Settings → सामान्य</strong> and complete your municipality profile</span></li>
           <li class="flex gap-2"><i class="fa-solid fa-map mt-0.5 shrink-0"></i><span>Go to <strong>Settings → नक्सा</strong> to configure the map center and GeoJSON URL</span></li>
           <li class="flex gap-2"><i class="fa-solid fa-file-import mt-0.5 shrink-0"></i><span>Go to <strong>Settings → सर्वेक्षण विकल्प</strong> to import survey dropdown options</span></li>

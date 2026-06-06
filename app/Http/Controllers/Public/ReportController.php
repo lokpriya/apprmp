@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Public;
 use App\Http\Controllers\Controller;
 use App\Models\Household;
 use App\Models\HouseholdAgriculture;
+use App\Models\HouseholdDisaster;
 use App\Models\HouseholdEconomic;
 use App\Models\HouseholdHousing;
 use App\Models\HouseholdLivestock;
@@ -577,6 +578,18 @@ class ReportController extends Controller
             $ck . '_vt_subject'
         );
 
+        $techTrainingFreq = CrossTabService::freq(
+            clone $mq, 'techtraining',
+            ['1' => 'प्राविधिक तालिम लिएको', '0' => 'प्राविधिक तालिम नलिएको'],
+            $ck . '_techtraining'
+        );
+
+        $saTrainingFreq = CrossTabService::freq(
+            clone $mq, 'sa_training',
+            ['1' => 'साक्षरता/अन्य तालिम लिएको', '0' => 'नलिएको'],
+            $ck . '_sa_training'
+        );
+
         return Inertia::render('Public/Reports/Show', [
             'lg'          => $this->lgProps($lg),
             'category'    => 'employment',
@@ -616,6 +629,18 @@ class ReportController extends Controller
                     'title_en'=> 'Vocational Training Subject',
                     'data'    => $vtSubjectFreq,
                 ],
+                [
+                    'id'      => 'techtraining',
+                    'title'   => 'प्राविधिक तालिम',
+                    'title_en'=> 'Technical Training',
+                    'data'    => $techTrainingFreq,
+                ],
+                [
+                    'id'      => 'sa_training',
+                    'title'   => 'साक्षरता/अन्य तालिम',
+                    'title_en'=> 'Literacy / Other Training',
+                    'data'    => $saTrainingFreq,
+                ],
             ],
         ]);
     }
@@ -642,6 +667,7 @@ class ReportController extends Controller
         $ownershipFreq   = CrossTabService::freq($hq(), 'ownership_type',      CrossTabService::optionLabels('ownership_type'),      $ck . '_ownership');
         $conditionFreq   = CrossTabService::freq($hq(), 'house_condition',     CrossTabService::optionLabels('house_condition'),     $ck . '_condition');
         $houseTypeFreq   = CrossTabService::freq($hq(), 'house_type',          CrossTabService::optionLabels('house_type'),          $ck . '_house_type');
+        $housePurposeFreq= CrossTabService::freq($hq(), 'house_purpose',       CrossTabService::optionLabels('house_purpose'),       $ck . '_house_purpose');
         $buildPermitFreq = CrossTabService::freq($hq(), 'has_building_permit', CrossTabService::optionLabels('has_building_permit'), $ck . '_permit');
         $riskFreq        = CrossTabService::freq($hq(), 'is_at_risk',          CrossTabService::optionLabels('is_at_risk'),          $ck . '_risk');
 
@@ -679,10 +705,11 @@ class ReportController extends Controller
                 ['id' => 'wall',         'title' => 'गारोको प्रकार',    'title_en' => 'Wall Type',           'data' => $wallFreq],
                 ['id' => 'foundation',   'title' => 'जगको प्रकार',      'title_en' => 'Foundation Type',     'data' => $foundationFreq],
                 ['id' => 'ownership',    'title' => 'घर स्वामित्व',     'title_en' => 'Ownership Type',      'data' => $ownershipFreq],
-                ['id' => 'condition',    'title' => 'घरको अवस्था',      'title_en' => 'House Condition',     'data' => $conditionFreq],
-                ['id' => 'house_type',   'title' => 'घरको किसिम',       'title_en' => 'House Type',          'data' => $houseTypeFreq],
-                ['id' => 'build_permit', 'title' => 'नक्शा पास',        'title_en' => 'Building Permit',     'data' => $buildPermitFreq],
-                ['id' => 'risk',         'title' => 'जोखिम अवस्था',     'title_en' => 'Disaster Risk',       'data' => $riskFreq],
+                ['id' => 'condition',      'title' => 'घरको अवस्था',      'title_en' => 'House Condition',     'data' => $conditionFreq],
+                ['id' => 'house_type',    'title' => 'घरको किसिम',       'title_en' => 'House Type',          'data' => $houseTypeFreq],
+                ['id' => 'house_purpose', 'title' => 'घरको उद्देश्य',    'title_en' => 'House Purpose',       'data' => $housePurposeFreq],
+                ['id' => 'build_permit',  'title' => 'नक्शा पास',        'title_en' => 'Building Permit',     'data' => $buildPermitFreq],
+                ['id' => 'risk',          'title' => 'जोखिम अवस्था',     'title_en' => 'Disaster Risk',       'data' => $riskFreq],
             ],
         ]);
     }
@@ -776,6 +803,7 @@ class ReportController extends Controller
         $bankFreq       = CrossTabService::freq($eq(), 'has_bank_account',         ['1'=>'बैंक खाता छ','0'=>'बैंक खाता छैन'],               $ck . '_bank');
         $povertyFreq    = CrossTabService::freq($eq(), 'poverty_card',             ['1'=>'परिचयपत्र छ','0'=>'परिचयपत्र छैन'],                $ck . '_poverty');
         $insuranceFreq  = CrossTabService::freq($eq(), 'has_insurance',            CrossTabService::optionLabels('has_insurance'),            $ck . '_insurance');
+        $loanSourceFreq = $this->jsonArrayFreq($eq(), 'loan_sources', CrossTabService::optionLabels('loan_source'), $ck . '_loan_sources');
 
         $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
         $wardColDef = CrossTabService::wardColDef($wards);
@@ -810,6 +838,7 @@ class ReportController extends Controller
                 ['id' => 'income_src',   'title' => 'मुख्य आय स्रोत',       'title_en' => 'Primary Income Source',  'data' => $incomeFreq],
                 ['id' => 'income_range', 'title' => 'वार्षिक आय दायरा',      'title_en' => 'Annual Income Range',    'data' => $incomeRangeFreq],
                 ['id' => 'expend',       'title' => 'वार्षिक खर्च दायरा',    'title_en' => 'Annual Expenditure',     'data' => $expendFreq],
+                ['id' => 'loan_sources', 'title' => 'ऋणको स्रोत',              'title_en' => 'Loan Sources',           'data' => $loanSourceFreq],
                 ['id' => 'bank',         'title' => 'बैंक खाता',              'title_en' => 'Bank Account',           'data' => $bankFreq],
                 ['id' => 'insurance',    'title' => 'बीमा',                   'title_en' => 'Insurance Coverage',     'data' => $insuranceFreq],
                 ['id' => 'poverty',      'title' => 'गरिबी परिचयपत्र',        'title_en' => 'Poverty Card',           'data' => $povertyFreq],
@@ -909,12 +938,15 @@ class ReportController extends Controller
             $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
         );
 
-        $agriFreq     = CrossTabService::freq($aq(), 'agriculture',               CrossTabService::optionLabels('agriculture'),               $ck . '_agri');
-        $landFreq     = CrossTabService::freq($aq(), 'owns_land',                 CrossTabService::optionLabels('owns_land'),                 $ck . '_land');
-        $chemFertFreq = CrossTabService::freq($aq(), 'uses_chemical_fertilizer',  CrossTabService::optionLabels('uses_chemical_fertilizer'),  $ck . '_chem_fert');
-        $orgFertFreq  = CrossTabService::freq($aq(), 'uses_organic_fertilizer',   CrossTabService::optionLabels('uses_organic_fertilizer'),   $ck . '_org_fert');
-        $sellsFreq    = CrossTabService::freq($aq(), 'sells_produce',             CrossTabService::optionLabels('sells_produce'),             $ck . '_sells');
-        $agriLoanFreq = CrossTabService::freq($aq(), 'has_agri_loan',             CrossTabService::optionLabels('has_agri_loan'),             $ck . '_agri_loan');
+        $agriFreq           = CrossTabService::freq($aq(), 'agriculture',              CrossTabService::optionLabels('agriculture'),              $ck . '_agri');
+        $landFreq           = CrossTabService::freq($aq(), 'owns_land',               CrossTabService::optionLabels('owns_land'),                $ck . '_land');
+        $irrigationFreq     = CrossTabService::freq($aq(), 'irrigation_source',        CrossTabService::optionLabels('irrigation_source'),        $ck . '_irrigation');
+        $chemFertFreq       = CrossTabService::freq($aq(), 'uses_chemical_fertilizer', CrossTabService::optionLabels('uses_chemical_fertilizer'), $ck . '_chem_fert');
+        $orgFertFreq        = CrossTabService::freq($aq(), 'uses_organic_fertilizer',  CrossTabService::optionLabels('uses_organic_fertilizer'),  $ck . '_org_fert');
+        $sellsFreq          = CrossTabService::freq($aq(), 'sells_produce',            CrossTabService::optionLabels('sells_produce'),            $ck . '_sells');
+        $agriLoanFreq       = CrossTabService::freq($aq(), 'has_agri_loan',            CrossTabService::optionLabels('has_agri_loan'),            $ck . '_agri_loan');
+        $agriCategoryFreq   = $this->jsonArrayFreq($aq(), 'agri_categories',  CrossTabService::optionLabels('agri_category'), $ck . '_agri_cat');
+        $farmChallengeFreq  = $this->jsonArrayFreq($aq(), 'Farm_Challenges',  CrossTabService::optionLabels('farm_challenge'),        $ck . '_farm_challenge');
 
         $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
         $wardColDef = CrossTabService::wardColDef($wards);
@@ -954,13 +986,16 @@ class ReportController extends Controller
                 ],
             ],
             'frequencies' => [
-                ['id' => 'agri',      'title' => 'कृषि अभ्यास',           'title_en' => 'Agriculture Practice',    'data' => $agriFreq],
-                ['id' => 'land',      'title' => 'जमिन स्वामित्व',         'title_en' => 'Land Ownership',          'data' => $landFreq],
-                ['id' => 'chem_fert', 'title' => 'रासायनिक मल प्रयोग',    'title_en' => 'Chemical Fertilizer Use', 'data' => $chemFertFreq],
-                ['id' => 'org_fert',  'title' => 'जैविक मल प्रयोग',       'title_en' => 'Organic Fertilizer Use',  'data' => $orgFertFreq],
-                ['id' => 'sells',     'title' => 'उपज बिक्री',             'title_en' => 'Sells Produce',           'data' => $sellsFreq],
-                ['id' => 'agri_loan', 'title' => 'कृषि ऋण',                'title_en' => 'Agricultural Loan',       'data' => $agriLoanFreq],
-                ['id' => 'livestock', 'title' => 'पशुपालनको प्रकार',       'title_en' => 'Livestock Type',          'data' => $livestockFreq],
+                ['id' => 'agri',          'title' => 'कृषि अभ्यास',           'title_en' => 'Agriculture Practice',    'data' => $agriFreq],
+                ['id' => 'land',          'title' => 'जमिन स्वामित्व',         'title_en' => 'Land Ownership',          'data' => $landFreq],
+                ['id' => 'irrigation',    'title' => 'सिँचाइको स्रोत',          'title_en' => 'Irrigation Source',       'data' => $irrigationFreq],
+                ['id' => 'agri_cat',      'title' => 'बाली/कृषि श्रेणी',        'title_en' => 'Crop / Agriculture Category', 'data' => $agriCategoryFreq],
+                ['id' => 'farm_challenge','title' => 'कृषि समस्याहरू',           'title_en' => 'Farm Challenges',         'data' => $farmChallengeFreq],
+                ['id' => 'chem_fert',     'title' => 'रासायनिक मल प्रयोग',    'title_en' => 'Chemical Fertilizer Use', 'data' => $chemFertFreq],
+                ['id' => 'org_fert',      'title' => 'जैविक मल प्रयोग',       'title_en' => 'Organic Fertilizer Use',  'data' => $orgFertFreq],
+                ['id' => 'sells',         'title' => 'उपज बिक्री',             'title_en' => 'Sells Produce',           'data' => $sellsFreq],
+                ['id' => 'agri_loan',     'title' => 'कृषि ऋण',                'title_en' => 'Agricultural Loan',       'data' => $agriLoanFreq],
+                ['id' => 'livestock',     'title' => 'पशुपालनको प्रकार',       'title_en' => 'Livestock Type',          'data' => $livestockFreq],
             ],
         ]);
     }
@@ -1063,5 +1098,368 @@ class ReportController extends Controller
                 ['id' => 'district',      'title' => 'देशभित्र बसोबासको जिल्ला','title_en' => 'Internal Residence District', 'data' => $districtFreq],
             ],
         ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 12. Child Development & Health
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function childDevelopment(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
+        $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
+        $mq      = $this->memberQuery($wardIds, $request);
+        $ck      = CrossTabService::cacheKey('child', $lg->id, $request->only(['ward_id', 'settlement_id']));
+
+        // Scope queries to each child age bracket
+        $childMq  = (clone $mq)->whereNotNull('age')->where('age', '>=', 0)->where('age', '<=', 15);
+        $mq03     = (clone $childMq)->where('age', '<=', 3);
+        $mq45     = (clone $childMq)->where('age', '>=', 4)->where('age', '<=', 5);
+        $mq615    = (clone $childMq)->where('age', '>=', 6)->where('age', '<=', 15);
+
+        $total03  = (clone $mq03)->count();
+        $total45  = (clone $mq45)->count();
+        $total615 = (clone $mq615)->count();
+
+        // ── Age group distribution ────────────────────────────────────────────
+        $ageGroupFreq = array_values(array_filter([
+            $total03  ? ['key' => '0-3',  'label' => 'शिशु (०–३ वर्ष)',           'count' => $total03]  : null,
+            $total45  ? ['key' => '4-5',  'label' => 'पूर्व-विद्यालय (४–५ वर्ष)', 'count' => $total45]  : null,
+            $total615 ? ['key' => '6-15', 'label' => 'विद्यालय उमेर (६–१५ वर्ष)', 'count' => $total615] : null,
+        ]));
+
+        // ── Age group × ward cross-tab ────────────────────────────────────────
+        $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
+        $wardColDef = CrossTabService::wardColDef($wards);
+        $ageExpr    = "CASE WHEN age <= 3 THEN '0-3' WHEN age <= 5 THEN '4-5' WHEN age <= 15 THEN '6-15' ELSE NULL END";
+        $ageRowDef  = ['0-3' => 'शिशु (०–३)', '4-5' => 'पूर्व-विद्यालय (४–५)', '6-15' => 'विद्यालय (६–१५)'];
+
+        $childByWard = CrossTabService::tab(
+            (clone $childMq)
+                ->join('households', 'household_members.household_id', '=', 'households.id')
+                ->join('wards', 'households.ward_id', '=', 'wards.id'),
+            $ageExpr,
+            'wards.ward_number',
+            $ageRowDef,
+            $wardColDef,
+            $ck . '_child_ward'
+        );
+
+        $childByGender = CrossTabService::tab(
+            clone $childMq,
+            $ageExpr,
+            'gender',
+            $ageRowDef,
+            CrossTabService::genderLabels(),
+            $ck . '_child_gender'
+        );
+
+        // ── Boolean indicator helper ──────────────────────────────────────────
+        $boolFreq = function ($query, string $col, int $total, string $yesLabel, string $noLabel): array {
+            if (!$total) return [];
+            $yes = (clone $query)->where($col, true)->count();
+            $no  = $total - $yes;
+            return array_values(array_filter([
+                $yes ? ['key' => 'yes', 'label' => $yesLabel, 'count' => $yes] : null,
+                $no  ? ['key' => 'no',  'label' => $noLabel,  'count' => $no]  : null,
+            ]));
+        };
+
+        // ── 0–3 year indicators ───────────────────────────────────────────────
+        $frequencies = [];
+
+        if ($ageGroupFreq) {
+            $frequencies[] = ['id' => 'age_group', 'title' => 'उमेर समूह वितरण', 'title_en' => 'Children by Age Group', 'data' => $ageGroupFreq];
+        }
+
+        foreach ([
+            ['colostrum',               'कोलोस्ट्रम/पहिलो दूध दिएको',     'Colostrum / First Milk',       'दिएको', 'दिएको छैन'],
+            ['vit_a_dewormin',          'भिटामिन A र जुका औषधि',          'Vitamin A & Deworming',        'दिएको', 'दिएको छैन'],
+            ['fullmilkcourse',          'पूर्ण स्तनपान गराएको',            'Full Breastfeeding Course',    'गराएको', 'गराएको छैन'],
+            ['childhealthcheckup',      'स्वास्थ्य जाँच नियमित गराएको',   'Regular Health Checkup',      'गराएको', 'गराएको छैन'],
+            ['diarrhea_before_two_weeks','पखाला (२ हप्तामा)',              'Diarrhea (last 2 weeks)',      'भएको',   'भएको छैन'],
+            ['fever_resp',              'ज्वरो/सास समस्या',               'Fever or Respiratory Issue',   'भएको',   'भएको छैन'],
+        ] as [$col, $title, $titleEn, $yes, $no]) {
+            $data = $boolFreq($mq03, $col, $total03, $yes, $no);
+            if ($data) $frequencies[] = ['id' => $col, 'title' => $title . ' (०–३ वर्ष)', 'title_en' => $titleEn . ' (0–3 yrs)', 'data' => $data];
+        }
+
+        // ── 4–5 year indicators ───────────────────────────────────────────────
+        foreach ([
+            ['vitaminA',         'भिटामिन A दिएको',          'Vitamin A (4–5 yrs)',        'दिएको', 'दिएको छैन'],
+            ['childhealthcheckup','स्वास्थ्य जाँच गराएको',    'Health Checkup (4–5 yrs)',   'गराएको', 'गराएको छैन'],
+        ] as [$col, $title, $titleEn, $yes, $no]) {
+            $data = $boolFreq($mq45, $col, $total45, $yes, $no);
+            if ($data) $frequencies[] = ['id' => $col . '_45', 'title' => $title . ' (४–५ वर्ष)', 'title_en' => $titleEn, 'data' => $data];
+        }
+
+        // ── 6–15 year indicators ──────────────────────────────────────────────
+        foreach ([
+            ['phy_dev_6_15',          'शारीरिक विकास सामान्य',   'Normal Physical Development (6–15)', 'सामान्य', 'समस्या छ'],
+            ['allergy_infection_6_15', 'एलर्जी/संक्रमण समस्या',  'Allergy or Infection (6–15)',        'छ',       'छैन'],
+            ['watch_mobile_tv_6_15',   'मोबाइल/टिभी हेर्ने बानी', 'Screen Time Habit (6–15)',           'छ',       'छैन'],
+        ] as [$col, $title, $titleEn, $yes, $no]) {
+            $data = $boolFreq($mq615, $col, $total615, $yes, $no);
+            if ($data) $frequencies[] = ['id' => $col, 'title' => $title . ' (६–१५ वर्ष)', 'title_en' => $titleEn, 'data' => $data];
+        }
+
+        return Inertia::render('Public/Reports/Show', [
+            'lg'          => $this->lgProps($lg),
+            'category'    => 'child-development',
+            'title'       => 'बाल विकास तथा स्वास्थ्य',
+            'title_en'    => 'Child Development & Health',
+            ...$this->filterProps($lg, $request),
+            'tables'      => [
+                [
+                    'id'       => 'child_by_ward',
+                    'title'    => 'उमेर समूह अनुसार वडागत बाल वितरण',
+                    'title_en' => 'Children by Age Group & Ward',
+                    'data'     => $childByWard,
+                ],
+                [
+                    'id'       => 'child_by_gender',
+                    'title'    => 'उमेर समूह अनुसार लिङ्ग',
+                    'title_en' => 'Children by Age Group & Gender',
+                    'data'     => $childByGender,
+                ],
+            ],
+            'frequencies' => $frequencies,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 13. Identity Documents
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function documents(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
+        $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
+        $mq      = $this->memberQuery($wardIds, $request);
+        $ck      = CrossTabService::cacheKey('docs', $lg->id, $request->only(['ward_id', 'settlement_id', 'gender']));
+
+        $boolFreq = function ($query, string $col, int $total, string $yes, string $no): array {
+            if (!$total) return [];
+            $yesCount = (clone $query)->where($col, true)->count();
+            $noCount  = $total - $yesCount;
+            return array_values(array_filter([
+                $yesCount ? ['key' => 'yes', 'label' => $yes, 'count' => $yesCount] : null,
+                $noCount  ? ['key' => 'no',  'label' => $no,  'count' => $noCount]  : null,
+            ]));
+        };
+
+        // Members aged 16+ for citizenship/voters/passport
+        $adults   = (clone $mq)->where('age', '>=', 16);
+        $voters   = (clone $mq)->where('age', '>=', 18);
+        $youth    = (clone $mq)->where('age', '<=', 18);
+        $totalAll = (clone $mq)->count();
+        $totalAdults  = $adults->count();
+        $totalVoters  = $voters->count();
+        $totalYouth   = $youth->count();
+
+        $citizenshipByGender = CrossTabService::tab(
+            clone $adults,
+            'has_citizenship',
+            'gender',
+            ['1' => 'नागरिकता छ', '0' => 'नागरिकता छैन'],
+            CrossTabService::genderLabels(),
+            $ck . '_citxgender'
+        );
+
+        $votersCardByGender = CrossTabService::tab(
+            clone $voters,
+            'has_voters_card',
+            'gender',
+            ['1' => 'मतदाता परिचयपत्र छ', '0' => 'छैन'],
+            CrossTabService::genderLabels(),
+            $ck . '_voterxgender'
+        );
+
+        $nationalIdByGender = CrossTabService::tab(
+            clone $mq,
+            'has_national_id_card',
+            'gender',
+            ['1' => 'राष्ट्रिय परिचयपत्र छ', '0' => 'छैन'],
+            CrossTabService::genderLabels(),
+            $ck . '_nidxgender'
+        );
+
+        $frequencies = [
+            ['id' => 'citizenship',    'title' => 'नागरिकता (१६+ वर्ष)',          'title_en' => 'Citizenship (age 16+)',        'data' => $boolFreq($adults, 'has_citizenship',    $totalAdults, 'नागरिकता छ',          'नागरिकता छैन')],
+            ['id' => 'voters_card',    'title' => 'मतदाता परिचयपत्र (१८+ वर्ष)', 'title_en' => 'Voters Card (age 18+)',        'data' => $boolFreq($voters, 'has_voters_card',    $totalVoters, 'मतदाता परिचयपत्र छ',  'छैन')],
+            ['id' => 'national_id',    'title' => 'राष्ट्रिय परिचयपत्र',          'title_en' => 'National ID Card',             'data' => $boolFreq($mq,     'has_national_id_card',$totalAll,    'राष्ट्रिय परिचयपत्र छ','छैन')],
+            ['id' => 'passport',       'title' => 'राहदानी (Passport)',           'title_en' => 'Passport',                     'data' => $boolFreq($mq,     'has_passport',        $totalAll,    'राहदानी छ',            'राहदानी छैन')],
+            ['id' => 'pan',            'title' => 'प्यान (PAN)',                   'title_en' => 'PAN Card',                     'data' => $boolFreq($mq,     'has_pan',             $totalAll,    'प्यान छ',              'प्यान छैन')],
+            ['id' => 'drivers_license','title' => 'सवारी चालक अनुमतिपत्र',       'title_en' => 'Driving Licence',              'data' => $boolFreq($mq,     'has_drivers_license', $totalAll,    'चालक अनुमतिपत्र छ',   'छैन')],
+            ['id' => 'birth_cert',     'title' => 'जन्मदर्ता (१८ वर्षमुनि)',      'title_en' => 'Birth Certificate (under 18)', 'data' => $boolFreq($youth,  'has_birth_certificate',$totalYouth, 'जन्मदर्ता छ',          'छैन')],
+        ];
+
+        // Remove empty frequency arrays
+        $frequencies = array_values(array_filter($frequencies, fn ($f) => !empty($f['data'])));
+
+        return Inertia::render('Public/Reports/Show', [
+            'lg'          => $this->lgProps($lg),
+            'category'    => 'documents',
+            'title'       => 'परिचयपत्र तथा कागजात विवरण',
+            'title_en'    => 'Identity Documents',
+            ...$this->filterProps($lg, $request),
+            'tables'      => [
+                [
+                    'id'      => 'citizenship_by_gender',
+                    'title'   => 'नागरिकता अनुसार लिङ्ग (१६+ वर्ष)',
+                    'title_en'=> 'Citizenship by Gender (age 16+)',
+                    'data'    => $citizenshipByGender,
+                ],
+                [
+                    'id'      => 'voters_by_gender',
+                    'title'   => 'मतदाता परिचयपत्र अनुसार लिङ्ग (१८+ वर्ष)',
+                    'title_en'=> 'Voters Card by Gender (age 18+)',
+                    'data'    => $votersCardByGender,
+                ],
+                [
+                    'id'      => 'nid_by_gender',
+                    'title'   => 'राष्ट्रिय परिचयपत्र अनुसार लिङ्ग',
+                    'title_en'=> 'National ID by Gender',
+                    'data'    => $nationalIdByGender,
+                ],
+            ],
+            'frequencies' => $frequencies,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 14. Disaster & Risk
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function disaster(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
+        $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
+        $ck      = CrossTabService::cacheKey('disaster', $lg->id, $request->only(['ward_id']));
+
+        $dq = fn () => HouseholdDisaster::whereHas('household', fn ($q) =>
+            $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
+        );
+
+        $total = $dq()->count();
+
+        $boolFreq = function ($col, string $yes, string $no) use ($dq, $total, $ck): array {
+            if (!$total) return [];
+            $yesCount = $dq()->where($col, true)->count();
+            $noCount  = $total - $yesCount;
+            return array_values(array_filter([
+                $yesCount ? ['key' => 'yes', 'label' => $yes, 'count' => $yesCount] : null,
+                $noCount  ? ['key' => 'no',  'label' => $no,  'count' => $noCount]  : null,
+            ]));
+        };
+
+        // Risk zone frequencies
+        $riskZones = [];
+        foreach ([
+            ['is_flood_zone',     'बाढी जोखिम क्षेत्र',   'बाढी जोखिम छ',    'बाढी जोखिम छैन'],
+            ['is_landslide_zone', 'पहिरो जोखिम क्षेत्र',  'पहिरो जोखिम छ',   'पहिरो जोखिम छैन'],
+            ['is_drought_zone',   'खडेरी जोखिम क्षेत्र',  'खडेरी जोखिम छ',   'खडेरी जोखिम छैन'],
+        ] as [$col, , $yes, $no]) {
+            $count = $dq()->where($col, true)->count();
+            if ($count) $riskZones[] = ['key' => $col, 'label' => match($col) {
+                'is_flood_zone'     => 'बाढी',
+                'is_landslide_zone' => 'पहिरो',
+                default             => 'खडेरी',
+            }, 'count' => $count];
+        }
+
+        $riskTypeFreq     = $this->jsonArrayFreq($dq(), 'risk_types', CrossTabService::optionLabels('disaster_type'), $ck . '_risk_types');
+        $evacuationFreq   = $boolFreq('has_evacuation_plan',  'निकासी योजना छ', 'निकासी योजना छैन');
+        $trainingFreq     = $boolFreq('disaster_training',    'तालिम लिएको',    'तालिम नलिएको');
+        $affectedFreq     = $boolFreq('affected_last_3years', 'प्रभावित भएको',  'प्रभावित भएको छैन');
+        $reliefFreq       = $boolFreq('received_relief',      'राहत पाएको',     'राहत पाएको छैन');
+        $riskPlanFreq     = $boolFreq('risk_reduction_plan',  'जोखिम न्यूनीकरण योजना छ', 'योजना छैन');
+
+        $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
+        $wardColDef = CrossTabService::wardColDef($wards);
+
+        $riskByWard = CrossTabService::tab(
+            HouseholdDisaster::whereHas('household', fn ($q) =>
+                $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
+            )->join('households', 'household_disaster.household_id', '=', 'households.id')
+             ->join('wards', 'households.ward_id', '=', 'wards.id'),
+            "CASE WHEN is_flood_zone=1 AND is_landslide_zone=1 THEN 'बाढी/पहिरो दुवै' WHEN is_flood_zone=1 THEN 'बाढी' WHEN is_landslide_zone=1 THEN 'पहिरो' WHEN is_drought_zone=1 THEN 'खडेरी' ELSE 'जोखिम छैन' END",
+            'wards.ward_number',
+            ['बाढी' => 'बाढी', 'पहिरो' => 'पहिरो', 'बाढी/पहिरो दुवै' => 'बाढी/पहिरो दुवै', 'खडेरी' => 'खडेरी', 'जोखिम छैन' => 'जोखिम छैन'],
+            $wardColDef,
+            $ck . '_riskxward'
+        );
+
+        $frequencies = array_values(array_filter([
+            $riskZones       ? ['id' => 'risk_zones',   'title' => 'जोखिम क्षेत्र',            'title_en' => 'Risk Zones',              'data' => $riskZones]     : null,
+            $riskTypeFreq    ? ['id' => 'risk_types',   'title' => 'जोखिमका प्रकार',           'title_en' => 'Types of Risk',           'data' => $riskTypeFreq]  : null,
+            $evacuationFreq  ? ['id' => 'evacuation',   'title' => 'निकासी योजना',             'title_en' => 'Evacuation Plan',         'data' => $evacuationFreq]: null,
+            $riskPlanFreq    ? ['id' => 'risk_plan',    'title' => 'जोखिम न्यूनीकरण योजना',    'title_en' => 'Risk Reduction Plan',     'data' => $riskPlanFreq]  : null,
+            $trainingFreq    ? ['id' => 'training',     'title' => 'विपद् तालिम',              'title_en' => 'Disaster Training',       'data' => $trainingFreq]  : null,
+            $affectedFreq    ? ['id' => 'affected',     'title' => 'विपदबाट प्रभावित (३ वर्ष)', 'title_en' => 'Disaster Affected (3 yrs)','data' => $affectedFreq] : null,
+            $reliefFreq      ? ['id' => 'relief',       'title' => 'राहत प्राप्त',             'title_en' => 'Relief Received',         'data' => $reliefFreq]    : null,
+        ]));
+
+        return Inertia::render('Public/Reports/Show', [
+            'lg'          => $this->lgProps($lg),
+            'category'    => 'disaster',
+            'title'       => 'विपद् तथा जोखिम विवरण',
+            'title_en'    => 'Disaster & Risk',
+            ...$this->filterProps($lg, $request),
+            'tables'      => [
+                [
+                    'id'      => 'risk_by_ward',
+                    'title'   => 'जोखिम क्षेत्र अनुसार वडा',
+                    'title_en'=> 'Risk Zone by Ward',
+                    'data'    => $riskByWard,
+                ],
+            ],
+            'frequencies' => $frequencies,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helper: frequency count from a JSON array column (PHP-side expansion)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private function jsonArrayFreq($query, string $column, array $labelMap = [], string $cacheKey = ''): array
+    {
+        if ($cacheKey) {
+            $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
+            if ($cached !== null) return $cached;
+        }
+
+        $rows   = $query->whereNotNull($column)->pluck($column);
+        $counts = [];
+
+        foreach ($rows as $raw) {
+            $values = is_array($raw) ? $raw : (is_string($raw) ? json_decode($raw, true) : null);
+            if (!is_array($values)) continue;
+            foreach ($values as $val) {
+                $val = trim((string)$val);
+                if ($val === '') continue;
+                $counts[$val] = ($counts[$val] ?? 0) + 1;
+            }
+        }
+
+        arsort($counts);
+
+        $result = [];
+        foreach ($counts as $key => $count) {
+            $result[] = [
+                'key'   => $key,
+                'label' => $labelMap[$key] ?? $key,
+                'count' => $count,
+            ];
+        }
+
+        if ($cacheKey) {
+            \Illuminate\Support\Facades\Cache::put($cacheKey, $result, now()->addMinutes(60));
+        }
+
+        return $result;
     }
 }

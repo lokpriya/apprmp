@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\ProgressController;
 use App\Http\Controllers\Admin\DataExportController;
 use App\Http\Controllers\Admin\GoogleSyncController;
 use App\Http\Controllers\Admin\AuditLogController;
+use App\Http\Controllers\Admin\ImpersonateController;
 use App\Http\Controllers\Admin\LicenseController;
 use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\EditRequestController;
@@ -80,6 +81,9 @@ Route::prefix('public')->name('public.')->middleware(['maintenance', 'public.acc
         Route::get('/economics',           [ReportController::class,    'economics'])      ->name('economics');
         Route::get('/agriculture',         [ReportController::class,    'agriculture'])    ->name('agriculture');
         Route::get('/migration',           [ReportController::class,    'migration'])      ->name('migration');
+        Route::get('/child-development',   [ReportController::class,    'childDevelopment'])->name('child-development');
+        Route::get('/documents',           [ReportController::class,    'documents'])      ->name('documents');
+        Route::get('/disaster',            [ReportController::class,    'disaster'])       ->name('disaster');
         Route::get('/export/{category}',   [ReportExportController::class, 'download'])   ->name('export');
         Route::get('/population-pyramid',  [AnalyticsController::class, 'populationPyramid'])->name('population-pyramid');
         Route::get('/ward-summary',        [AnalyticsController::class, 'wardSummaryPage'])  ->name('ward-summary');
@@ -103,6 +107,9 @@ Route::prefix('public')->name('public.')->middleware(['maintenance', 'public.acc
         Route::get('/infrastructure',[InstitutionReportController::class, 'infrastructure'])->name('infrastructure');
         Route::get('/services',      [InstitutionReportController::class, 'services'])      ->name('services');
         Route::get('/staff',         [InstitutionReportController::class, 'staff'])         ->name('staff');
+        Route::get('/education',     fn() => redirect('/public/institution-reports/school', 301));
+        Route::get('/health',        [InstitutionReportController::class, 'health'])        ->name('health');
+        Route::get('/school',        [InstitutionReportController::class, 'school'])        ->name('school');
     });
 });
 
@@ -118,6 +125,9 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
+
+    // Impersonation stop — any authenticated user can exit (ward_reviewer, enumerator, etc.)
+    Route::post('/admin/impersonate/stop', [ImpersonateController::class, 'stop'])->name('admin.impersonate.stop');
 
     // Dashboard — redirects based on role
     Route::get('/dashboard', function () {
@@ -267,6 +277,9 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
             Route::patch('/users/{user}/assign-wards',  [UserController::class, 'assignWards'])  ->name('users.assign-wards');
             Route::get('/role-permissions',              [RolePermissionsController::class, 'index'])->name('role-permissions');
             Route::patch('/role-permissions',            [RolePermissionsController::class, 'update'])->name('role-permissions.update');
+
+            // Impersonation start (admin only)
+            Route::post('/impersonate/{target}',   [ImpersonateController::class, 'start'])->name('impersonate.start');
 
             // Survey Options (super_admin only)
             Route::get('/survey-options',                        [SurveyOptionsController::class, 'index'])           ->name('survey-options');

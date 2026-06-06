@@ -56,8 +56,8 @@ class HousingSheet implements ToCollection, WithChunkReading, WithHeadingRow, Wi
                         }
                     }
 
-                    // Parse risk_types (comma-separated string → array)
-                    $riskTypes = $this->parseArray($row['risk_types'] ?? null);
+                    // Parse disaster_type (comma-separated string → array)
+                    $riskTypes = $this->parseArray($row['disaster_type'] ?? null);
 
                     HouseholdHousing::updateOrCreate(
                         ['household_id' => $householdId],

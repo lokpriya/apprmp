@@ -58,6 +58,11 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        // If mid-impersonation, restore original admin before logging out
+        if ($request->session()->has('impersonator_id')) {
+            $request->session()->forget('impersonator_id');
+        }
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

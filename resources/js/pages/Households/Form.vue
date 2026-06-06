@@ -58,8 +58,8 @@
       </div>
     </Teleport>
 
-    <!-- Page heading — 2 columns: left=title, right=progress -->
-    <div class="bg-white rounded-md border border-[#e6e7e9] shadow-sm px-5 py-4 flex items-center gap-6">
+    <!-- Page heading — sticky master save bar -->
+    <div class="sticky top-0 z-30 bg-white rounded-md border border-[#e6e7e9] shadow-sm px-5 py-4 flex items-center gap-6">
 
       <!-- Left: icon + title -->
       <div class="flex items-center gap-3 flex-1 min-w-0">
@@ -78,7 +78,7 @@
       <div class="w-px h-10 bg-[#e6e7e9] shrink-0"></div>
 
       <!-- Right: data fill progress -->
-      <div class="w-52 shrink-0">
+      <div class="w-44 shrink-0">
         <div class="flex items-center justify-between mb-1.5">
           <div class="flex items-center gap-1.5">
             <i class="fa-solid fa-chart-simple text-[10px] text-gray-400"></i>
@@ -98,6 +98,25 @@
           {{ fillProgress < 30 ? 'सुरु गर्नुहोस्' : fillProgress < 60 ? 'राम्रो प्रगति' : fillProgress < 85 ? 'लगभग पूर्ण' : 'लगभग पूर्ण ✓' }}
            — Data Fill Progress
         </p>
+      </div>
+
+      <!-- Divider -->
+      <div class="w-px h-10 bg-[#e6e7e9] shrink-0"></div>
+
+      <!-- Master Save button -->
+      <div class="flex flex-col items-center gap-1 shrink-0">
+        <button type="button" @click="submitForm" :disabled="form.processing"
+          class="flex items-center gap-2 px-4 py-2 rounded-md bg-[#206bc4] text-white text-sm font-semibold
+                 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors">
+          <i v-if="form.processing" class="fa-solid fa-spinner fa-spin text-xs"></i>
+          <i v-else class="fa-solid fa-floppy-disk text-xs"></i>
+          <span class="hidden sm:inline">{{ isEdit ? 'अद्यावधिक गर्नुहोस्' : 'सुरक्षित गर्नुहोस्' }}</span>
+        </button>
+        <span v-if="hasValidationErrors"
+          class="flex items-center gap-1 text-[10px] text-amber-600">
+          <i class="fa-solid fa-triangle-exclamation text-[9px]"></i>
+          {{ validationErrorCount }} विवरण खाली
+        </span>
       </div>
 
     </div>
@@ -400,7 +419,7 @@
             <label class="text-[12px] font-semibold text-[#626976]">जग्गाको किसिम</label>
             <span class="text-[11px] text-gray-400 -mt-0.5">Land Type</span>
             <select v-model="form.housing.house_land_type" class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-[13px] bg-white focus:ring-2 focus:ring-[#206bc4]/20 focus:border-[#206bc4]">
-              <option value="">-- छान्नुहोस् --</option>
+              <option value="">---छान्नुहोस्---</option>
               <option v-for="opt in (surveyOptions.house_land_type ?? [])" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </select>
           </div>
@@ -408,7 +427,7 @@
             <label class="text-[12px] font-semibold text-[#626976]">घरको उद्देश्य</label>
             <span class="text-[11px] text-gray-400 -mt-0.5">House Purpose</span>
             <select v-model="form.housing.house_purpose" class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-[13px] bg-white focus:ring-2 focus:ring-[#206bc4]/20 focus:border-[#206bc4]">
-              <option value="">-- छान्नुहोस् --</option>
+              <option value="">---छान्नुहोस्---</option>
               <option v-for="opt in (surveyOptions.house_purpose ?? [])" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </select>
           </div>
@@ -1229,10 +1248,17 @@
           <div v-for="decision in decisionFields" :key="decision.key" class="flex flex-col gap-1">
             <label class="text-[12px] font-semibold text-[#626976]">{{ decision.label }}</label>
             <span class="text-[11px] text-gray-400 -mt-0.5">{{ decision.en }}</span>
-            <select v-model="form.decisions[decision.key]" class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-[13px] bg-white focus:ring-2 focus:ring-[#206bc4]/20 focus:border-[#206bc4]">
-              <option value="">-- छान्नुहोस् --</option>
-              <option v-for="opt in (surveyOptions.decision_owner ?? [])" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
+            <div class="flex flex-wrap gap-2 mt-1">
+              <button v-for="opt in (surveyOptions.decision_owner ?? [])" :key="opt.value"
+                type="button"
+                @click="form.decisions[decision.key] = form.decisions[decision.key] === opt.value ? '' : opt.value"
+                :class="['flex-1 py-1.5 text-[12px] font-semibold rounded border transition-colors',
+                         form.decisions[decision.key] === opt.value
+                           ? 'bg-indigo-600 text-white border-indigo-600'
+                           : 'bg-white text-gray-600 border-[#e6e7e9] hover:border-indigo-400']">
+                {{ opt.label }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1453,10 +1479,17 @@
           <div class="flex flex-col gap-1 px-4 py-3 bg-gray-50 rounded border border-[#e6e7e9]">
             <label class="text-[12px] font-semibold text-[#626976]">तपाईं बसेको ठाउँ कस्तो लाग्छ?</label>
             <span class="text-[11px] text-gray-400 -mt-0.5">How do you feel about the place you live?</span>
-            <select v-model="form.wellbeing.residence_perception" class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-[13px] bg-white focus:ring-2 focus:ring-[#206bc4]/20 focus:border-[#206bc4]">
-              <option value="">-- छान्नुहोस् --</option>
-              <option v-for="opt in (surveyOptions.residence_perception ?? [])" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
+            <div class="flex flex-wrap gap-2 mt-1">
+              <button v-for="opt in (surveyOptions.residence_perception ?? [])" :key="opt.value"
+                type="button"
+                @click="form.wellbeing.residence_perception = form.wellbeing.residence_perception === opt.value ? '' : opt.value"
+                :class="['flex-1 py-1.5 text-[12px] font-semibold rounded border transition-colors',
+                         form.wellbeing.residence_perception === opt.value
+                           ? 'bg-rose-600 text-white border-rose-600'
+                           : 'bg-white text-gray-600 border-[#e6e7e9] hover:border-rose-400']">
+                {{ opt.label }}
+              </button>
+            </div>
           </div>
 
         </div>
@@ -1474,10 +1507,17 @@
           <div class="flex flex-col gap-1">
             <label class="text-[12px] font-semibold text-[#626976]">खुशीको लागि परिवारलाई कति पटक भेला गर्नुहुन्छ?</label>
             <span class="text-[11px] text-gray-400 -mt-0.5">How often do you have family get-togethers?</span>
-            <select v-model="form.wellbeing.family_gathering_freq" class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-[13px] bg-white focus:ring-2 focus:ring-[#206bc4]/20 focus:border-[#206bc4]">
-              <option value="">-- छान्नुहोस् --</option>
-              <option v-for="opt in (surveyOptions.family_gathering_freq ?? [])" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
+            <div class="flex flex-wrap gap-2 mt-1">
+              <button v-for="opt in (surveyOptions.family_gathering_freq ?? [])" :key="opt.value"
+                type="button"
+                @click="form.wellbeing.family_gathering_freq = form.wellbeing.family_gathering_freq === opt.value ? '' : opt.value"
+                :class="['px-3 py-1.5 text-[12px] font-semibold rounded border transition-colors',
+                         form.wellbeing.family_gathering_freq === opt.value
+                           ? 'bg-amber-500 text-white border-amber-500'
+                           : 'bg-white text-gray-600 border-[#e6e7e9] hover:border-amber-400']">
+                {{ opt.label }}
+              </button>
+            </div>
           </div>
 
           <!-- Happiness activities (multi-select) -->
@@ -1525,10 +1565,17 @@
             class="flex flex-col gap-1 px-4 py-3 bg-gray-50 rounded border border-[#e6e7e9]">
             <label class="text-[12px] font-semibold text-[#626976]">छिमेकीहरूबीच कतिको सहाकार्य हुन्छ?</label>
             <span class="text-[11px] text-gray-400 -mt-0.5">How much cooperation is there between neighbors?</span>
-            <select v-model="form.wellbeing.neighbor_cooperation" class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-[13px] bg-white focus:ring-2 focus:ring-[#206bc4]/20 focus:border-[#206bc4]">
-              <option value="">-- छान्नुहोस् --</option>
-              <option v-for="opt in (surveyOptions.neighbor_cooperation ?? [])" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
+            <div class="flex flex-wrap gap-2 mt-1">
+              <button v-for="opt in (surveyOptions.neighbor_cooperation ?? [])" :key="opt.value"
+                type="button"
+                @click="form.wellbeing.neighbor_cooperation = form.wellbeing.neighbor_cooperation === opt.value ? '' : opt.value"
+                :class="['flex-1 py-1.5 text-[12px] font-semibold rounded border transition-colors',
+                         form.wellbeing.neighbor_cooperation === opt.value
+                           ? 'bg-emerald-600 text-white border-emerald-600'
+                           : 'bg-white text-gray-600 border-[#e6e7e9] hover:border-emerald-400']">
+                {{ opt.label }}
+              </button>
+            </div>
           </div>
 
         </div>
@@ -5147,6 +5194,7 @@ const reliefSourceOptions      = computed(() => props.surveyOptions.relief_sourc
 
 // ── Form (useForm) ─────────────────────────────────────────────────
 const hh = props.household
+const inOpts = (cat, val) => val && (props.surveyOptions?.[cat] ?? []).some(o => o.value === val)
 const form = useForm({
   ward_id:            hh?.ward_id             ?? '',
   settlement_id:      hh?.settlement_id       ?? '',
@@ -5169,7 +5217,7 @@ const form = useForm({
   },
 
   housing: {
-    house_land_type:      hh?.housing?.house_land_type      ?? '',
+    house_land_type:      inOpts('house_land_type', hh?.housing?.house_land_type) ? hh.housing.house_land_type : '',
     land_measurement_unit:hh?.housing?.land_measurement_unit?? '',
     house_type:           hh?.housing?.house_type           ?? '',
     roof_type:            hh?.housing?.roof_type            ?? '',
@@ -5184,7 +5232,7 @@ const form = useForm({
     house_condition:      hh?.housing?.house_condition      ?? '',
     is_at_risk:           hh?.housing?.is_at_risk           ?? false,
     risk_types:           hh?.housing?.risk_types           ?? [],
-    house_purpose:          hh?.housing?.house_purpose          ?? '',
+    house_purpose:          inOpts('house_purpose',   hh?.housing?.house_purpose)   ? hh.housing.house_purpose   : '',
     location_house_built:   hh?.housing?.location_house_built   ?? '',
     distance_to_mainroad:   hh?.housing?.distance_to_mainroad   ?? '',
     distance_to_school:     hh?.housing?.distance_to_school     ?? '',

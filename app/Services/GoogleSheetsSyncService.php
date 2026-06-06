@@ -14,6 +14,7 @@ use App\Models\InstitutionType;
 use App\Models\Settlement;
 use App\Models\SurveyOption;
 use App\Models\Ward;
+use Illuminate\Http\Client\Pool;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -22,14 +23,22 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class GoogleSheetsSyncService
 {
-    private int $syncLgId = 0;
+    private int   $syncLgId       = 0;
+    private array $unmappedValues = [];
 
-    /** Canonicalize an enum field value via SurveyOption lookup. Returns null for blank input. */
+    /**
+     * Canonicalize an enum field value via SurveyOption lookup.
+     * Tracks values that are not found in the registry so they can be surfaced in preview/apply results.
+     */
     private function opt(string $category, mixed $raw): ?string
     {
         $value = trim((string)($raw ?? ''));
         if ($value === '') return null;
-        return SurveyOption::canonicalize($category, $value, $this->syncLgId ?: null);
+        $lgId = $this->syncLgId ?: null;
+        if (!SurveyOption::isKnown($category, $value, $lgId)) {
+            $this->unmappedValues[$category][$value] = ($this->unmappedValues[$category][$value] ?? 0) + 1;
+        }
+        return SurveyOption::canonicalize($category, $value, $lgId);
     }
 
     // ── CSV sheet download (gviz/tq — no XLSX, no temp file, no library) ────────
@@ -42,25 +51,9 @@ class GoogleSheetsSyncService
         return trim($s, '_');
     }
 
-    private function downloadSheetCsv(string $sheetId, string $sheetName): array
+    /** Parse a raw CSV body string into an array of keyed rows. */
+    private function parseCsvBody(string $body): array
     {
-        $url = 'https://docs.google.com/spreadsheets/d/'
-             . rawurlencode($sheetId)
-             . '/gviz/tq?tqx=out:csv&sheet=' . rawurlencode($sheetName);
-
-        $response = Http::connectTimeout(8)->timeout(20)->get($url);
-
-        if (!$response->successful()) {
-            throw new \RuntimeException(
-                "Sheet '{$sheetName}' डाउनलोड गर्न सकिएन (HTTP {$response->status()}). "
-                . "Sheet \"Anyone with link can view\" मा सेट गर्नुभएको छ?"
-            );
-        }
-
-        $body = trim($response->body());
-        if ($body === '') return [];
-
-        // Use php://temp stream so fgetcsv() handles quoted newlines correctly
         $stream = fopen('php://temp', 'r+');
         fwrite($stream, $body);
         rewind($stream);
@@ -78,6 +71,86 @@ class GoogleSheetsSyncService
         }
         fclose($stream);
         return $rows;
+    }
+
+    /**
+     * Download multiple sheets in parallel using Http::pool().
+     * Falls back to sequential retry for any sheet that fails.
+     */
+    private function downloadSheetsParallel(string $sheetId, array $sheetNames): array
+    {
+        $baseUrl = 'https://docs.google.com/spreadsheets/d/'
+                 . rawurlencode($sheetId)
+                 . '/gviz/tq?tqx=out:csv&sheet=';
+
+        $responses = Http::pool(function (Pool $pool) use ($baseUrl, $sheetNames) {
+            $reqs = [];
+            foreach ($sheetNames as $name) {
+                $reqs[] = $pool->as($name)->connectTimeout(10)->timeout(30)
+                               ->get($baseUrl . rawurlencode($name));
+            }
+            return $reqs;
+        });
+
+        $result   = [];
+        $failures = [];
+
+        foreach ($sheetNames as $name) {
+            $resp = $responses[$name] ?? null;
+            if ($resp instanceof \Throwable || !$resp || !$resp->successful()) {
+                $failures[] = $name;
+            } else {
+                $body = trim($resp->body());
+                $result[$name] = $body === '' ? [] : $this->parseCsvBody($body);
+            }
+        }
+
+        // Retry any failed sheets individually (3 attempts with 1.5 s backoff)
+        foreach ($failures as $name) {
+            $result[$name] = $this->downloadSheetCsvRetry($baseUrl . rawurlencode($name), $name);
+        }
+
+        return $result;
+    }
+
+    /** Single-sheet download with up to 3 retry attempts. */
+    private function downloadSheetCsvRetry(string $url, string $sheetName): array
+    {
+        $lastException = null;
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                $response = Http::connectTimeout(10)->timeout(30)->get($url);
+                if ($response->successful()) {
+                    $body = trim($response->body());
+                    return $body === '' ? [] : $this->parseCsvBody($body);
+                }
+                if ($response->status() === 404) break;
+            } catch (\Throwable $e) {
+                $lastException = $e;
+            }
+            if ($attempt < 3) usleep(1_500_000);
+        }
+        throw new \RuntimeException(
+            "Sheet '{$sheetName}' डाउनलोड गर्न सकिएन (3 attempts). "
+            . "Sheet \"Anyone with link can view\" मा सेट गर्नुभएको छ?"
+        );
+    }
+
+    /** @deprecated Use downloadSheetsParallel(); kept for external callers. */
+    private function downloadSheetCsv(string $sheetId, string $sheetName): array
+    {
+        $url = 'https://docs.google.com/spreadsheets/d/'
+             . rawurlencode($sheetId)
+             . '/gviz/tq?tqx=out:csv&sheet=' . rawurlencode($sheetName);
+        $response = Http::connectTimeout(8)->timeout(20)->get($url);
+        if (!$response->successful()) {
+            throw new \RuntimeException(
+                "Sheet '{$sheetName}' डाउनलोड गर्न सकिएन (HTTP {$response->status()}). "
+                . "Sheet \"Anyone with link can view\" मा सेट गर्नुभएको छ?"
+            );
+        }
+        $body = trim($response->body());
+        return $body === '' ? [] : $this->parseCsvBody($body);
     }
 
     // Keep downloadSheet() for any future/external callers but sync no longer uses it
@@ -112,8 +185,47 @@ class GoogleSheetsSyncService
         return $this->writeHouseholds($diff, $wardId, $lgId, $forceLockedRecords);
     }
 
+    /**
+     * Dry-run scan of opt() fields for one household row + its related sub-rows.
+     * Populates $this->unmappedValues without touching the DB.
+     */
+    private function scanRowForUnmapped(array $related): void
+    {
+        if ($h = $related['housingRow'] ?? null) {
+            foreach ([
+                'house_land_type', 'land_measurement_unit', 'house_type', 'house_purpose',
+                'location_house_built', 'roof_type', 'wall_type', 'foundation_type',
+                'ownership_type', 'house_condition',
+            ] as $cat) {
+                $this->opt($cat, $h[$cat] ?? null);
+            }
+        }
+        if ($u = $related['utilitiesRow'] ?? null) {
+            foreach ([
+                'water_source', 'toilet_type', 'sanitation_type', 'electricity_source',
+                'cooking_fuel', 'internet_type', 'handwashing',
+            ] as $cat) {
+                $this->opt($cat, $u[$cat] ?? null);
+            }
+            $this->opt('waste_management', $u['waste_management'] ?? null);
+        }
+        foreach ($related['memberRows'] ?? [] as $m) {
+            foreach ([
+                'relation_to_head', 'ethnicity', 'religion', 'marital_status',
+                'education_level', 'occupation_type', 'employment_status',
+                'disability_type', 'residence_status',
+            ] as $cat) {
+                $this->opt($cat, $m[$cat] ?? null);
+            }
+            $this->opt('language', $m['language'] ?? null);
+        }
+    }
+
     private function diffHouseholds(string $sheetId, int $wardId, int $lgId): array
     {
+        $this->syncLgId       = $lgId;
+        $this->unmappedValues = [];
+
         $sheets  = $this->loadAllSheetsAsCsv($sheetId);
         $ward    = Ward::find($wardId);
         $wardNum = $ward?->ward_number;
@@ -126,6 +238,7 @@ class GoogleSheetsSyncService
         $membersIdx      = $this->groupBy($sheets['members'],     'household_code');
         $livestockIdx    = $this->groupBy($sheets['livestock'],   'household_code');
         $landParcelsIdx  = $this->groupBy($sheets['landParcels'], 'household_code');
+        $disasterIdx     = $this->indexBy($sheets['disaster'],    'household_code');
 
         $existingMap = Household::where('ward_id', $wardId)
             ->select(['id', 'unique_code', 'sync_hash', 'sync_locked'])
@@ -157,15 +270,19 @@ class GoogleSheetsSyncService
             $memberRows      = $membersIdx[$codeKey]     ?? [];
             $livestockRows   = $livestockIdx[$codeKey]   ?? [];
             $landParcelRows  = $landParcelsIdx[$codeKey] ?? [];
+            $disasterRow     = $disasterIdx[$codeKey]    ?? null;
 
             $hash = $this->hashAllSheets(
                 $row, $housingRow, $utilitiesRow, $economicRow,
-                $agricultureRow, $memberRows, $livestockRows, $landParcelRows
+                $agricultureRow, $memberRows, $livestockRows, $landParcelRows, $disasterRow
             );
             $existing = $existingMap->get($uniqueCode);
 
             // Attach sub-sheet data (stripped before sending to frontend)
-            $row['_related'] = compact('housingRow', 'utilitiesRow', 'economicRow', 'agricultureRow', 'memberRows', 'livestockRows', 'landParcelRows');
+            $row['_related'] = compact('housingRow', 'utilitiesRow', 'economicRow', 'agricultureRow', 'memberRows', 'livestockRows', 'landParcelRows', 'disasterRow');
+
+            // Scan opt() fields now so preview surfaces unmapped values before apply
+            $this->scanRowForUnmapped($row['_related']);
 
             // Completeness snapshot — visible in preview
             $row['_completeness'] = [
@@ -176,6 +293,7 @@ class GoogleSheetsSyncService
                 'agriculture' => !empty($agricultureRow),
                 'livestock'   => count($livestockRows),
                 'landParcels' => count($landParcelRows),
+                'disaster'    => !empty($disasterRow),
                 'settlement'  => !empty(trim($row['settlement_name'] ?? '')),
             ];
 
@@ -209,18 +327,22 @@ class GoogleSheetsSyncService
                 'members_in_file'   => count($sheets['members']),
                 'livestock_in_file' => count($sheets['livestock']),
                 'housing_in_file'   => count($sheets['housing']),
+                'disaster_in_file'  => count($sheets['disaster']),
             ],
         ];
 
-        return compact('new', 'changed', 'locked', 'upToDate', 'errors', 'debug');
+        $unmappedValues = $this->unmappedValues;
+        return compact('new', 'changed', 'locked', 'upToDate', 'errors', 'debug', 'unmappedValues');
     }
 
     private function writeHouseholds(array $diff, int $wardId, int $lgId, bool $forceLockedRecords): array
     {
-        $this->syncLgId = $lgId;
+        $this->syncLgId       = $lgId;
+        $this->unmappedValues = [];
         $imported   = 0;
         $updated    = 0;
         $skipped    = 0;
+        $allErrors  = [];
         $firstError = null;
 
         $toProcess = array_merge($diff['new'], $diff['changed']);
@@ -236,41 +358,74 @@ class GoogleSheetsSyncService
             : [];
 
         foreach ($toProcess as $row) {
+            $outcome = null;
             try {
-                $data     = $this->rowToHouseholdData($row, $wardId, $lgId);
-                $existing = isset($row['_id']) ? ($existingMap[$row['_id']] ?? null) : null;
+                DB::transaction(function () use ($row, $wardId, $lgId, $existingMap, &$outcome) {
+                    $data     = $this->rowToHouseholdData($row, $wardId, $lgId);
+                    $existing = isset($row['_id']) ? ($existingMap[$row['_id']] ?? null) : null;
 
-                $syncMeta = [
-                    'sync_source' => 'google_sheets',
-                    'sync_hash'   => $row['_hash'],
-                    'sync_locked' => false,
-                    'status'      => 'submitted',
-                ];
+                    $syncMeta = [
+                        'sync_source' => 'google_sheets',
+                        'sync_hash'   => $row['_hash'],
+                        'sync_locked' => false,
+                        'status'      => 'submitted',
+                    ];
 
-                if ($existing) {
-                    $existing->update(array_merge($data, $syncMeta));
-                    $household = $existing;
-                    $updated++;
-                } else {
-                    $household = Household::create(array_merge($data, [
-                        'ward_id'       => $wardId,
-                        'enumerator_id' => null,
-                    ], $syncMeta));
-                    $imported++;
-                }
+                    if ($existing) {
+                        $existing->update(array_merge($data, $syncMeta));
+                        $household = $existing;
+                        $outcome   = 'updated';
+                    } else {
+                        // Use updateOrCreate so stale cached diffs or duplicate GAS rows
+                        // don't cause a unique_code constraint violation.
+                        $household = Household::updateOrCreate(
+                            ['unique_code' => $data['unique_code']],
+                            array_merge($data, ['ward_id' => $wardId, 'enumerator_id' => null], $syncMeta)
+                        );
+                        $outcome = $household->wasRecentlyCreated ? 'imported' : 'updated';
+                    }
 
-                $this->syncRelated($household, $row['_related'] ?? []);
+                    // Populate survey_data.social from Households sheet columns
+                    $socialPatch = array_filter([
+                        'family_head' => trim($row['family_head'] ?? '') ?: null,
+                        'family_type' => $this->opt('family_type', $row['family_type'] ?? null),
+                        'male_num'    => is_numeric($row['total_male']   ?? '') ? (int)$row['total_male']   : null,
+                        'female_num'  => is_numeric($row['total_female'] ?? '') ? (int)$row['total_female'] : null,
+                        'other_num'   => is_numeric($row['total_other']  ?? '') ? (int)$row['total_other']  : null,
+                    ], fn($v) => $v !== null && $v !== '');
+                    if (!empty($socialPatch)) {
+                        $sd = $household->survey_data ?? [];
+                        $sd['social'] = array_merge($sd['social'] ?? [], $socialPatch);
+                        $household->update(['survey_data' => $sd]);
+                    }
+
+                    $this->syncRelated($household, $row['_related'] ?? []);
+                });
+
+                if ($outcome === 'imported') $imported++;
+                else                         $updated++;
+
             } catch (\Throwable $e) {
                 Log::warning('GS sync household row failed', [
                     'code' => $row['unique_code'] ?? '?',
                     'err'  => $e->getMessage(),
                 ]);
+                $allErrors[] = ['code' => $row['unique_code'] ?? '?', 'error' => $e->getMessage()];
                 $firstError ??= $e->getMessage();
                 $skipped++;
             }
         }
 
-        return ['imported' => $imported, 'updated' => $updated, 'skipped' => $skipped, 'firstError' => $firstError];
+        $this->logSyncAudit('household', $wardId, $imported, $updated, $skipped);
+
+        return [
+            'imported'       => $imported,
+            'updated'        => $updated,
+            'skipped'        => $skipped,
+            'firstError'     => $firstError,
+            'errors'         => $allErrors,
+            'unmappedValues' => $this->unmappedValues,
+        ];
     }
 
     // ── Related table sync ────────────────────────────────────────────────────
@@ -307,6 +462,7 @@ class GoogleSheetsSyncService
                 'decisioninSMC'        => trim($economicRow['decision_school_mgmt']        ?? ''),
                 'decisioninBusiness'   => trim($economicRow['decision_business']           ?? ''),
                 'bank_account_owner'   => trim($economicRow['decision_bank_account']       ?? ''),
+                'has_bank_account'     => $this->parseBoolYesNo($economicRow['has_bank_account'] ?? null) ?? '',
             ];
             $decisionData = array_filter($decisionsMap, fn($v) => $v !== '');
 
@@ -315,12 +471,24 @@ class GoogleSheetsSyncService
                 'foreign_employment_country' => trim($economicRow['foreign_employment_country'] ?? '') ?: null,
             ]);
 
+            // Loan and insurance fields → survey_data.social
+            $loanSources = $this->parseJsonArray($economicRow['loan_source'] ?? null) ?? [];
+            $socialEconPatch = array_filter([
+                'bankloan'         => !empty($loanSources) ? 'yes' : null,
+                'loansource'       => !empty($loanSources) ? $loanSources : null,
+                'health_insurance' => $this->parseBoolYesNo($economicRow['has_insurance'] ?? null),
+            ], fn($v) => $v !== null && $v !== '');
+
             if ($decisionData) {
                 $surveyData['decisions'] = array_merge($surveyData['decisions'] ?? [], $decisionData);
                 $surveyDataChanged = true;
             }
             if ($occupationData) {
                 $surveyData['occupation'] = array_merge($surveyData['occupation'] ?? [], $occupationData);
+                $surveyDataChanged = true;
+            }
+            if ($socialEconPatch) {
+                $surveyData['social'] = array_merge($surveyData['social'] ?? [], $socialEconPatch);
                 $surveyDataChanged = true;
             }
         }
@@ -344,6 +512,32 @@ class GoogleSheetsSyncService
 
         if (!empty($related['memberRows'])) {
             $this->syncMembers($household, $related['memberRows']);
+
+            // Derive household-level social fields from the head-of-household member
+            $headMember = $household->members()->where('relation_to_head', 'self')->first()
+                       ?? $household->members()->where('is_household_head', true)->first();
+            if ($headMember) {
+                $headSocial = array_filter([
+                    'ethnicity'               => $headMember->ethnicity       ?: null,
+                    'religion'                => $headMember->religion        ?: null,
+                    'mother_tongue'           => $headMember->mother_tongue   ?: null,
+                    'com_language'            => $headMember->mother_tongue   ?: null,
+                    'major_family_occupation' => $headMember->occupation_type ?: null,
+                ], fn($v) => $v !== null && $v !== '');
+                if (!empty($headSocial)) {
+                    $surveyData['social'] = array_merge($surveyData['social'] ?? [], $headSocial);
+                    $surveyDataChanged = true;
+                }
+            }
+        }
+
+        // Disaster sheet → survey_data.social.death
+        if ($disasterRow = $related['disasterRow'] ?? null) {
+            $deathVal = $this->parseBoolYesNo($disasterRow['has_death_this_year'] ?? null);
+            if ($deathVal !== null) {
+                $surveyData['social']['death'] = $deathVal;
+                $surveyDataChanged = true;
+            }
         }
 
         $landParcelRows = $related['landParcelRows'] ?? [];
@@ -455,16 +649,20 @@ class GoogleSheetsSyncService
 
     private function diffInstitutions(string $sheetId, int $wardId, int $lgId): array
     {
+        $this->syncLgId       = $lgId;
+        $this->unmappedValues = [];
+
         $sheets  = $this->loadAllInstitutionSheetsAsCsv($sheetId);
         $ward    = Ward::find($wardId);
         $wardNum = $ward?->ward_number;
 
-        $infraIdx    = $this->indexBy($sheets['infrastructure'], 'institution_code');
-        $healthIdx   = $this->indexBy($sheets['health'],         'institution_code');
-        $staffIdx    = $this->groupBy($sheets['staff'],          'institution_code');
-        $educationIdx = $this->groupBy($sheets['education'],     'institution_code');
-        $servicesIdx = $this->groupBy($sheets['services'],       'institution_code');
-        $teachersIdx = $this->groupBy($sheets['teachers'],       'institution_code');
+        $infraIdx     = $this->indexBy($sheets['infrastructure'],  'institution_code');
+        $healthIdx    = $this->indexBy($sheets['health'],          'institution_code');
+        $staffIdx     = $this->groupBy($sheets['staff'],           'institution_code');
+        $educationIdx = $this->groupBy($sheets['education'],       'institution_code');
+        $servicesIdx  = $this->groupBy($sheets['services'],        'institution_code');
+        $teachersIdx  = $this->groupBy($sheets['teachers'],        'institution_code');
+        $typesIdx     = $this->indexBy($sheets['typespecific'] ?? [], 'institution_code');
 
         $existingMap = Institution::where('ward_id', $wardId)
             ->select(['id', 'unique_code', 'sync_hash', 'sync_locked'])
@@ -489,17 +687,18 @@ class GoogleSheetsSyncService
             $row['unique_code'] = $uniqueCode;
             $codeKey = strtolower($uniqueCode);
 
-            $infraRow    = $infraIdx[$codeKey]    ?? null;
-            $healthRow   = $healthIdx[$codeKey]   ?? null;
-            $staffRows   = $staffIdx[$codeKey]    ?? [];
-            $educRows    = $educationIdx[$codeKey] ?? [];
-            $serviceRows = $servicesIdx[$codeKey] ?? [];
-            $teacherRows = $teachersIdx[$codeKey] ?? [];
+            $infraRow    = $infraIdx[$codeKey]     ?? null;
+            $healthRow   = $healthIdx[$codeKey]    ?? null;
+            $staffRows   = $staffIdx[$codeKey]     ?? [];
+            $educRows    = $educationIdx[$codeKey]  ?? [];
+            $serviceRows = $servicesIdx[$codeKey]  ?? [];
+            $teacherRows = $teachersIdx[$codeKey]  ?? [];
+            $tsRow       = $typesIdx[$codeKey]     ?? null;
 
-            $hash     = $this->hashInstitutionAllSheets($row, $infraRow, $healthRow, $staffRows, $educRows, $serviceRows, $teacherRows);
+            $hash     = $this->hashInstitutionAllSheets($row, $infraRow, $healthRow, $staffRows, $educRows, $serviceRows, $teacherRows, $tsRow);
             $existing = $existingMap->get($uniqueCode);
 
-            $row['_related'] = compact('infraRow', 'healthRow', 'staffRows', 'educRows', 'serviceRows', 'teacherRows');
+            $row['_related'] = compact('infraRow', 'healthRow', 'staffRows', 'educRows', 'serviceRows', 'teacherRows', 'tsRow');
 
             $row['_completeness'] = [
                 'infrastructure' => !empty($infraRow),
@@ -508,6 +707,7 @@ class GoogleSheetsSyncService
                 'education'      => count($educRows),
                 'services'       => count($serviceRows),
                 'teachers'       => count($teacherRows),
+                'typespecific'   => !empty($tsRow),
                 'settlement'     => !empty(trim($row['settlement_name'] ?? '')),
             ];
 
@@ -547,13 +747,19 @@ class GoogleSheetsSyncService
             ],
         ];
 
-        return compact('new', 'changed', 'locked', 'upToDate', 'errors', 'debug');
+        $unmappedValues = $this->unmappedValues;
+        return compact('new', 'changed', 'locked', 'upToDate', 'errors', 'debug', 'unmappedValues');
     }
 
     private function writeInstitutions(array $diff, int $wardId, int $lgId, bool $forceLockedRecords): array
     {
-        $this->syncLgId = $lgId;
-        $imported = 0; $updated = 0; $skipped = 0; $firstError = null;
+        $this->syncLgId       = $lgId;
+        $this->unmappedValues = [];
+        $imported   = 0;
+        $updated    = 0;
+        $skipped    = 0;
+        $allErrors  = [];
+        $firstError = null;
 
         $toProcess = array_merge($diff['new'], $diff['changed']);
         if ($forceLockedRecords) $toProcess = array_merge($toProcess, $diff['locked']);
@@ -565,38 +771,58 @@ class GoogleSheetsSyncService
             : [];
 
         foreach ($toProcess as $row) {
+            $outcome = null;
             try {
-                $data     = $this->rowToInstitutionData($row, $wardId, $lgId);
-                $existing = isset($row['_id']) ? ($existingMap[$row['_id']] ?? null) : null;
+                DB::transaction(function () use ($row, $wardId, $lgId, $existingMap, &$outcome) {
+                    $data     = $this->rowToInstitutionData($row, $wardId, $lgId);
+                    $existing = isset($row['_id']) ? ($existingMap[$row['_id']] ?? null) : null;
 
-                $syncMeta = [
-                    'sync_source' => 'google_sheets',
-                    'sync_hash'   => $row['_hash'],
-                    'sync_locked' => false,
-                    'status'      => 'submitted',
-                ];
+                    $syncMeta = [
+                        'sync_source' => 'google_sheets',
+                        'sync_hash'   => $row['_hash'],
+                        'sync_locked' => false,
+                        'status'      => 'submitted',
+                    ];
 
-                if ($existing) {
-                    $existing->update(array_merge($data, $syncMeta));
-                    $institution = $existing;
-                    $updated++;
-                } else {
-                    $institution = Institution::create(array_merge($data, [
-                        'ward_id'       => $wardId,
-                        'enumerator_id' => null,
-                    ], $syncMeta));
-                    $imported++;
-                }
+                    if ($existing) {
+                        $existing->update(array_merge($data, $syncMeta));
+                        $institution = $existing;
+                        $outcome     = 'updated';
+                    } else {
+                        $institution = Institution::create(array_merge($data, [
+                            'ward_id'       => $wardId,
+                            'enumerator_id' => null,
+                        ], $syncMeta));
+                        $outcome = 'imported';
+                    }
 
-                $this->syncInstitutionRelated($institution, $row['_related'] ?? []);
+                    $this->syncInstitutionRelated($institution, $row['_related'] ?? []);
+                });
+
+                if ($outcome === 'imported') $imported++;
+                else                         $updated++;
+
             } catch (\Throwable $e) {
-                Log::warning('GS sync institution row failed', ['code' => $row['unique_code'] ?? '?', 'err' => $e->getMessage()]);
+                Log::warning('GS sync institution row failed', [
+                    'code' => $row['unique_code'] ?? '?',
+                    'err'  => $e->getMessage(),
+                ]);
+                $allErrors[] = ['code' => $row['unique_code'] ?? '?', 'error' => $e->getMessage()];
                 $firstError ??= $e->getMessage();
                 $skipped++;
             }
         }
 
-        return ['imported' => $imported, 'updated' => $updated, 'skipped' => $skipped, 'firstError' => $firstError];
+        $this->logSyncAudit('institution', $wardId, $imported, $updated, $skipped);
+
+        return [
+            'imported'       => $imported,
+            'updated'        => $updated,
+            'skipped'        => $skipped,
+            'firstError'     => $firstError,
+            'errors'         => $allErrors,
+            'unmappedValues' => $this->unmappedValues,
+        ];
     }
 
     private function syncInstitutionRelated(Institution $institution, array $related): void
@@ -681,34 +907,54 @@ class GoogleSheetsSyncService
             $surveyData['teachers'] = $teachers;
             $institution->update(['survey_data' => $surveyData]);
         }
+
+        // TypeSpecific: merge into survey_data.typespecific JSON
+        if ($tsRow = $related['tsRow'] ?? null) {
+            $ts = $this->rowToTypespecificData($tsRow);
+            if (!empty($ts)) {
+                $surveyData = $institution->survey_data ?? [];
+                $surveyData['typespecific'] = array_merge($surveyData['typespecific'] ?? [], $ts);
+                $institution->update(['survey_data' => $surveyData]);
+            }
+        }
     }
 
     // ── Multi-sheet CSV loading ───────────────────────────────────────────────
 
     private function loadAllSheetsAsCsv(string $sheetId): array
     {
+        $raw = $this->downloadSheetsParallel($sheetId, [
+            'Households', 'Members', 'Housing', 'Utilities',
+            'Economic', 'Agriculture', 'Livestock', 'LandParcels', 'Disaster',
+        ]);
         return [
-            'households'  => $this->downloadSheetCsv($sheetId, 'Households'),
-            'members'     => $this->downloadSheetCsv($sheetId, 'Members'),
-            'housing'     => $this->downloadSheetCsv($sheetId, 'Housing'),
-            'utilities'   => $this->downloadSheetCsv($sheetId, 'Utilities'),
-            'economic'    => $this->downloadSheetCsv($sheetId, 'Economic'),
-            'agriculture' => $this->downloadSheetCsv($sheetId, 'Agriculture'),
-            'livestock'   => $this->downloadSheetCsv($sheetId, 'Livestock'),
-            'landParcels' => $this->downloadSheetCsv($sheetId, 'LandParcels'),
+            'households'  => $raw['Households'],
+            'members'     => $raw['Members'],
+            'housing'     => $raw['Housing'],
+            'utilities'   => $raw['Utilities'],
+            'economic'    => $raw['Economic'],
+            'agriculture' => $raw['Agriculture'],
+            'livestock'   => $raw['Livestock'],
+            'landParcels' => $raw['LandParcels'],
+            'disaster'    => $raw['Disaster'] ?? [],
         ];
     }
 
     private function loadAllInstitutionSheetsAsCsv(string $sheetId): array
     {
+        $raw = $this->downloadSheetsParallel($sheetId, [
+            'Institutions', 'Infrastructure', 'Staff', 'Education',
+            'Health', 'Services', 'Teachers', 'TypeSpecific',
+        ]);
         return [
-            'institutions'   => $this->downloadSheetCsv($sheetId, 'Institutions'),
-            'infrastructure' => $this->downloadSheetCsv($sheetId, 'Infrastructure'),
-            'staff'          => $this->downloadSheetCsv($sheetId, 'Staff'),
-            'education'      => $this->downloadSheetCsv($sheetId, 'Education'),
-            'health'         => $this->downloadSheetCsv($sheetId, 'Health'),
-            'services'       => $this->downloadSheetCsv($sheetId, 'Services'),
-            'teachers'       => $this->downloadSheetCsv($sheetId, 'Teachers'),
+            'institutions'   => $raw['Institutions'],
+            'infrastructure' => $raw['Infrastructure'],
+            'staff'          => $raw['Staff'],
+            'education'      => $raw['Education'],
+            'health'         => $raw['Health'],
+            'services'       => $raw['Services'],
+            'teachers'       => $raw['Teachers'],
+            'typespecific'   => $raw['TypeSpecific'],
         ];
     }
 
@@ -734,7 +980,7 @@ class GoogleSheetsSyncService
         return $map;
     }
 
-    /** Combined hash across all 8 sheets for a single household */
+    /** Combined hash across all 9 sheets for a single household */
     private function hashAllSheets(
         array  $hhRow,
         ?array $housingRow,
@@ -743,7 +989,8 @@ class GoogleSheetsSyncService
         ?array $agricultureRow,
         array  $memberRows,
         array  $livestockRows,
-        array  $landParcelRows = []
+        array  $landParcelRows = [],
+        ?array $disasterRow = null
     ): string {
         usort($memberRows,    fn($a, $b) => strcmp(
             strtolower(trim($a['full_name'] ?? '')),
@@ -753,7 +1000,7 @@ class GoogleSheetsSyncService
             strtolower(trim($a['livestock_type'] ?? '')),
             strtolower(trim($b['livestock_type'] ?? ''))
         ));
-        $combined = compact('hhRow', 'housingRow', 'utilitiesRow', 'economicRow', 'agricultureRow', 'memberRows', 'livestockRows', 'landParcelRows');
+        $combined = compact('hhRow', 'housingRow', 'utilitiesRow', 'economicRow', 'agricultureRow', 'memberRows', 'livestockRows', 'landParcelRows', 'disasterRow');
         return hash('sha256', json_encode($combined, JSON_UNESCAPED_UNICODE));
     }
 
@@ -764,13 +1011,14 @@ class GoogleSheetsSyncService
         array  $staffRows,
         array  $educRows,
         array  $serviceRows,
-        array  $teacherRows
+        array  $teacherRows,
+        ?array $tsRow = null
     ): string {
         usort($staffRows,    fn($a, $b) => strcmp($a['staff_category'] ?? '', $b['staff_category'] ?? ''));
         usort($educRows,     fn($a, $b) => strcmp($a['grade'] ?? '',          $b['grade'] ?? ''));
         usort($serviceRows,  fn($a, $b) => strcmp($a['service_name'] ?? '',   $b['service_name'] ?? ''));
         usort($teacherRows,  fn($a, $b) => strcmp($a['full_name'] ?? '',      $b['full_name'] ?? ''));
-        $combined = compact('instRow', 'infraRow', 'healthRow', 'staffRows', 'educRows', 'serviceRows', 'teacherRows');
+        $combined = compact('instRow', 'infraRow', 'healthRow', 'staffRows', 'educRows', 'serviceRows', 'teacherRows', 'tsRow');
         return hash('sha256', json_encode($combined, JSON_UNESCAPED_UNICODE));
     }
 
@@ -816,7 +1064,7 @@ class GoogleSheetsSyncService
             'construction_year'     => is_numeric($row['construction_year']    ?? '') ? (int)$row['construction_year']     : null,
             'house_condition'       => $this->opt('house_condition',       $row['house_condition']       ?? null),
             'is_at_risk'            => $this->parseBool($row['is_at_risk'] ?? null) ?? false,
-            'risk_types'            => $this->parseJsonArray($row['risk_types'] ?? null),
+            'risk_types'            => $this->parseJsonArray($row['disaster_type'] ?? null),
         ];
     }
 
@@ -845,7 +1093,7 @@ class GoogleSheetsSyncService
             'monthly_electricity_units' => is_numeric($row['monthly_electricity_units'] ?? '') ? (int)$row['monthly_electricity_units'] : null,
             'cooking_fuel'              => $this->opt('cooking_fuel',      $row['cooking_fuel']           ?? null),
             'has_biogas'                => $this->parseBool($row['has_biogas']    ?? null) ?? false,
-            'solid_waste_management'    => $this->opt('waste_management',  $row['solid_waste_management'] ?? null),
+            'solid_waste_management'    => $this->opt('waste_management',  $row['waste_management'] ?? null),
             'has_internet'              => $this->parseBool($row['has_internet']  ?? null) ?? false,
             'internet_type'             => $this->opt('internet_type',     $row['internet_type']          ?? null),
             'handwashing'               => $this->opt('handwashing',       $row['handwashing']            ?? null),
@@ -858,11 +1106,11 @@ class GoogleSheetsSyncService
     private function rowToEconomicData(array $row): array
     {
         return [
-            'primary_income_source'     => trim($row['primary_income_source']     ?? '') ?: null,
+            'primary_income_source'     => trim($row['income_source']             ?? '') ?: null,
             'annual_income_range'       => trim($row['annual_income_range']       ?? '') ?: null,
             'annual_expenditure_range'  => trim($row['annual_expenditure_range']  ?? '') ?: null,
             'remittance_amount'         => is_numeric($row['remittance_amount']   ?? '') ? (int)$row['remittance_amount'] : null,
-            'loan_sources'              => $this->parseJsonArray($row['loan_sources'] ?? null),
+            'loan_sources'              => $this->parseJsonArray($row['loan_source'] ?? null),
             'total_loan_amount'         => is_numeric($row['total_loan_amount']   ?? '') ? (int)$row['total_loan_amount'] : null,
             'has_bank_account'          => $this->parseBool($row['has_bank_account']          ?? null) ?? false,
             'has_insurance'             => $this->parseBool($row['has_insurance']             ?? null) ?? false,
@@ -877,9 +1125,9 @@ class GoogleSheetsSyncService
         return [
             // 'agriculture' column = yes/no toggle for whether the HH practices agriculture
             'agriculture'            => trim($row['agriculture']            ?? '') ?: null,
-            'agri_categories'        => $this->parseJsonArray($row['agri_categories'] ?? null),
+            'agri_categories'        => $this->parseJsonArray($row['agri_category'] ?? null),
             'use_of_chem_fertilizer' => trim($row['use_of_chem_fertilizer'] ?? '') ?: null,
-            'Farm_Challenges'        => $this->parseJsonArray($row['farm_challenges'] ?? null),
+            'Farm_Challenges'        => $this->parseJsonArray($row['farm_challenge'] ?? null),
             'owns_land'              => $this->parseBool($row['owns_land']  ?? null) ?? false,
             'land_area_ropani'       => is_numeric($row['land_area_ropani']      ?? '') ? (float)$row['land_area_ropani']      : null,
             'irrigated_area_ropani'  => is_numeric($row['irrigated_area_ropani'] ?? '') ? (float)$row['irrigated_area_ropani'] : null,
@@ -897,7 +1145,7 @@ class GoogleSheetsSyncService
             'relation_to_head'  => $this->opt('relation_to_head',  $row['relation_to_head']  ?? null),
             'ethnicity'         => $this->opt('ethnicity',         $row['ethnicity']         ?? null),
             'religion'          => $this->opt('religion',          $row['religion']          ?? null),
-            'mother_tongue'     => $this->opt('language',          $row['mother_tongue']     ?? null),
+            'mother_tongue'     => $this->opt('language',          $row['language']          ?? null),
             'marital_status'    => $this->opt('marital_status',    $row['marital_status']    ?? null),
             'education_level'   => $this->opt('education_level',   $row['education_level']   ?? null),
             'is_literate'       => $this->parseBool($row['is_literate']       ?? null) ?? false,
@@ -954,7 +1202,11 @@ class GoogleSheetsSyncService
     private function rowToInfrastructureData(array $row): array
     {
         return [
-            'buildings'        => $this->opt('inst_building_type',      $row['building_type']      ?? null),
+            'buildings'        => array_filter([
+                                     $this->opt('inst_building_type', $row['building_type'] ?? null)
+                                         ? ['building_type' => $this->opt('inst_building_type', $row['building_type'] ?? null), 'building_count' => 1, 'room_count' => null]
+                                         : null,
+                                 ]),
             'condition'        => $this->opt('inst_building_condition', $row['building_condition'] ?? null),
             'total_rooms'      => is_numeric($row['total_rooms']  ?? '') ? (int)$row['total_rooms']  : null,
             'total_floors'     => is_numeric($row['total_floors'] ?? '') ? (int)$row['total_floors'] : null,
@@ -973,6 +1225,9 @@ class GoogleSheetsSyncService
             'fire_extinguisher'  => $this->parseBool($row['fire_extinguisher']  ?? null) ?? false,
             'earthquake_safe'    => $this->parseBool($row['earthquake_safe']    ?? null) ?? false,
             'evacuation_plan'    => $this->parseBool($row['evacuation_plan']    ?? null) ?? false,
+            'total_classrooms'   => is_numeric($row['total_classrooms'] ?? '') ? (int)$row['total_classrooms'] : null,
+            'has_library'        => $this->parseBool($row['has_library']  ?? null) ?? false,
+            'has_lab'            => $this->parseBool($row['has_lab']      ?? null) ?? false,
         ];
     }
 
@@ -1006,17 +1261,99 @@ class GoogleSheetsSyncService
     private function rowToHealthData(array $row): array
     {
         return [
-            'bed_count'              => is_numeric($row['bed_count'] ?? '') ? (int)$row['bed_count'] : null,
-            'delivery_service'       => $this->parseBool($row['delivery_service']       ?? null) ?? false,
-            'emergency_service'      => $this->parseBool($row['emergency_service']      ?? null) ?? false,
-            'has_lab'                => $this->parseBool($row['lab_service']             ?? null) ?? false,
-            'has_xray'               => $this->parseBool($row['xray_service']            ?? null) ?? false,
-            'has_ambulance'          => $this->parseBool($row['ambulance']               ?? null) ?? false,
-            'opd_monthly'            => is_numeric($row['monthly_outpatient_avg'] ?? '') ? (int)$row['monthly_outpatient_avg'] : null,
-            'ipd_monthly'            => is_numeric($row['monthly_inpatient_avg']  ?? '') ? (int)$row['monthly_inpatient_avg']  : null,
-            'vaccine_service'        => $this->parseBool($row['vaccine_service']         ?? null) ?? false,
-            'family_planning'        => $this->parseBool($row['family_planning']         ?? null) ?? false,
+            'health_type'           => trim($row['health_type'] ?? '') ?: null,
+            'bed_count'             => is_numeric($row['bed_count'] ?? '') ? (int)$row['bed_count'] : null,
+            'male_ward_beds'        => is_numeric($row['male_ward_beds'] ?? '') ? (int)$row['male_ward_beds'] : null,
+            'female_ward_beds'      => is_numeric($row['female_ward_beds'] ?? '') ? (int)$row['female_ward_beds'] : null,
+            'children_ward_beds'    => is_numeric($row['children_ward_beds'] ?? '') ? (int)$row['children_ward_beds'] : null,
+            'maternity_beds'        => is_numeric($row['maternity_beds'] ?? '') ? (int)$row['maternity_beds'] : null,
+            'icu_beds'              => is_numeric($row['icu_beds'] ?? '') ? (int)$row['icu_beds'] : null,
+            'emergency_beds'        => is_numeric($row['emergency_beds'] ?? '') ? (int)$row['emergency_beds'] : null,
+            'delivery_service'      => $this->parseBool($row['delivery_service']      ?? null) ?? false,
+            'emergency_service'     => $this->parseBool($row['emergency_service']     ?? null) ?? false,
+            'has_lab'               => $this->parseBool($row['lab_service']            ?? null) ?? false,
+            'has_xray'              => $this->parseBool($row['xray_service']           ?? null) ?? false,
+            'has_ambulance'         => $this->parseBool($row['ambulance']              ?? null) ?? false,
+            'vaccine_service'       => $this->parseBool($row['vaccine_service']        ?? null) ?? false,
+            'family_planning'       => $this->parseBool($row['family_planning']        ?? null) ?? false,
+            'opd_daily'             => is_numeric($row['opd_daily'] ?? '') ? (int)$row['opd_daily'] : null,
+            'opd_monthly'           => is_numeric($row['monthly_outpatient_avg'] ?? '') ? (int)$row['monthly_outpatient_avg'] : null,
+            'ipd_monthly'           => is_numeric($row['monthly_inpatient_avg']  ?? '') ? (int)$row['monthly_inpatient_avg']  : null,
+            'has_ultrasound'        => $this->parseBool($row['has_ultrasound']        ?? null) ?? false,
+            'has_ecg'               => $this->parseBool($row['has_ecg']               ?? null) ?? false,
+            'has_icu'               => $this->parseBool($row['has_icu']               ?? null) ?? false,
+            'has_operation_theatre' => $this->parseBool($row['has_operation_theatre'] ?? null) ?? false,
+            'has_blood_bank'        => $this->parseBool($row['has_blood_bank']        ?? null) ?? false,
+            'has_dialysis'          => $this->parseBool($row['has_dialysis']          ?? null) ?? false,
+            'has_dental'            => $this->parseBool($row['has_dental']            ?? null) ?? false,
+            'has_physiotherapy'     => $this->parseBool($row['has_physiotherapy']     ?? null) ?? false,
+            'has_oxygen_plant'      => $this->parseBool($row['has_oxygen_plant']      ?? null) ?? false,
+            'health_services'       => $this->parseJsonArray($row['health_services']  ?? null),
+            'equipment'             => $this->parseJsonArray($row['equipment']         ?? null),
+            'lab_services'          => $this->parseJsonArray($row['lab_services']      ?? null),
         ];
+    }
+
+    private function rowToTypespecificData(array $row): array
+    {
+        $arr = fn($v) => $this->parseJsonArray($v) ?? [];
+        return array_filter([
+            // School
+            'school_level'          => trim($row['school_level']    ?? '') ?: null,
+            'management_type'       => trim($row['management_type'] ?? '') ?: null,
+            'medium'                => trim($row['medium']          ?? '') ?: null,
+            // Cooperative
+            'coop_type'             => trim($row['coop_type']       ?? '') ?: null,
+            'share_capital'         => is_numeric($row['share_capital']    ?? '') ? (float)$row['share_capital']    : null,
+            'loan_outstanding'      => is_numeric($row['loan_outstanding'] ?? '') ? (float)$row['loan_outstanding'] : null,
+            'male_members'          => is_numeric($row['male_members']     ?? '') ? (int)$row['male_members']       : null,
+            'female_members'        => is_numeric($row['female_members']   ?? '') ? (int)$row['female_members']     : null,
+            'other_members'         => is_numeric($row['other_members']    ?? '') ? (int)$row['other_members']      : null,
+            // Bank
+            'bank_type'             => trim($row['bank_type']       ?? '') ?: null,
+            'branch_count'          => is_numeric($row['branch_count']    ?? '') ? (int)$row['branch_count']    : null,
+            'total_deposits'        => is_numeric($row['total_deposits']   ?? '') ? (float)$row['total_deposits'] : null,
+            'total_loans'           => is_numeric($row['total_loans']      ?? '') ? (float)$row['total_loans']    : null,
+            // Government
+            'office_level'          => trim($row['office_level'] ?? '') ?: null,
+            'department'            => trim($row['department']   ?? '') ?: null,
+            // NGO / INGO
+            'registration_type'     => trim($row['registration_type'] ?? '') ?: null,
+            'donor'                 => trim($row['donor']             ?? '') ?: null,
+            'beneficiaries_m'       => is_numeric($row['beneficiaries_m'] ?? '') ? (int)$row['beneficiaries_m'] : null,
+            'beneficiaries_f'       => is_numeric($row['beneficiaries_f'] ?? '') ? (int)$row['beneficiaries_f'] : null,
+            'working_areas'         => $arr($row['working_areas'] ?? null) ?: null,
+            // Religious
+            'religion_type'         => trim($row['religion_type']  ?? '') ?: null,
+            'daily_visitors'        => is_numeric($row['daily_visitors'] ?? '') ? (int)$row['daily_visitors'] : null,
+            'has_trust'             => ($this->parseBool($row['has_trust'] ?? null)) ? true : null,
+            // Market
+            'shop_count'            => is_numeric($row['shop_count'] ?? '') ? (int)$row['shop_count'] : null,
+            'goods_types'           => trim($row['goods_types']      ?? '') ?: null,
+            'market_days'           => $arr($row['market_days']      ?? null) ?: null,
+            // Industry
+            'industry_type'         => trim($row['industry_type']      ?? '') ?: null,
+            'annual_production'     => is_numeric($row['annual_production'] ?? '') ? (float)$row['annual_production'] : null,
+            'male_workers'          => is_numeric($row['male_workers']      ?? '') ? (int)$row['male_workers']   : null,
+            'female_workers'        => is_numeric($row['female_workers']    ?? '') ? (int)$row['female_workers'] : null,
+            // Media
+            'media_type'            => trim($row['media_type']    ?? '') ?: null,
+            'coverage_area'         => trim($row['coverage_area'] ?? '') ?: null,
+            'frequency'             => trim($row['frequency']     ?? '') ?: null,
+            // Forest / CFUG
+            'forest_type'           => trim($row['forest_type']           ?? '') ?: null,
+            'forest_area_hectare'   => is_numeric($row['forest_area_hectare']   ?? '') ? (float)$row['forest_area_hectare']   : null,
+            'forest_covered_wards'  => trim($row['forest_covered_wards']  ?? '') ?: null,
+            'consumer_households'   => is_numeric($row['consumer_households']   ?? '') ? (int)$row['consumer_households']   : null,
+            'total_trees'           => is_numeric($row['total_trees']           ?? '') ? (int)$row['total_trees']           : null,
+            'annual_budget'         => is_numeric($row['annual_budget']         ?? '') ? (float)$row['annual_budget']       : null,
+            'annual_income'         => is_numeric($row['annual_income']         ?? '') ? (float)$row['annual_income']       : null,
+            'member_count_m'        => is_numeric($row['member_count_m']        ?? '') ? (int)$row['member_count_m']        : null,
+            'member_count_f'        => is_numeric($row['member_count_f']        ?? '') ? (int)$row['member_count_f']        : null,
+            'committee_chairperson' => trim($row['committee_chairperson']  ?? '') ?: null,
+            'tree_types'            => $arr($row['tree_types']  ?? null) ?: null,
+            'herb_types'            => $arr($row['herb_types']  ?? null) ?: null,
+        ], fn ($v) => $v !== null);
     }
 
     private function rowToServicesData(array $row): array
@@ -1218,5 +1555,24 @@ class GoogleSheetsSyncService
             $this->institutionTypeCache[$slug] = InstitutionType::where('slug', $slug)->value('id');
         }
         return $this->institutionTypeCache[$slug];
+    }
+
+    private function logSyncAudit(string $type, int $wardId, int $imported, int $updated, int $skipped): void
+    {
+        if ($imported + $updated === 0) return;
+        try {
+            \App\Models\AuditLog::create([
+                'user_id'        => auth()->id(),
+                'event_type'     => 'google_sync',
+                'auditable_type' => 'App\\Models\\Ward',
+                'auditable_id'   => $wardId,
+                'old_values'     => [],
+                'new_values'     => compact('type', 'imported', 'updated', 'skipped'),
+                'ip_address'     => request()->ip(),
+                'user_agent'     => request()->userAgent(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('GS sync audit log failed', ['err' => $e->getMessage()]);
+        }
     }
 }

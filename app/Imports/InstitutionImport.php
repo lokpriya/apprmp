@@ -9,6 +9,7 @@ use App\Imports\Sheets\InstEducationSheet;
 use App\Imports\Sheets\InstHealthSheet;
 use App\Imports\Sheets\InstServicesSheet;
 use App\Imports\Sheets\TeachersSheet;
+use App\Imports\Sheets\TypeSpecificSheet;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
 class InstitutionImport implements WithMultipleSheets
@@ -29,6 +30,7 @@ class InstitutionImport implements WithMultipleSheets
             'Health'         => new InstHealthSheet($this->institutionsSheet),
             'Services'       => new InstServicesSheet($this->institutionsSheet),
             'Teachers'       => new TeachersSheet($this->institutionsSheet),
+            'TypeSpecific'   => new TypeSpecificSheet($this->institutionsSheet),
         ];
     }
 

@@ -144,6 +144,18 @@ class SurveyOption extends Model
         return $value;
     }
 
+    /**
+     * Returns true if the value exists in the lookup map for the given category.
+     * Unknown categories always return true (no mapping expected → not an error).
+     */
+    public static function isKnown(string $category, string $value, ?int $lgId = null): bool
+    {
+        if ($value === '') return true;
+        $map = static::buildLookupMap($lgId);
+        if (!isset($map[$category])) return true;
+        return isset($map[$category][$value]) || isset($map[$category][strtolower($value)]);
+    }
+
     // ── Category registry ─────────────────────────────────────────────────────
 
     /** Institution-specific categories (keys starting with 'inst_'). */

@@ -72,31 +72,40 @@ class BulkImport extends Component
         $this->errorMsg = '';
 
         try {
-            /** @var BulkImportService $service */
-            $service = app(BulkImportService::class);
-
-            $batch = $service->importHouseholds(
+            $batch = app(BulkImportService::class)->importHouseholds(
                 $this->file,
                 auth()->user(),
                 $this->wardId ?: null
             );
 
-            $this->batchId      = $batch->id;
-            $this->importedCount = $batch->processed_rows;
-            $this->errorCount    = $batch->error_rows;
-            $this->errorLog      = $batch->error_log ?? [];
-            $this->status        = $batch->status === 'failed' ? 'error' : 'done';
-
-            if ($batch->status === 'failed' && !empty($this->errorLog)) {
-                $this->errorMsg = $this->errorLog[0]['error'] ?? 'Import failed.';
-            }
-
-            $this->file = null;
+            $this->batchId = $batch->id;
+            $this->file    = null;
             $this->loadRecentBatches();
 
         } catch (\Throwable $e) {
             $this->status   = 'error';
             $this->errorMsg = $e->getMessage();
+        }
+    }
+
+    public function pollStatus(): void
+    {
+        if (!$this->batchId || $this->status !== 'uploading') return;
+
+        $batch = BulkImportBatch::find($this->batchId);
+        if (!$batch) return;
+
+        if ($batch->status === 'completed') {
+            $this->importedCount = $batch->processed_rows;
+            $this->errorCount    = $batch->error_rows;
+            $this->errorLog      = $batch->error_log ?? [];
+            $this->status        = 'done';
+            $this->loadRecentBatches();
+        } elseif ($batch->status === 'failed') {
+            $this->errorLog = $batch->error_log ?? [];
+            $this->errorMsg = $this->errorLog[0]['error'] ?? 'Import failed.';
+            $this->status   = 'error';
+            $this->loadRecentBatches();
         }
     }
 
