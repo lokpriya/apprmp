@@ -33,8 +33,8 @@ class InstitutionReportController extends Controller
             'id'       => $lg->id,
             'name_en'  => $lg->name_en,
             'name_np'  => $lg->name_np,
-            'logo_url' => $lg->logo && file_exists(storage_path('app/public/' . $lg->logo))
-                            ? Storage::url($lg->logo)
+            'logo_url' => $lg->logo && Storage::disk('public')->exists($lg->logo)
+                            ? Storage::disk('public')->url($lg->logo)
                             : null,
             'province' => $lg->district?->province?->name_en,
             'district' => $lg->district?->name_en,

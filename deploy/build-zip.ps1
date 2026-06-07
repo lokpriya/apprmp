@@ -33,7 +33,7 @@ $Targets = @{
     }
     'aamchowk' = @{
         LaravelRoot = '/home2/prayaspr/aamchowk'
-        WebRoot     = 'aamchowk'          # doc root = Laravel root (same directory)
+        WebRoot     = 'public_html/aamchowk'
         AppUrl      = 'https://aamchowk.prayasprarambha.com.np'
         DbName      = 'prayaspra_aamchowk'
         DbUser      = 'prayaspra_aamchowk'
@@ -253,7 +253,6 @@ Write-Host "  Size : $sizeMB MB" -ForegroundColor Green
 Write-Host '  ============================================' -ForegroundColor Green
 Write-Host ''
 $homeDir = ($Cfg.LaravelRoot -split '/')[0..2] -join '/'  # e.g. /home2/prayaspra
-$laravelFolder = ($Cfg.LaravelRoot -split '/')[-1]       # e.g. ajirkot
 
 Write-Host "  DEPLOY STEPS (cPanel - $($Cfg.AppUrl)):" -ForegroundColor Cyan
 Write-Host ''
