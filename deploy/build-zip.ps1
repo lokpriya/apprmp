@@ -32,8 +32,8 @@ $Targets = @{
         InstallUrl  = 'https://ajirkot.prayasprarambha.com.np/install.php'
     }
     'aamchowk' = @{
-        LaravelRoot = '/home2/prayaspra/aamchowk'
-        WebRoot     = 'public_html/aamchowk'
+        LaravelRoot = '/home2/prayaspr/aamchowk'
+        WebRoot     = 'aamchowk'          # doc root = Laravel root (same directory)
         AppUrl      = 'https://aamchowk.prayasprarambha.com.np'
         DbName      = 'prayaspra_aamchowk'
         DbUser      = 'prayaspra_aamchowk'
