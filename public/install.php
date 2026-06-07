@@ -346,6 +346,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$completed) {
                 // seed Nepal geo data
                 $geoR = ins_artisan($lRoot, 'db:seed --class=NepalMasterDataSeeder --force');
                 $log[] = ['ok'=>true, 'label'=>'Seed Nepal provinces / districts / LGs', 'out'=>$geoR['output']];
+                // seed global survey options
+                $seeders = [
+                    'SurveyOptionSeeder', 'Phase1MemberOptionsSeeder', 'Phase2ChildOptionsSeeder',
+                    'Phase3OptionsSeeder', 'BusinessSurveyOptionsSeeder', 'DisasterOptionSeeder',
+                    'MemberEducationOptionSeeder', 'InstitutionTypesSeeder',
+                    'CommitteePositionSeeder', 'InstitutionTeacherQualificationSeeder',
+                    'InstitutionTeacherSubjectSeeder', 'InstitutionTeacherLevelSeeder',
+                    'FixCorruptedSurveyOptionsSeeder',
+                ];
+                foreach ($seeders as $seeder) {
+                    $sr = ins_artisan($lRoot, "db:seed --class={$seeder} --force");
+                    $log[] = ['ok'=>true, 'label'=>"Seed {$seeder}", 'out'=>$sr['output']];
+                }
                 // storage:link
                 $r = ins_artisan($lRoot, 'storage:link --force');
                 $log[] = ['ok'=>true, 'label'=>'Create storage symlink', 'out'=>$r['output']];
