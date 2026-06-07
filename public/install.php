@@ -940,7 +940,11 @@ php artisan optimize</pre>
     <!--  STEP 6 — Complete                          -->
     <!-- ════════════════════════════════════════════ -->
     <?php elseif ($step === 6): ?>
-    <?php $appUrl = $lock['app_url'] ?? ''; $adminEmail = $lock['admin_email'] ?? ''; ?>
+    <?php
+        $appUrl      = $lock['app_url'] ?? '';
+        $adminEmail  = $lock['admin_email'] ?? '';
+        $artisanPath = rtrim($lock['laravel_root'] ?? LARAVEL_ROOT_DEFAULT, '/') . '/artisan';
+    ?>
     <div class="px-7 py-10 text-center">
       <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
         <i class="fa-solid fa-circle-check text-green-500 text-3xl"></i>
@@ -968,7 +972,7 @@ php artisan optimize</pre>
         </h3>
         <ul class="space-y-1.5 text-[12px] text-amber-700">
           <li class="flex gap-2"><i class="fa-solid fa-trash-can mt-0.5 shrink-0"></i><span><strong>Delete install.php</strong> — Remove this file from your server immediately</span></li>
-          <li class="flex gap-2"><i class="fa-solid fa-clock mt-0.5 shrink-0"></i><span><strong>Set up Queue Worker cron</strong> — In cPanel → Cron Jobs, add:<br><code class="bg-amber-100 text-amber-900 text-[10px] px-1 rounded">* * * * * /usr/local/bin/ea-php84 /home2/prayasne/apprmp/artisan queue:work --stop-when-empty --max-time=55 --tries=1 2&gt;/dev/null</code><br>This runs bulk imports in the background.</span></li>
+          <li class="flex gap-2"><i class="fa-solid fa-clock mt-0.5 shrink-0"></i><span><strong>Set up Queue Worker cron</strong> — In cPanel → Cron Jobs, add:<br><code class="bg-amber-100 text-amber-900 text-[10px] px-1 rounded">* * * * * /usr/local/bin/ea-php84 <?= h($artisanPath) ?> queue:work --stop-when-empty --max-time=55 --tries=1 2&gt;/dev/null</code><br>This runs bulk imports in the background.</span></li>
           <li class="flex gap-2"><i class="fa-solid fa-building-columns mt-0.5 shrink-0"></i><span>Go to <strong>Settings → सामान्य</strong> and complete your municipality profile</span></li>
           <li class="flex gap-2"><i class="fa-solid fa-map mt-0.5 shrink-0"></i><span>Go to <strong>Settings → नक्सा</strong> to configure the map center and GeoJSON URL</span></li>
           <li class="flex gap-2"><i class="fa-solid fa-file-import mt-0.5 shrink-0"></i><span>Go to <strong>Settings → सर्वेक्षण विकल्प</strong> to import survey dropdown options</span></li>

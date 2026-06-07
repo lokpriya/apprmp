@@ -8,7 +8,7 @@
 # =============================================================
 
 param(
-    [string]$Target = 'apprmp'   # 'apprmp' = prayasnepal.com | 'ajirkot' = ajirkot.prayasprarambha.com.np
+    [string]$Target = 'apprmp'   # 'apprmp' | 'ajirkot' | 'aamchowk'
 )
 
 # ── Per-target config ────────────────────────────────────────────────────────
@@ -31,10 +31,19 @@ $Targets = @{
         ZipName     = 'ajirkot-deploy.zip'
         InstallUrl  = 'https://ajirkot.prayasprarambha.com.np/install.php'
     }
+    'aamchowk' = @{
+        LaravelRoot = '/home2/prayaspra/aamchowk'
+        WebRoot     = 'public_html/aamchowk'
+        AppUrl      = 'https://aamchowk.prayasprarambha.com.np'
+        DbName      = 'prayaspra_aamchowk'
+        DbUser      = 'prayaspra_aamchowk'
+        ZipName     = 'aamchowk-deploy.zip'
+        InstallUrl  = 'https://aamchowk.prayasprarambha.com.np/install.php'
+    }
 }
 
 if (-not $Targets.ContainsKey($Target)) {
-    Write-Host "  ERROR: Unknown target '$Target'. Use 'apprmp' or 'ajirkot'." -ForegroundColor Red
+    Write-Host "  ERROR: Unknown target '$Target'. Use 'apprmp', 'ajirkot', or 'aamchowk'." -ForegroundColor Red
     exit 1
 }
 
@@ -64,16 +73,19 @@ $SkipNames = @(
     '.env',
     'tests',
     'phpunit.xml', 'phpunit.xml.dist', '.phpunit.result.cache',
-    'apprmp-deploy.zip', 'ajirkot-deploy.zip',
+    'apprmp-deploy.zip', 'ajirkot-deploy.zip', 'aamchowk-deploy.zip',
     '.install_lock',
     'Makefile',
     'vite.config.js', 'tailwind.config.js', 'postcss.config.js',
     'package.json', 'package-lock.json', 'bun.lockb',
     '.editorconfig', '.prettierrc', '.styleci.yml',
     'README.md', '.env.example',
-    # Stray dev/data files
+    # Stray dev/data/temp files — not app code, not web-accessible but keep ZIP clean
     'choices_data.json', 'choices_rows.tsv', 'extracted_data.json',
-    'survey_rows.tsv', 'survey_rows_554_656.json'
+    'survey_rows.tsv', 'survey_rows_554_656.json',
+    'convert_ward1.php', 'inspect_ward1.php',
+    'survey_dictionary.csv', 'survey_dictionary_update.csv',
+    'apprmp_dump_20260515_123758.sql'
 )
 
 # --- Copy project files ---
