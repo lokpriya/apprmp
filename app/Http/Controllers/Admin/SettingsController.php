@@ -1335,8 +1335,8 @@ class SettingsController extends Controller
         $url      = "https://docs.google.com/spreadsheets/d/{$sheetId}/export?format=xlsx";
 
         try {
-            $response = \Illuminate\Support\Facades\Http::timeout(10)->head($url);
-            if ($response->successful() || $response->status() === 302) {
+            $response = \Illuminate\Support\Facades\Http::withoutRedirecting()->timeout(10)->head($url);
+            if ($response->successful() || in_array($response->status(), [301, 302, 303, 307, 308])) {
                 return response()->json(['ok' => true, 'message' => 'Sheet पहुँचयोग्य छ।']);
             }
             return response()->json(['ok' => false, 'message' => 'Sheet पहुँच गर्न सकिएन (HTTP '.$response->status().'). Sheet "Anyone with link can view" मा सेट गर्नुभएको छ?']);

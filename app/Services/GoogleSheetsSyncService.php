@@ -83,29 +83,51 @@ class GoogleSheetsSyncService
                  . rawurlencode($sheetId)
                  . '/gviz/tq?tqx=out:csv&sheet=';
 
-        $responses = Http::pool(function (Pool $pool) use ($baseUrl, $sheetNames) {
-            $reqs = [];
-            foreach ($sheetNames as $name) {
-                $reqs[] = $pool->as($name)->connectTimeout(10)->timeout(30)
-                               ->get($baseUrl . rawurlencode($name));
-            }
-            return $reqs;
-        });
+        $ua    = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+        $multi = curl_multi_init();
+        $handles = [];
+
+        foreach ($sheetNames as $name) {
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL            => $baseUrl . rawurlencode($name),
+                CURLOPT_USERAGENT      => $ua,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 30,
+                CURLOPT_CONNECTTIMEOUT => 10,
+            ]);
+            curl_multi_add_handle($multi, $ch);
+            $handles[$name] = $ch;
+        }
+
+        $running = null;
+        do {
+            curl_multi_exec($multi, $running);
+            curl_multi_select($multi);
+        } while ($running > 0);
 
         $result   = [];
         $failures = [];
 
         foreach ($sheetNames as $name) {
-            $resp = $responses[$name] ?? null;
-            if ($resp instanceof \Throwable || !$resp || !$resp->successful()) {
+            $ch    = $handles[$name];
+            $code  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $body  = curl_multi_getcontent($ch);
+            $errNo = curl_errno($ch);
+            curl_multi_remove_handle($multi, $ch);
+            curl_close($ch);
+
+            if ($errNo || $code !== 200 || $body === false) {
                 $failures[] = $name;
             } else {
-                $body = trim($resp->body());
+                $body = trim($body);
                 $result[$name] = $body === '' ? [] : $this->parseCsvBody($body);
             }
         }
 
-        // Retry any failed sheets individually (3 attempts with 1.5 s backoff)
+        curl_multi_close($multi);
+
         foreach ($failures as $name) {
             $result[$name] = $this->downloadSheetCsvRetry($baseUrl . rawurlencode($name), $name);
         }
@@ -116,18 +138,27 @@ class GoogleSheetsSyncService
     /** Single-sheet download with up to 3 retry attempts. */
     private function downloadSheetCsvRetry(string $url, string $sheetName): array
     {
-        $lastException = null;
+        $ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
         for ($attempt = 1; $attempt <= 3; $attempt++) {
-            try {
-                $response = Http::connectTimeout(10)->timeout(30)->get($url);
-                if ($response->successful()) {
-                    $body = trim($response->body());
-                    return $body === '' ? [] : $this->parseCsvBody($body);
-                }
-                if ($response->status() === 404) break;
-            } catch (\Throwable $e) {
-                $lastException = $e;
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL            => $url,
+                CURLOPT_USERAGENT      => $ua,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 30,
+                CURLOPT_CONNECTTIMEOUT => 10,
+            ]);
+            $body  = curl_exec($ch);
+            $code  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $errNo = curl_errno($ch);
+            curl_close($ch);
+
+            if (!$errNo && $code === 200 && $body !== false) {
+                $body = trim($body);
+                return $body === '' ? [] : $this->parseCsvBody($body);
             }
+            if ($code === 404) break;
             if ($attempt < 3) usleep(1_500_000);
         }
         throw new \RuntimeException(
