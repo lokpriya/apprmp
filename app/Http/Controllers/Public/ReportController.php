@@ -1055,18 +1055,18 @@ class ReportController extends Controller
                     'data'    => $agriByWard,
                 ],
             ],
-            'frequencies' => [
-                ['id' => 'agri',          'title' => 'कृषि अभ्यास',           'title_en' => 'Agriculture Practice',    'data' => $agriFreq],
-                ['id' => 'land',          'title' => 'जमिन स्वामित्व',         'title_en' => 'Land Ownership',          'data' => $landFreq],
-                ['id' => 'irrigation',    'title' => 'सिँचाइको स्रोत',          'title_en' => 'Irrigation Source',       'data' => $irrigationFreq],
-                ['id' => 'agri_cat',      'title' => 'बाली/कृषि श्रेणी',        'title_en' => 'Crop / Agriculture Category', 'data' => $agriCategoryFreq],
-                ['id' => 'farm_challenge','title' => 'कृषि समस्याहरू',           'title_en' => 'Farm Challenges',         'data' => $farmChallengeFreq],
-                ['id' => 'chem_fert',     'title' => 'रासायनिक मल प्रयोग',    'title_en' => 'Chemical Fertilizer Use', 'data' => $chemFertFreq],
-                ['id' => 'org_fert',      'title' => 'जैविक मल प्रयोग',       'title_en' => 'Organic Fertilizer Use',  'data' => $orgFertFreq],
-                ['id' => 'sells',         'title' => 'उपज बिक्री',             'title_en' => 'Sells Produce',           'data' => $sellsFreq],
-                ['id' => 'agri_loan',     'title' => 'कृषि ऋण',                'title_en' => 'Agricultural Loan',       'data' => $agriLoanFreq],
-                ['id' => 'livestock',     'title' => 'पशुपालनको प्रकार',       'title_en' => 'Livestock Type',          'data' => $livestockFreq],
-            ],
+            'frequencies' => array_values(array_filter([
+                $agriFreq         ? ['id' => 'agri',          'title' => 'कृषि अभ्यास',           'title_en' => 'Agriculture Practice',        'data' => $agriFreq]         : null,
+                $landFreq         ? ['id' => 'land',          'title' => 'जमिन स्वामित्व',         'title_en' => 'Land Ownership',              'data' => $landFreq]         : null,
+                $irrigationFreq   ? ['id' => 'irrigation',    'title' => 'सिँचाइको स्रोत',         'title_en' => 'Irrigation Source',           'data' => $irrigationFreq]   : null,
+                $agriCategoryFreq ? ['id' => 'agri_cat',      'title' => 'बाली/कृषि श्रेणी',       'title_en' => 'Crop / Agriculture Category', 'data' => $agriCategoryFreq] : null,
+                $farmChallengeFreq? ['id' => 'farm_challenge','title' => 'कृषि समस्याहरू',          'title_en' => 'Farm Challenges',             'data' => $farmChallengeFreq]: null,
+                $chemFertFreq     ? ['id' => 'chem_fert',     'title' => 'रासायनिक मल प्रयोग',   'title_en' => 'Chemical Fertilizer Use',     'data' => $chemFertFreq]     : null,
+                $orgFertFreq      ? ['id' => 'org_fert',      'title' => 'जैविक मल प्रयोग',      'title_en' => 'Organic Fertilizer Use',      'data' => $orgFertFreq]      : null,
+                $sellsFreq        ? ['id' => 'sells',         'title' => 'उपज बिक्री',            'title_en' => 'Sells Produce',               'data' => $sellsFreq]        : null,
+                $agriLoanFreq     ? ['id' => 'agri_loan',     'title' => 'कृषि ऋण',               'title_en' => 'Agricultural Loan',           'data' => $agriLoanFreq]     : null,
+                $livestockFreq    ? ['id' => 'livestock',     'title' => 'पशुपालनको प्रकार',      'title_en' => 'Livestock Type',              'data' => $livestockFreq]    : null,
+            ])),
         ]);
     }
 

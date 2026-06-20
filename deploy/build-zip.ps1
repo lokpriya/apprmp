@@ -80,12 +80,12 @@ $SkipNames = @(
     'package.json', 'package-lock.json', 'bun.lockb',
     '.editorconfig', '.prettierrc', '.styleci.yml',
     'README.md', '.env.example',
-    # Stray dev/data/temp files — not app code, not web-accessible but keep ZIP clean
+    # Stray dev/data/temp files
     'choices_data.json', 'choices_rows.tsv', 'extracted_data.json',
     'survey_rows.tsv', 'survey_rows_554_656.json',
-    'convert_ward1.php', 'inspect_ward1.php',
-    'survey_dictionary.csv', 'survey_dictionary_update.csv',
-    'apprmp_dump_20260515_123758.sql'
+    'build.zip', 'build-only.zip',
+    'database/sql',
+    'run-apprmp.php', 'run-ajirkot.php', 'run-aamchowk.php'
 )
 
 # --- Copy project files ---

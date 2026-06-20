@@ -22,3 +22,15 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+# Deployment artifacts
+*-deploy.zip
+build.zip
+build-only.zip
+deploy/run-*.php
+# Temp dev scripts
+convert_ward*.php
+inspect_ward*.php
+survey_dictionary*.csv
+# Local working data files (not needed in git or deploy)
+Reference Files/
+database/sql/

@@ -1157,17 +1157,18 @@ class GoogleSheetsSyncService
 
     private function rowToAgricultureData(array $row): array
     {
+        $yn = fn($v) => ($b = $this->parseBool($v)) === null ? null : ($b ? 'yes' : 'no');
         return [
-            'agriculture'              => trim($row['agriculture']            ?? '') ?: null,
+            'agriculture'              => $yn($row['agriculture'] ?? null),
             'agri_categories'          => $this->parseJsonArray($row['agri_category'] ?? null),
             'use_of_chem_fertilizer'   => trim($row['use_of_chem_fertilizer'] ?? '') ?: null,
-            'uses_chemical_fertilizer' => $this->parseBool($row['uses_chemical_fertilizer'] ?? $row['use_of_chem_fertilizer'] ?? null) ?? false,
-            'uses_organic_fertilizer'  => $this->parseBool($row['uses_organic_fertilizer']  ?? null) ?? false,
-            'sells_produce'            => $this->parseBool($row['sells_produce']             ?? null) ?? false,
-            'has_agri_loan'            => $this->parseBool($row['has_agri_loan']             ?? null) ?? false,
+            'uses_chemical_fertilizer' => $yn($row['uses_chemical_fertilizer'] ?? $row['use_of_chem_fertilizer'] ?? null),
+            'uses_organic_fertilizer'  => $yn($row['uses_organic_fertilizer']  ?? null),
+            'sells_produce'            => $yn($row['sells_produce']             ?? null),
+            'has_agri_loan'            => $yn($row['has_agri_loan']             ?? null),
             'irrigation_source'        => trim($row['irrigation_source']       ?? '') ?: null,
             'Farm_Challenges'          => $this->parseJsonArray($row['farm_challenge'] ?? null),
-            'owns_land'                => $this->parseBool($row['owns_land']   ?? null) ?? false,
+            'owns_land'                => $yn($row['owns_land']   ?? null),
             'land_area_ropani'         => is_numeric($row['land_area_ropani']      ?? '') ? (float)$row['land_area_ropani']      : null,
             'irrigated_area_ropani'    => is_numeric($row['irrigated_area_ropani'] ?? '') ? (float)$row['irrigated_area_ropani'] : null,
             'annual_agri_income'       => is_numeric($row['annual_agri_income']    ?? '') ? (int)$row['annual_agri_income']      : null,
