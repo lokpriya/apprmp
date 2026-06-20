@@ -36,24 +36,30 @@ class AgricultureSheet implements ToCollection, WithChunkReading, WithHeadingRow
                     }
 
                     // Template columns → model columns (aligned with HouseholdAgriculture $fillable)
+                    // agriculture, owns_land, uses_* are VARCHAR(10) storing 'yes'/'no' — use yn() not bool()
+                    $chemFert = $row['use_of_chem_fertilizer'] ?? 0;
                     HouseholdAgriculture::updateOrCreate(
                         ['household_id' => $codeMap[$code]],
                         [
-                            'agriculture'            => $this->bool($row['agriculture'] ?? 0),
-                            'owns_land'              => $this->bool($row['owns_land'] ?? 0),
-                            'land_area_ropani'       => is_numeric($row['land_area_ropani'] ?? '') ? $row['land_area_ropani'] : null,
-                            'irrigated_area_ropani'  => is_numeric($row['irrigated_area_ropani'] ?? '') ? $row['irrigated_area_ropani'] : null,
-                            'irrigation_source'      => trim($row['irrigation_source'] ?? '') ?: null,
-                            'agri_categories'        => $this->parseArray($row['agri_category'] ?? null) ?: null,
-                            'use_of_chem_fertilizer' => $this->bool($row['use_of_chem_fertilizer'] ?? 0),
-                            'chem_fertilizer_types'  => $this->parseArray($row['chem_fertilizer'] ?? null) ?: null,
-                            'chem_fertilizer_kg'     => is_numeric($row['chem_fertilizer_kg'] ?? '') ? $row['chem_fertilizer_kg'] : null,
-                            'fertilizer_sources'     => $this->parseArray($row['fertilizer_source'] ?? null) ?: null,
-                            'use_of_chem_pesticide'  => $this->bool($row['use_of_chem_pesticide'] ?? 0),
-                            'chem_pesticide_types'   => $this->parseArray($row['chem_pesticide'] ?? null) ?: null,
-                            'chem_pesticide_cost'    => is_numeric($row['chem_pesticide_cost'] ?? '') ? $row['chem_pesticide_cost'] : null,
-                            'Farm_Challenges'        => $this->parseArray($row['farm_challenge'] ?? null) ?: null,
-                            'annual_agri_income'     => is_numeric($row['annual_agri_income'] ?? '') ? $row['annual_agri_income'] : null,
+                            'agriculture'               => $this->yn($row['agriculture'] ?? 0),
+                            'owns_land'                 => $this->yn($row['owns_land'] ?? 0),
+                            'land_area_ropani'          => is_numeric($row['land_area_ropani'] ?? '') ? $row['land_area_ropani'] : null,
+                            'irrigated_area_ropani'     => is_numeric($row['irrigated_area_ropani'] ?? '') ? $row['irrigated_area_ropani'] : null,
+                            'irrigation_source'         => trim($row['irrigation_source'] ?? '') ?: null,
+                            'agri_categories'           => $this->parseArray($row['agri_category'] ?? null) ?: null,
+                            'use_of_chem_fertilizer'    => $this->yn($chemFert),
+                            'uses_chemical_fertilizer'  => $this->yn($chemFert),
+                            'chem_fertilizer_types'     => $this->parseArray($row['chem_fertilizer'] ?? null) ?: null,
+                            'chem_fertilizer_kg'        => is_numeric($row['chem_fertilizer_kg'] ?? '') ? $row['chem_fertilizer_kg'] : null,
+                            'fertilizer_sources'        => $this->parseArray($row['fertilizer_source'] ?? null) ?: null,
+                            'use_of_chem_pesticide'     => $this->yn($row['use_of_chem_pesticide'] ?? 0),
+                            'chem_pesticide_types'      => $this->parseArray($row['chem_pesticide'] ?? null) ?: null,
+                            'chem_pesticide_cost'       => is_numeric($row['chem_pesticide_cost'] ?? '') ? $row['chem_pesticide_cost'] : null,
+                            'Farm_Challenges'           => $this->parseArray($row['farm_challenge'] ?? null) ?: null,
+                            'annual_agri_income'        => is_numeric($row['annual_agri_income'] ?? '') ? $row['annual_agri_income'] : null,
+                            'uses_organic_fertilizer'   => $this->yn($row['uses_organic_fertilizer'] ?? 0),
+                            'sells_produce'             => $this->yn($row['sells_produce'] ?? 0),
+                            'has_agri_loan'             => $this->yn($row['has_agri_loan'] ?? 0),
                         ]
                     );
                     $this->imported++;
@@ -64,9 +70,9 @@ class AgricultureSheet implements ToCollection, WithChunkReading, WithHeadingRow
         });
     }
 
-    private function bool(mixed $val): bool
+    private function yn(mixed $val): string
     {
-        return in_array(strtolower((string)$val), ['1', 'yes', 'true', 'y'], true);
+        return in_array(strtolower((string)$val), ['1', 'yes', 'true', 'y'], true) ? 'yes' : 'no';
     }
 
     private function parseArray(mixed $val): array

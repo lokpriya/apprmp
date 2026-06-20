@@ -552,38 +552,43 @@ class AgricultureTemplateSheet implements FromArray, WithTitle, WithStyles, Shou
     protected function headerColor(): string { return 'FF166534'; }
     protected function lightColor(): string  { return 'FFF0FDF4'; }
     protected function sampleColor(): string { return 'FFBBF7D0'; }
-    protected function lastCol(): string     { return 'P'; }
+    protected function lastCol(): string     { return 'S'; }
 
     public function array(): array
     {
         $g = $this->grouped;
         return [
-            // 16 columns — A–P
+            // 19 columns — A–S
             ['household_code','agriculture','owns_land','land_area_ropani','irrigated_area_ropani',
              'irrigation_source',
              'agri_category',
              'use_of_chem_fertilizer','chem_fertilizer','chem_fertilizer_kg','fertilizer_source',
              'use_of_chem_pesticide','chem_pesticide','chem_pesticide_cost',
-             'farm_challenge','annual_agri_income'],
+             'farm_challenge','annual_agri_income',
+             'uses_organic_fertilizer','sells_produce','has_agri_loan'],
             ['Match Households sheet',
-             '1=yes (practices agriculture), 0=no',
-             '1=yes (owns land), 0=no',
+             'yes / no — कृषि गर्नुहुन्छ?',
+             'yes / no — जमिन स्वामित्व',
              'Total land area in ropani',
              'Irrigated area in ropani',
              hhOptHint($g, 'irrigation_source', 'canal / rain / groundwater / river / pond / sprinkler / drip / none (comma-separated)'),
              hhOptHint($g, 'agri_category', 'food_crops / pulses / oil_seeds / vegetables / cash_crops / fruits / other_crops (comma-separated)'),
-             '1=yes, 0=no — रासायनिक मल प्रयोग',
+             'yes / no — रासायनिक मल प्रयोग',
              hhOptHint($g, 'chem_fertilizer', 'urea / dap / potash / nano_urea / other (comma-separated)'),
              'Fertilizer quantity kg/year',
              hhOptHint($g, 'fertilizer_source', 'small_farmers / private_agro / cooperative / salt_trading / other (comma-separated)'),
-             '1=yes, 0=no — रासायनिक विषादी प्रयोग',
+             'yes / no — रासायनिक विषादी प्रयोग',
              hhOptHint($g, 'chem_pesticide', 'malathion / chlorpyrifos / glyphosate / mancozeb / atrazine (comma-separated)'),
              'Pesticide cost NPR/year',
              hhOptHint($g, 'farm_challenge', 'drought / flood / pest / disease / market / labour / credit / other (comma-separated)'),
-             'Annual agri income NPR'],
-            ['HH-W01-00001','1','1','4.5','2.0','canal,rain','food_crops,vegetables',
-             '1','urea,dap','50','cooperative',
-             '0','','','drought,market','85000'],
+             'Annual agri income NPR',
+             'yes / no — जैविक मल प्रयोग',
+             'yes / no — उपज बिक्री गर्नुहुन्छ?',
+             'yes / no — कृषि ऋण छ?'],
+            ['HH-W01-00001','yes','yes','4.5','2.0','canal,rain','food_crops,vegetables',
+             'yes','urea,dap','50','cooperative',
+             'no','','','drought,market','85000',
+             'no','yes','no'],
         ];
     }
 }
@@ -806,12 +811,12 @@ class HhDynamicValidValuesSheet implements FromArray, WithTitle, WithStyles, Sho
             'loan_purpose'             => 'loan_purpose',
         ],
         'Agriculture (07)' => [
-            'agri_category'         => 'agri_category',
-            'irrigation_source'     => 'irrigation_source',
-            'farm_challenge'        => 'farm_challenge',
-            'chem_fertilizer'       => 'chem_fertilizer',
-            'fertilizer_source'     => 'fertilizer_source',
-            'chem_pesticide'        => 'chem_pesticide',
+            'agri_category'            => 'agri_category',
+            'irrigation_source'        => 'irrigation_source',
+            'farm_challenge'           => 'farm_challenge',
+            'chem_fertilizer'          => 'chem_fertilizer',
+            'fertilizer_source'        => 'fertilizer_source',
+            'chem_pesticide'           => 'chem_pesticide',
         ],
         'Livestock (08)' => [
             'livestock_type'  => 'livestock_kind',
@@ -888,7 +893,13 @@ class HhDynamicValidValuesSheet implements FromArray, WithTitle, WithStyles, Sho
         $rows[] = ['06|annual_income_range',      'below_50000 / 50000_100000 / 100000_200000 / 200000_500000 / above_500000', 'आय दायरा',                             'Economic (06) — add to Survey Options for dynamic'];
         $rows[] = ['06|annual_expenditure_range', 'below_50000 / 50000_100000 / 100000_200000 / 200000_500000 / above_500000', 'खर्च दायरा',                           'Economic (06) — add to Survey Options for dynamic'];
         $rows[] = ['06|decision_*',               'Male / Female / Both / Other',                                          'पुरुष / महिला / दुवै / अन्य',               'Economic (06) — decision columns'];
-        $rows[] = ['Boolean 1/0',                 '1 = Yes / True  ·  0 = No / False',                                    '',                                           'For all has_*, is_* columns'];
+        $rows[] = ['Boolean 1/0',                 '1 = Yes / True  ·  0 = No / False  ·  yes / no  (case-insensitive)', '',                                           'For all has_*, is_* columns'];
+        $rows[] = ['07|agriculture',              'yes / no — कृषि गर्नुहुन्छ?',                                           '',                                           'Agriculture (07)'];
+        $rows[] = ['07|owns_land',                'yes / no — जमिन स्वामित्व छ?',                                          '',                                           'Agriculture (07)'];
+        $rows[] = ['07|use_of_chem_fertilizer',   'yes / no — रासायनिक मल प्रयोग',                                         '',                                           'Agriculture (07)'];
+        $rows[] = ['07|uses_organic_fertilizer',  'yes / no — जैविक मल प्रयोग',                                            '',                                           'Agriculture (07)'];
+        $rows[] = ['07|sells_produce',            'yes / no — उपज बिक्री गर्नुहुन्छ?',                                    '',                                           'Agriculture (07)'];
+        $rows[] = ['07|has_agri_loan',            'yes / no — कृषि ऋण छ?',                                                 '',                                           'Agriculture (07)'];
         $rows[] = ['Date format',                 'YYYY-MM-DD  (e.g. ' . date('Y-m-d') . ')',                             '',                                           'English calendar AD'];
         $rows[] = ['GPS coordinates',             'Decimal degrees  (lat: 27.7172 / lng: 85.3240)',                        '',                                           'Altitude & accuracy in metres'];
         $rows[] = ['', '', '', ''];
