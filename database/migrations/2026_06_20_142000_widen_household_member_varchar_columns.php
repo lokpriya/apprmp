@@ -40,7 +40,6 @@ return new class extends Migration
             $table->string('hw_support_6_15',            200)->nullable()->change();
             $table->string('other_interest_6_15',        200)->nullable()->change();
             $table->string('frequency_smoking_drinking', 200)->nullable()->change();
-            $table->string('school_dropout_reason',      500)->nullable()->change();
         });
     }
 
