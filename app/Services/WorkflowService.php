@@ -10,6 +10,7 @@ use App\Models\SubmissionLog;
 use App\Models\User;
 use App\Notifications\SubmissionStatusNotification;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class WorkflowService
@@ -96,5 +97,7 @@ class WorkflowService
     public function publish(Model $record, User $actor): void
     {
         $this->transition($record, RecordStatus::Published, $actor);
+        // Bust public analytics/report caches so the dashboard reflects new data immediately.
+        Cache::put('analytics_version', now()->timestamp, 86400);
     }
 }

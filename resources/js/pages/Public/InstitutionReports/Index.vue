@@ -141,9 +141,9 @@ const maxTypeCount = computed(() =>
 const ownerColors = ['#6366f1','#0ca678','#f59f00','#e74c3c','#3498db','#9b59b6','#1abc9c']
 
 const ownershipLabels = {
-  government: 'सरकारी / Government', private: 'निजी / Private',
-  community:  'सामुदायिक / Community', cooperative: 'सहकारी / Cooperative',
-  ngo:        'गैसस / NGO', religious: 'धार्मिक / Religious', other: 'अन्य / Other',
+  govt:        'सरकारी / Government', private: 'निजी / Private',
+  community:   'सामुदायिक / Community', cooperative: 'सहकारी / Cooperative',
+  ngo:         'गैसस / NGO', joint: 'संयुक्त / Joint', other: 'अन्य / Other',
 }
 
 function ownerLabel(val) { return ownershipLabels[val] ?? val }

@@ -158,10 +158,19 @@ class CrossTabService
                 }
             }
 
+            // Build lowercase→canonical key maps for case-insensitive matching
+            $rowKeyMap = [];
+            foreach ($rowKeys as $k) { $rowKeyMap[strtolower($k)] = $k; }
+            $colKeyMap = [];
+            foreach ($colKeys as $k) { $colKeyMap[strtolower($k)] = $k; }
+
             // Fill matrix
             foreach ($rows as $row) {
                 $r = (string)$row->_row;
                 $c = (string)$row->_col;
+                // Normalize to canonical key via case-insensitive lookup
+                $r = $rowKeyMap[strtolower($r)] ?? $r;
+                $c = $colKeyMap[strtolower($c)] ?? $c;
                 if (isset($matrix[$r][$c])) {
                     $matrix[$r][$c] = (int)$row->cnt;
                 } elseif (!isset($rowDef[$r]) && !empty($rowDef)) {
@@ -237,13 +246,21 @@ class CrossTabService
                 ->orderByDesc('cnt')
                 ->get();
 
+            // Build lowercase→canonical key map for case-insensitive label lookup
+            $labelKeyMap = [];
+            foreach (array_keys($labelDef) as $k) {
+                $labelKeyMap[strtolower($k)] = $k;
+            }
+
             $result = [];
             foreach ($rows as $row) {
                 $key = (string)$row->_val;
                 if (!$key) continue;
+                // Normalize to canonical label key (case-insensitive)
+                $canonKey = $labelKeyMap[strtolower($key)] ?? null;
                 $result[] = [
                     'key'   => $key,
-                    'label' => $labelDef[$key] ?? $key,
+                    'label' => ($canonKey !== null ? ($labelDef[$canonKey] ?? $key) : $key),
                     'count' => (int)$row->cnt,
                 ];
             }
@@ -275,6 +292,7 @@ class CrossTabService
             'loan_sources'           => 'loan_source',
             'type_of_vehicle'        => 'vehicle_type',
             'addrslocation'          => 'addrslocation',
+            'occupation'             => 'occupation_type',
         ];
 
         // Static fallback labels for fields with no survey_options category
@@ -318,6 +336,30 @@ class CrossTabService
             'has_insurance' => [
                 '1' => 'बीमा छ',
                 '0' => 'बीमा छैन',
+            ],
+            'ss_allowance' => [
+                '1' => 'सामाजिक सुरक्षा भत्ता पाउँछ',
+                '0' => 'भत्ता पाउँदैनन्',
+            ],
+            'livestock_kind' => [
+                'Cow'     => 'गाई',       'cow'     => 'गाई',
+                'OX'      => 'गोरु',      'ox'      => 'गोरु',     'oxen'    => 'गोरु',
+                'Buffalo' => 'भैंसी',     'buffalo' => 'भैंसी',
+                'Goats'   => 'बाख्रा',    'goats'   => 'बाख्रा',
+                'Sheep'   => 'भेडा',      'sheep'   => 'भेडा',
+                'Swine'   => 'बंगुर',     'swine'   => 'बंगुर',    'pigs'    => 'बंगुर',
+                'Horse'   => 'घोडा',      'horse'   => 'घोडा',
+                'Poultry' => 'कुखुरा',    'poultry' => 'कुखुरा',
+                'Ducks'   => 'हाँस',      'ducks'   => 'हाँस',
+                'Rabbit'  => 'खरायो',     'rabbit'  => 'खरायो',
+                'Yak'     => 'चौरी/याक',  'yak'     => 'चौरी/याक',
+                'other'   => 'अन्य',      'Other'   => 'अन्य',
+            ],
+            'disability_card' => [
+                'red'    => 'रातो (पूर्ण अशक्त)',
+                'blue'   => 'निलो (अति अशक्त)',
+                'yellow' => 'पहेंलो (मध्यम अशक्त)',
+                'white'  => 'सेतो (सामान्य अशक्त)',
             ],
             'annual_income_range' => [
                 'below_50000'    => 'रु ५०,००० भन्दा कम',
@@ -367,6 +409,7 @@ class CrossTabService
     public static function cacheKey(string $prefix, int $lgId, array $filters = []): string
     {
         $filterStr = http_build_query(array_filter($filters, fn($v) => $v !== null && $v !== ''));
-        return "crosstab.{$prefix}.{$lgId}." . ($filterStr ? md5($filterStr) : 'all');
+        $v         = \Illuminate\Support\Facades\Cache::get('analytics_version', 0);
+        return "crosstab.{$prefix}.{$lgId}.v{$v}." . ($filterStr ? md5($filterStr) : 'all');
     }
 }

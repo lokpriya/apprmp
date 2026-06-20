@@ -19,13 +19,17 @@
   $lvd = $sd['livestockDetail'] ?? null;
   $bfs = $sd['beeFishSilk']     ?? null;
 
-  // Resolve single survey-option value → Nepali label
-  $ol  = fn($cat, $val) => ($val && $opts->get($cat)?->get($val)) ? $opts->get($cat)->get($val) : ($val ?? '—');
+  // Resolve single survey-option value → Nepali label (case-insensitive)
+  $ol = function($cat, $val) use ($opts) {
+    if ($val === null || $val === '') return '—';
+    $map = $opts->get($cat);
+    return $map?->get(strtolower((string)$val)) ?? $map?->get((string)$val) ?? $val;
+  };
 
   // Resolve array of survey-option values → comma-joined Nepali labels
-  $ols = function($cat, $arr) use ($opts) {
+  $ols = function($cat, $arr) use ($ol) {
     if (!is_array($arr) || !count($arr)) return '—';
-    return implode(', ', array_map(fn($v) => ($opts->get($cat)?->get($v) ?? $v), $arr));
+    return implode(', ', array_map(fn($v) => $ol($cat, $v), $arr));
   };
 
   // yes/no/bool → Nepali

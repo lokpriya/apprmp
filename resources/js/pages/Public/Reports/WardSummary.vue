@@ -380,7 +380,7 @@
                 <i class="fa-regular fa-keyboard mr-1"></i>
                 ← → बाण चाबी, Esc बन्द
               </p>
-              <a :href="`/public/reports/ward/${activeWard.ward_id}`"
+              <a :href="`/public/reports/ward/${activeWard.ward_number}`"
                 class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#206bc4] hover:bg-[#1a56a0] text-white text-[12px] font-medium rounded-lg transition-colors">
                 विस्तृत प्रोफाइल
                 <i class="fa-solid fa-arrow-right text-[10px]"></i>
@@ -397,9 +397,9 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, defineComponent, h } from 'vue'
 import Chart from 'chart.js/auto'
-import PublicLayout from '@/layouts/PublicLayout.vue'
+import PublicReportsLayout from '@/layouts/PublicReportsLayout.vue'
 
-defineOptions({ layout: PublicLayout })
+defineOptions({ layout: PublicReportsLayout })
 
 // ── Sort icon inline component ────────────────────────────────────────────
 const SortIcon = defineComponent({
@@ -415,6 +415,9 @@ const SortIcon = defineComponent({
 const props = defineProps({
   lg:          { type: Object, default: null },
   wardSummary: { type: Array,  default: () => [] },
+  wards:       { type: Array,  default: () => [] },
+  settlements: { type: Array,  default: () => [] },
+  filters:     { type: Object, default: () => ({}) },
 })
 
 // ── Sort state ────────────────────────────────────────────────────────────

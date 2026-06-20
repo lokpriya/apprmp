@@ -27,6 +27,8 @@ use App\Http\Controllers\Public\BusinessReportController;
 use App\Http\Controllers\Public\InstitutionReportController;
 use App\Http\Controllers\Public\ReportController;
 use App\Http\Controllers\Public\ReportExportController;
+use App\Http\Controllers\Public\FeedbackController as PublicFeedbackController;
+use App\Http\Controllers\Admin\FeedbackController as AdminFeedbackController;
 use Illuminate\Support\Facades\Route;
 
 // ── Public access captcha gate ───────────────────────────────────────────────
@@ -61,6 +63,8 @@ Route::prefix('public')->name('public.')->middleware(['maintenance', 'public.acc
     Route::get('/employees',       [AnalyticsController::class, 'employees'])->name('employees');
     Route::get('/gallery',         [AnalyticsController::class, 'gallery'])->name('gallery');
     Route::get('/downloads',       [AnalyticsController::class, 'downloads'])->name('downloads');
+    Route::get('/feedback',        [PublicFeedbackController::class, 'create'])->name('feedback');
+    Route::post('/feedback',       [PublicFeedbackController::class, 'store'])->name('feedback.store')->middleware('throttle:5,1');
     Route::get('/housing', [AnalyticsController::class, 'housing'])->name('housing');
     Route::get('/map',             [AnalyticsController::class, 'map'])->name('map');
     Route::get('/institution-map', [AnalyticsController::class, 'institutionMap'])->name('institution-map');
@@ -83,11 +87,18 @@ Route::prefix('public')->name('public.')->middleware(['maintenance', 'public.acc
         Route::get('/migration',           [ReportController::class,    'migration'])      ->name('migration');
         Route::get('/child-development',   [ReportController::class,    'childDevelopment'])->name('child-development');
         Route::get('/documents',           [ReportController::class,    'documents'])      ->name('documents');
-        Route::get('/disaster',            [ReportController::class,    'disaster'])       ->name('disaster');
-        Route::get('/export/{category}',   [ReportExportController::class, 'download'])   ->name('export');
+        Route::get('/disaster',            [ReportController::class,    'disaster'])            ->name('disaster');
+        Route::get('/women-empowerment',   [ReportController::class,    'womenEmpowerment'])  ->name('women-empowerment');
+        Route::get('/digital-connectivity',[ReportController::class,    'digitalConnectivity'])->name('digital-connectivity');
+        Route::get('/social-security',     [ReportController::class,    'socialSecurity'])    ->name('social-security');
+        Route::get('/livestock-detail',    [ReportController::class,    'livestockDetail'])   ->name('livestock-detail');
+        Route::get('/land-agriculture',    [ReportController::class,    'landAgriculture'])   ->name('land-agriculture');
+        Route::get('/development-index',   [ReportController::class,    'developmentIndex'])  ->name('development-index');
+        Route::get('/export/{category}',   [ReportExportController::class, 'download'])       ->name('export');
         Route::get('/population-pyramid',  [AnalyticsController::class, 'populationPyramid'])->name('population-pyramid');
-        Route::get('/ward-summary',        [AnalyticsController::class, 'wardSummaryPage'])  ->name('ward-summary');
-        Route::get('/ward/{wardId}',       [AnalyticsController::class, 'wardProfile'])      ->name('ward-profile');
+        Route::get('/ward-summary',        [AnalyticsController::class, 'wardSummaryPage'])     ->name('ward-summary');
+        Route::get('/ward-profile',        [AnalyticsController::class, 'wardProfileDefault']) ->name('ward-profile');
+        Route::get('/ward/{wardId}',       [AnalyticsController::class, 'wardProfile'])        ->name('ward-profile.ward');
     });
 
     // ── Public Business Reports ──────────────────────────────────────────────
@@ -260,6 +271,15 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
             Route::get('/edit-requests',                         [EditRequestController::class, 'index'])  ->name('edit-requests.index');
             Route::patch('/edit-requests/{editRequest}/approve', [EditRequestController::class, 'approve'])->name('edit-requests.approve');
             Route::patch('/edit-requests/{editRequest}/reject',  [EditRequestController::class, 'reject']) ->name('edit-requests.reject');
+        });
+
+    // ─── Feedback routes — ward_admin+ (hasPermission enforced inside controller) ───
+    Route::middleware(['role:ward_admin,municipal_admin,super_admin'])
+        ->prefix('admin')->name('admin.')->group(function () {
+            Route::get('/feedback',               [AdminFeedbackController::class, 'index'])  ->name('feedback');
+            Route::get('/feedback/export',        [AdminFeedbackController::class, 'export']) ->name('feedback.export');
+            Route::patch('/feedback/{feedback}',  [AdminFeedbackController::class, 'update']) ->name('feedback.update');
+            Route::delete('/feedback/{feedback}', [AdminFeedbackController::class, 'destroy'])->name('feedback.destroy');
         });
 
     // ─── Admin Routes ────────────────────────────────────────────────────────

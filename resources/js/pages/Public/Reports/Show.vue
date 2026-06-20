@@ -108,26 +108,20 @@
       <p class="text-[14px] font-medium text-[#626976]">{{ t('reports.noData') }}</p>
     </div>
 
-    <!-- ── Bottom: navigate other categories ── -->
-    <div class="border-t border-[#e6e7e9] pt-5">
-      <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9aa0ac] mb-3">
-        {{ t('reports.otherCategories') }}
-      </p>
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        <a v-for="cat in otherCategories" :key="cat.href"
-          :href="filteredHref(cat.href)"
-          class="flex items-center gap-2.5 px-3 py-2.5 bg-white border border-[#e6e7e9]
-                 rounded-lg hover:border-[#206bc4]/40 hover:bg-[#206bc4]/4 transition
-                 no-underline group">
-          <span class="text-[18px] shrink-0">{{ cat.icon }}</span>
-          <span class="text-[13px] font-medium text-[#1d273b] group-hover:text-[#206bc4]
-                       transition truncate">
-            {{ t(cat.labelKey) }}
-          </span>
-          <i class="fa-solid fa-arrow-right text-[10px] text-[#c8ccd4]
-                    group-hover:text-[#206bc4] ml-auto transition"></i>
-        </a>
-      </div>
+    <!-- ── Bottom: quick adjacent navigation ── -->
+    <div class="border-t border-[#e6e7e9] pt-4 flex flex-wrap items-center gap-2">
+      <span class="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9aa0ac] shrink-0">
+        {{ t('reports.otherCategories') }}:
+      </span>
+      <a v-for="cat in otherCategories" :key="cat.href"
+        :href="filteredHref(cat.href)"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-[#e6e7e9]
+               rounded-full text-[12px] font-medium text-[#626976]
+               hover:border-[#206bc4]/40 hover:text-[#206bc4] hover:bg-[#206bc4]/4
+               transition no-underline">
+        <span class="text-[13px] leading-none">{{ cat.icon }}</span>
+        {{ t(cat.labelKey) }}
+      </a>
     </div>
 
   </div>
@@ -166,19 +160,25 @@ function filteredHref(base) {
 
 // ── Category metadata (icon + bg) ─────────────────────────────────────────────
 const CAT_META = {
-  'demographics':     { icon: '👥', bgRaw: '#eef2f8' },
-  'age-groups':       { icon: '📅', bgRaw: '#ecfdf5' },
-  'education':        { icon: '🎓', bgRaw: '#f9f0ff' },
-  'health':           { icon: '🏥', bgRaw: '#fff5f5' },
-  'employment':       { icon: '💼', bgRaw: '#fff4e6' },
-  'housing':          { icon: '🏠', bgRaw: '#fffbe6' },
-  'utilities':        { icon: '💧', bgRaw: '#ebf8ff' },
-  'economics':        { icon: '💰', bgRaw: '#f0fff4' },
-  'agriculture':      { icon: '🌾', bgRaw: '#f4f9f0' },
-  'migration':        { icon: '✈️',  bgRaw: '#f0f4ff' },
-  'child-development':{ icon: '👶', bgRaw: '#ecfdf5' },
-  'documents':        { icon: '🪪', bgRaw: '#fff8f0' },
-  'disaster':         { icon: '🔴', bgRaw: '#fff5f5' },
+  'demographics':        { icon: '👥', bgRaw: '#eef2f8' },
+  'age-groups':          { icon: '📅', bgRaw: '#ecfdf5' },
+  'education':           { icon: '🎓', bgRaw: '#f9f0ff' },
+  'health':              { icon: '🏥', bgRaw: '#fff5f5' },
+  'employment':          { icon: '💼', bgRaw: '#fff4e6' },
+  'housing':             { icon: '🏠', bgRaw: '#fffbe6' },
+  'utilities':           { icon: '💧', bgRaw: '#ebf8ff' },
+  'economics':           { icon: '💰', bgRaw: '#f0fff4' },
+  'agriculture':         { icon: '🌾', bgRaw: '#f4f9f0' },
+  'migration':           { icon: '✈️',  bgRaw: '#f0f4ff' },
+  'child-development':   { icon: '👶', bgRaw: '#ecfdf5' },
+  'documents':           { icon: '🪪', bgRaw: '#fff8f0' },
+  'disaster':            { icon: '🔴', bgRaw: '#fff5f5' },
+  'women-empowerment':   { icon: '👩', bgRaw: '#fce7f3' },
+  'digital-connectivity':{ icon: '📱', bgRaw: '#eff6ff' },
+  'social-security':     { icon: '🛡️', bgRaw: '#f0fdf4' },
+  'livestock-detail':    { icon: '🐄', bgRaw: '#fefce8' },
+  'land-agriculture':    { icon: '🌱', bgRaw: '#f0fdf4' },
+  'development-index':   { icon: '📈', bgRaw: '#f0f9ff' },
 }
 const catMeta = computed(() => CAT_META[props.category] ?? { icon: '📊', bgRaw: '#f8f9fb' })
 
@@ -244,19 +244,25 @@ onUnmounted(() => observer?.disconnect())
 
 // ── Other category links ──────────────────────────────────────────────────────
 const ALL_CATEGORIES = [
-  { route: 'demographics',     href: '/public/reports/demographics',      icon: '👥', labelKey: 'reports.cat.demographics'    },
-  { route: 'age-groups',       href: '/public/reports/age-groups',        icon: '📅', labelKey: 'reports.cat.ageGroups'        },
-  { route: 'education',        href: '/public/reports/education',          icon: '🎓', labelKey: 'reports.cat.education'        },
-  { route: 'health',           href: '/public/reports/health',             icon: '🏥', labelKey: 'reports.cat.health'           },
-  { route: 'employment',       href: '/public/reports/employment',         icon: '💼', labelKey: 'reports.cat.employment'       },
-  { route: 'housing',          href: '/public/reports/housing',            icon: '🏠', labelKey: 'reports.cat.housing'          },
-  { route: 'utilities',        href: '/public/reports/utilities',          icon: '💧', labelKey: 'reports.cat.utilities'        },
-  { route: 'economics',        href: '/public/reports/economics',          icon: '💰', labelKey: 'reports.cat.economics'        },
-  { route: 'agriculture',      href: '/public/reports/agriculture',        icon: '🌾', labelKey: 'reports.cat.agriculture'      },
-  { route: 'migration',        href: '/public/reports/migration',          icon: '✈️',  labelKey: 'reports.cat.migration'         },
-  { route: 'child-development',href: '/public/reports/child-development',  icon: '👶', labelKey: 'reports.cat.childDevelopment' },
-  { route: 'documents',        href: '/public/reports/documents',          icon: '🪪', labelKey: 'reports.cat.documents'        },
-  { route: 'disaster',         href: '/public/reports/disaster',           icon: '🔴', labelKey: 'reports.cat.disaster'         },
+  { route: 'demographics',        href: '/public/reports/demographics',        icon: '👥', labelKey: 'reports.cat.demographics'       },
+  { route: 'age-groups',          href: '/public/reports/age-groups',          icon: '📅', labelKey: 'reports.cat.ageGroups'           },
+  { route: 'education',           href: '/public/reports/education',            icon: '🎓', labelKey: 'reports.cat.education'           },
+  { route: 'health',              href: '/public/reports/health',               icon: '🏥', labelKey: 'reports.cat.health'              },
+  { route: 'employment',          href: '/public/reports/employment',           icon: '💼', labelKey: 'reports.cat.employment'          },
+  { route: 'housing',             href: '/public/reports/housing',              icon: '🏠', labelKey: 'reports.cat.housing'             },
+  { route: 'utilities',           href: '/public/reports/utilities',            icon: '💧', labelKey: 'reports.cat.utilities'           },
+  { route: 'economics',           href: '/public/reports/economics',            icon: '💰', labelKey: 'reports.cat.economics'           },
+  { route: 'agriculture',         href: '/public/reports/agriculture',          icon: '🌾', labelKey: 'reports.cat.agriculture'         },
+  { route: 'migration',           href: '/public/reports/migration',            icon: '✈️',  labelKey: 'reports.cat.migration'           },
+  { route: 'child-development',   href: '/public/reports/child-development',    icon: '👶', labelKey: 'reports.cat.childDevelopment'    },
+  { route: 'documents',           href: '/public/reports/documents',            icon: '🪪', labelKey: 'reports.cat.documents'           },
+  { route: 'disaster',            href: '/public/reports/disaster',             icon: '🔴', labelKey: 'reports.cat.disaster'            },
+  { route: 'women-empowerment',   href: '/public/reports/women-empowerment',   icon: '👩', labelKey: 'reports.cat.womenEmpowerment'   },
+  { route: 'digital-connectivity',href: '/public/reports/digital-connectivity',icon: '📱', labelKey: 'reports.cat.digitalConnectivity' },
+  { route: 'social-security',     href: '/public/reports/social-security',     icon: '🛡️', labelKey: 'reports.cat.socialSecurity'     },
+  { route: 'livestock-detail',    href: '/public/reports/livestock-detail',    icon: '🐄', labelKey: 'reports.cat.livestockDetail'    },
+  { route: 'land-agriculture',    href: '/public/reports/land-agriculture',    icon: '🌱', labelKey: 'reports.cat.landAgriculture'    },
+  { route: 'development-index',   href: '/public/reports/development-index',   icon: '📈', labelKey: 'reports.cat.developmentIndex'   },
 ]
 
 const otherCategories = computed(() =>

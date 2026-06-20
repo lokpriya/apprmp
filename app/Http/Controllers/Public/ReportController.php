@@ -140,11 +140,65 @@ class ReportController extends Controller
             $ck . '_age'
         );
 
+        $occupationData = CrossTabService::freq(
+            clone $mq,
+            'occupation_type',
+            CrossTabService::optionLabels('occupation'),
+            $ck . '_occ'
+        );
+
+        $educationData = CrossTabService::freq(
+            clone $mq,
+            'education_level',
+            CrossTabService::optionLabels('education_level'),
+            $ck . '_edu'
+        );
+
+        // Per-ward population + household counts
+        $allLgWards  = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
+        $hhByWard    = DB::table('households')
+            ->whereIn('ward_id', $allLgWards->pluck('id'))
+            ->where('status', 'published')
+            ->select('ward_id', DB::raw('count(*) as cnt'))
+            ->groupBy('ward_id')->pluck('cnt', 'ward_id');
+        $popByWard   = DB::table('household_members')
+            ->join('households', 'household_members.household_id', '=', 'households.id')
+            ->whereIn('households.ward_id', $allLgWards->pluck('id'))
+            ->where('households.status', 'published')
+            ->where('household_members.is_deceased', false)
+            ->select('households.ward_id', DB::raw('count(*) as cnt'))
+            ->groupBy('households.ward_id')->pluck('cnt', 'ward_id');
+
+        $wardData = $allLgWards->map(fn($w) => [
+            'ward_number' => $w->ward_number,
+            'population'  => (int)($popByWard->get($w->id, 0)),
+            'households'  => (int)($hhByWard->get($w->id, 0)),
+        ])->values();
+
+        // Key indicators
+        $litCount = (clone $mq)
+            ->whereNotNull('education_level')->where('education_level', '!=', '')
+            ->whereRaw("LOWER(education_level) NOT IN ('illitrate','illiterate')")
+            ->count();
+        $totalPop = $summary['total_population'];
+        $totalHH  = $summary['total_households'];
+
+        $keyIndicators = [
+            'sex_ratio'    => $summary['total_female'] > 0
+                ? round($summary['total_male'] / $summary['total_female'] * 100) : 0,
+            'literacy_rate' => $totalPop > 0 ? round($litCount / $totalPop * 100, 1) : 0,
+            'avg_hh_size'  => $totalHH > 0 ? round($totalPop / $totalHH, 2) : 0,
+        ];
+
         return Inertia::render('Public/Reports/Index', [
-            'lg'         => $this->lgProps($lg),
-            'summary'    => $summary,
-            'genderData' => $genderData,
-            'ageData'    => $ageData,
+            'lg'             => $this->lgProps($lg),
+            'summary'        => $summary,
+            'genderData'     => $genderData,
+            'ageData'        => $ageData,
+            'occupationData' => $occupationData,
+            'educationData'  => $educationData,
+            'wardData'       => $wardData,
+            'keyIndicators'  => $keyIndicators,
             ...$this->filterProps($lg, $request),
         ]);
     }
@@ -208,6 +262,19 @@ class ReportController extends Controller
             $ck . '_ethxgender'
         );
 
+        $maritalByGender = CrossTabService::tab(
+            clone $mq,
+            'marital_status',
+            'gender',
+            CrossTabService::optionLabels('marital_status'),
+            CrossTabService::genderLabels(),
+            $ck . '_maritalxgender'
+        );
+
+        $maritalFreq = CrossTabService::freq(
+            clone $mq, 'marital_status', CrossTabService::optionLabels('marital_status'), $ck . '_marital'
+        );
+
         return Inertia::render('Public/Reports/Show', [
             'lg'               => $this->lgProps($lg),
             'category'         => 'demographics',
@@ -233,6 +300,12 @@ class ReportController extends Controller
                     'title_en'=> 'Ethnicity by Gender',
                     'data'    => $ethnicityByGender,
                 ],
+                [
+                    'id'      => 'marital_by_gender',
+                    'title'   => 'वैवाहिक अवस्था अनुसार लिङ्ग',
+                    'title_en'=> 'Marital Status by Gender',
+                    'data'    => $maritalByGender,
+                ],
             ],
             'frequencies'      => [
                 [
@@ -252,6 +325,12 @@ class ReportController extends Controller
                     'title'   => 'मातृभाषा अनुसार जनसंख्या',
                     'title_en'=> 'Mother Tongue Distribution',
                     'data'    => $motherTongueFreq,
+                ],
+                [
+                    'id'      => 'marital',
+                    'title'   => 'वैवाहिक अवस्था',
+                    'title_en'=> 'Marital Status',
+                    'data'    => $maritalFreq,
                 ],
             ],
         ]);
@@ -289,9 +368,9 @@ class ReportController extends Controller
 
         $literacyByGender = CrossTabService::tab(
             clone $mq,
-            'is_literate',
+            "IF(is_literate = 1 OR LOWER(is_literate) = 'yes', 'yes', 'no')",
             'gender',
-            ['1' => 'साक्षर', '0' => 'निरक्षर'],
+            ['yes' => 'साक्षर', 'no' => 'निरक्षर'],
             CrossTabService::genderLabels(),
             $ck . '_litxgender'
         );
@@ -310,7 +389,7 @@ class ReportController extends Controller
 
         $vocTrainingByGender = CrossTabService::tab(
             clone $mq,
-            'vocational_training',
+            "IF(vocational_training = 1 OR LOWER(vocational_training) = 'yes', 'yes', 'no')",
             'gender',
             ['yes' => 'छ', 'no' => 'छैन'],
             CrossTabService::genderLabels(),
@@ -384,9 +463,12 @@ class ReportController extends Controller
         $mq      = $this->memberQuery($wardIds, $request);
         $ck      = CrossTabService::cacheKey('health', $lg->id, $request->only(['ward_id','settlement_id','gender']));
 
+        // Boolean columns stored as 0/1 tinyint — normalise to 'yes'/'no' for rowDef matching
+        $boolExpr = fn(string $col) => "IF({$col} = 1 OR LOWER({$col}) = 'yes', 'yes', 'no')";
+
         $disabilityByGender = CrossTabService::tab(
             clone $mq,
-            'disability_status',
+            $boolExpr('disability_status'),
             'gender',
             ['yes' => 'अपाङ्गता छ', 'no' => 'अपाङ्गता छैन'],
             CrossTabService::genderLabels(),
@@ -394,12 +476,13 @@ class ReportController extends Controller
         );
 
         $disabilityTypeFreq = CrossTabService::freq(
-            clone $mq, 'disability_type', CrossTabService::optionLabels('disability_type'), $ck . '_dis_type'
+            (clone $mq)->where('disability_status', 1),
+            'disability_type', CrossTabService::optionLabels('disability_type'), $ck . '_dis_type'
         );
 
         $chronicByGender = CrossTabService::tab(
             clone $mq,
-            'chronic_illness',
+            $boolExpr('chronic_illness'),
             'gender',
             ['yes' => 'दीर्घ रोग छ', 'no' => 'दीर्घ रोग छैन'],
             CrossTabService::genderLabels(),
@@ -412,7 +495,7 @@ class ReportController extends Controller
 
         $smokingByGender = CrossTabService::tab(
             clone $mq,
-            'smoking_drinking',
+            $boolExpr('smoking_drinking'),
             'gender',
             ['yes' => 'छ', 'no' => 'छैन'],
             CrossTabService::genderLabels(),
@@ -435,20 +518,11 @@ class ReportController extends Controller
         $childLabourMq = (clone $mq)->whereBetween('age', [6, 15]);
         $childLabourByGender = CrossTabService::tab(
             $childLabourMq,
-            'child_labor',
+            $boolExpr('child_labor'),
             'gender',
             ['yes' => 'बाल श्रम', 'no' => 'बाल श्रम छैन'],
             CrossTabService::genderLabels(),
             $ck . '_childlaborxgender'
-        );
-
-        $maritalByGender = CrossTabService::tab(
-            clone $mq,
-            'marital_status',
-            'gender',
-            CrossTabService::optionLabels('marital_status'),
-            CrossTabService::genderLabels(),
-            $ck . '_maritalxgender'
         );
 
         $bloodGroupFreq = CrossTabService::freq(
@@ -473,12 +547,6 @@ class ReportController extends Controller
                     'title'   => 'दीर्घ रोग अनुसार लिङ्ग',
                     'title_en'=> 'Chronic Illness by Gender',
                     'data'    => $chronicByGender,
-                ],
-                [
-                    'id'      => 'marital_by_gender',
-                    'title'   => 'वैवाहिक अवस्था अनुसार लिङ्ग',
-                    'title_en'=> 'Marital Status by Gender',
-                    'data'    => $maritalByGender,
                 ],
                 [
                     'id'      => 'smoking_by_gender',
@@ -572,21 +640,23 @@ class ReportController extends Controller
         );
 
         $vtSubjectFreq = CrossTabService::freq(
-            (clone $mq)->where('vocational_training', 'yes'),
+            (clone $mq)->where('vocational_training', 1),
             'vt_subject',
             CrossTabService::optionLabels('vt_subject'),
             $ck . '_vt_subject'
         );
 
+        $boolExpr = fn(string $col) => "IF({$col} = 1 OR LOWER({$col}) = 'yes', 'yes', 'no')";
+
         $techTrainingFreq = CrossTabService::freq(
-            clone $mq, 'techtraining',
-            ['1' => 'प्राविधिक तालिम लिएको', '0' => 'प्राविधिक तालिम नलिएको'],
+            clone $mq, $boolExpr('techtraining'),
+            ['yes' => 'प्राविधिक तालिम लिएको', 'no' => 'प्राविधिक तालिम नलिएको'],
             $ck . '_techtraining'
         );
 
         $saTrainingFreq = CrossTabService::freq(
-            clone $mq, 'sa_training',
-            ['1' => 'साक्षरता/अन्य तालिम लिएको', '0' => 'नलिएको'],
+            clone $mq, $boolExpr('sa_training'),
+            ['yes' => 'साक्षरता/अन्य तालिम लिएको', 'no' => 'नलिएको'],
             $ck . '_sa_training'
         );
 
@@ -1012,19 +1082,29 @@ class ReportController extends Controller
         $mq      = $this->memberQuery($wardIds, $request);
         $ck      = CrossTabService::cacheKey('migr', $lg->id, $request->only(['ward_id', 'settlement_id', 'gender']));
 
+        // Kobo stores full Nepali text in addrslocation — map to shorter display labels
+        $addrLabels = [
+            'गणना गरेको ठाउँमा बसेको'                         => 'गणनास्थलमा उपस्थित',
+            'स्वदेशमा अन्यत्र (६ महिना भन्दा बढी समय देखि)'   => 'स्वदेशमा अन्यत्र',
+            'विदेशमा बसेको (६ महिना भन्दा बढी समय देखि)'      => 'विदेशमा',
+        ];
+
+        // 1. Overall residence distribution
         $residenceFreq = CrossTabService::freq(
-            clone $mq, 'residence_status', CrossTabService::optionLabels('residence_status'), $ck . '_residence'
+            clone $mq, 'addrslocation', $addrLabels, $ck . '_residence'
         );
 
+        // 2. Residence × gender
         $residenceByGender = CrossTabService::tab(
             clone $mq,
-            'residence_status',
+            'addrslocation',
             'gender',
-            CrossTabService::optionLabels('residence_status'),
+            $addrLabels,
             CrossTabService::genderLabels(),
             $ck . '_resxgender'
         );
 
+        // 3. Residence × ward
         $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
         $wardColDef = CrossTabService::wardColDef($wards);
 
@@ -1032,38 +1112,53 @@ class ReportController extends Controller
             (clone $mq)
                 ->join('households', 'household_members.household_id', '=', 'households.id')
                 ->join('wards', 'households.ward_id', '=', 'wards.id'),
-            'household_members.residence_status',
+            'household_members.addrslocation',
             'wards.ward_number',
-            CrossTabService::optionLabels('residence_status'),
+            $addrLabels,
             $wardColDef,
             $ck . '_resxward'
         );
 
-        // Abroad-specific members only
-        $abroadMq = (clone $mq)->where('residence_status', 'abroad');
-
-        $abroadJobFreq = CrossTabService::freq(
-            clone $abroadMq, 'typeofabroadjob', CrossTabService::optionLabels('typeofabroadjob'), $ck . '_abroad_job'
-        );
-
-        $abroadStatusFreq = CrossTabService::freq(
-            clone $abroadMq, 'abroadjobstatus', CrossTabService::optionLabels('abroadjobstatus'), $ck . '_abroad_status'
-        );
-
-        $abroadJobByGender = CrossTabService::tab(
-            clone $abroadMq,
-            'typeofabroadjob',
-            'gender',
-            CrossTabService::optionLabels('typeofabroadjob'),
-            CrossTabService::genderLabels(),
-            $ck . '_abroadxgender'
-        );
-
-        // Internal migration (district of residence)
-        $internalMq   = (clone $mq)->whereNotNull('addrslocation')->where('residence_status', '!=', 'abroad');
+        // 4. Internal migration — district-wise breakdown
+        $internalKey  = 'स्वदेशमा अन्यत्र (६ महिना भन्दा बढी समय देखि)';
+        $internalMq   = (clone $mq)->where('addrslocation', $internalKey)->whereNotNull('residing_district')->where('residing_district', '!=', '');
         $districtFreq = CrossTabService::freq(
-            $internalMq, 'addrslocation', CrossTabService::optionLabels('addrslocation'), $ck . '_district'
+            $internalMq, 'residing_district', [], $ck . '_district'
         );
+
+        // 5. Abroad — job type & status (may be empty if not captured in this sync version)
+        $abroadKey    = 'विदेशमा बसेको (६ महिना भन्दा बढी समय देखि)';
+        $abroadMq     = (clone $mq)->where('addrslocation', $abroadKey);
+        $abroadCount  = (clone $abroadMq)->count();
+
+        $abroadJobFreq    = $abroadCount ? CrossTabService::freq(clone $abroadMq, 'typeofabroadjob', CrossTabService::optionLabels('typeofabroadjob'), $ck . '_abroad_job')    : [];
+        $abroadStatusFreq = $abroadCount ? CrossTabService::freq(clone $abroadMq, 'abroadjobstatus', CrossTabService::optionLabels('abroadjobstatus'), $ck . '_abroad_status') : [];
+        $countryFreq      = $abroadCount ? CrossTabService::freq(clone $abroadMq, 'residing_country', CrossTabService::optionLabels('residing_country'), $ck . '_country')      : [];
+
+        // Build tables — only include abroad cross-tabs if there's data
+        $tables = [
+            [
+                'id'       => 'residence_by_gender',
+                'title'    => 'बसोबास अवस्था अनुसार लिङ्ग',
+                'title_en' => 'Residence Status by Gender',
+                'data'     => $residenceByGender,
+            ],
+            [
+                'id'       => 'residence_by_ward',
+                'title'    => 'बसोबास अवस्था अनुसार वडा',
+                'title_en' => 'Residence Status by Ward',
+                'data'     => $residenceByWard,
+            ],
+        ];
+
+        // Build frequencies — filter out empty ones
+        $frequencies = array_values(array_filter([
+            $residenceFreq  ? ['id' => 'residence',     'title' => 'बसोबास अवस्था',              'title_en' => 'Residence Status',            'data' => $residenceFreq]  : null,
+            $districtFreq   ? ['id' => 'district',      'title' => 'स्वदेश बसाइँसरीको जिल्ला',   'title_en' => 'Internal Migration District', 'data' => $districtFreq]   : null,
+            $countryFreq    ? ['id' => 'country',       'title' => 'विदेशमा बसेको देश',           'title_en' => 'Country of Residence Abroad', 'data' => $countryFreq]    : null,
+            $abroadJobFreq  ? ['id' => 'abroad_job',    'title' => 'विदेशी रोजगारको प्रकार',     'title_en' => 'Type of Abroad Job',          'data' => $abroadJobFreq]  : null,
+            $abroadStatusFreq ? ['id' => 'abroad_status','title' => 'विदेशी रोजगार अवस्था',      'title_en' => 'Abroad Job Status',           'data' => $abroadStatusFreq] : null,
+        ]));
 
         return Inertia::render('Public/Reports/Show', [
             'lg'          => $this->lgProps($lg),
@@ -1071,32 +1166,8 @@ class ReportController extends Controller
             'title'       => 'बसाइँसराइ तथा वैदेशिक रोजगार',
             'title_en'    => 'Migration & Abroad Employment',
             ...$this->filterProps($lg, $request),
-            'tables'      => [
-                [
-                    'id'      => 'residence_by_gender',
-                    'title'   => 'बसोबास अवस्था अनुसार लिङ्ग',
-                    'title_en'=> 'Residence Status by Gender',
-                    'data'    => $residenceByGender,
-                ],
-                [
-                    'id'      => 'residence_by_ward',
-                    'title'   => 'बसोबास अवस्था अनुसार वडा',
-                    'title_en'=> 'Residence Status by Ward',
-                    'data'    => $residenceByWard,
-                ],
-                [
-                    'id'      => 'abroad_job_by_gender',
-                    'title'   => 'विदेशी रोजगार प्रकार अनुसार लिङ्ग',
-                    'title_en'=> 'Abroad Job Type by Gender',
-                    'data'    => $abroadJobByGender,
-                ],
-            ],
-            'frequencies' => [
-                ['id' => 'residence',     'title' => 'बसोबास अवस्था',         'title_en' => 'Residence Status',       'data' => $residenceFreq],
-                ['id' => 'abroad_job',    'title' => 'विदेशी रोजगारको प्रकार', 'title_en' => 'Type of Abroad Job',     'data' => $abroadJobFreq],
-                ['id' => 'abroad_status', 'title' => 'विदेशी रोजगार अवस्था',   'title_en' => 'Abroad Job Status',      'data' => $abroadStatusFreq],
-                ['id' => 'district',      'title' => 'देशभित्र बसोबासको जिल्ला','title_en' => 'Internal Residence District', 'data' => $districtFreq],
-            ],
+            'tables'      => $tables,
+            'frequencies' => $frequencies,
         ]);
     }
 
@@ -1418,6 +1489,491 @@ class ReportController extends Controller
                 ],
             ],
             'frequencies' => $frequencies,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 15. Women Empowerment
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function womenEmpowerment(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
+        $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
+        $mq      = $this->memberQuery($wardIds, $request);
+        $ck      = CrossTabService::cacheKey('women', $lg->id, $request->only(['ward_id', 'settlement_id']));
+
+        $litExpr = "CASE WHEN LOWER(education_level) NOT IN ('illitrate','illiterate') AND education_level IS NOT NULL AND education_level != '' THEN 'साक्षर' ELSE 'निरक्षर' END";
+
+        $litByGender = CrossTabService::tab(
+            clone $mq,
+            $litExpr,
+            'gender',
+            ['साक्षर' => 'साक्षर', 'निरक्षर' => 'निरक्षर'],
+            CrossTabService::genderLabels(),
+            $ck . '_lit_gender'
+        );
+
+        $citizenshipByGender = CrossTabService::tab(
+            clone($mq)->where('age', '>=', 16),
+            'has_citizenship',
+            'gender',
+            ['1' => 'नागरिकता छ', '0' => 'नागरिकता छैन'],
+            CrossTabService::genderLabels(),
+            $ck . '_cit_gender'
+        );
+
+        $femaleOccupation = CrossTabService::freq(
+            clone($mq)->where('gender', 'female'),
+            'occupation_type',
+            CrossTabService::optionLabels('occupation'),
+            $ck . '_f_occ'
+        );
+
+        $femaleEmployment = CrossTabService::freq(
+            clone($mq)->where('gender', 'female'),
+            'employment_status',
+            CrossTabService::optionLabels('employment_status'),
+            $ck . '_f_emp'
+        );
+
+        $maritalFemale = CrossTabService::freq(
+            clone($mq)->where('gender', 'female')->where('age', '>=', 15),
+            'marital_status',
+            CrossTabService::optionLabels('marital_status'),
+            $ck . '_marital_f'
+        );
+
+        // ss_allowance is boolean 0/1 — use boolFreq pattern
+        $femaleSsYes = (clone $mq)->where('gender', 'female')->where('ss_allowance', true)->count();
+        $femaleSsNo  = (clone $mq)->where('gender', 'female')->where('ss_allowance', false)->count();
+        $ssAllowanceFemale = array_values(array_filter([
+            $femaleSsYes ? ['key' => 'yes', 'label' => 'सामाजिक सुरक्षा भत्ता पाउँछ', 'count' => $femaleSsYes] : null,
+            $femaleSsNo  ? ['key' => 'no',  'label' => 'पाउँदैनन्',                     'count' => $femaleSsNo]  : null,
+        ]));
+
+        $femaleDisability = CrossTabService::freq(
+            clone($mq)->where('gender', 'female')->where('disability_status', true),
+            'disability_type',
+            CrossTabService::optionLabels('disability_type'),
+            $ck . '_f_dis'
+        );
+
+        $frequencies = array_values(array_filter([
+            ['id' => 'female_occupation',   'title' => 'महिला — पेसाको प्रकार',         'title_en' => 'Women by Occupation',     'data' => $femaleOccupation],
+            ['id' => 'female_employment',   'title' => 'महिला — रोजगारी अवस्था',         'title_en' => 'Women Employment Status', 'data' => $femaleEmployment],
+            ['id' => 'marital_female',      'title' => 'महिला (१५+) — वैवाहिक अवस्था',  'title_en' => 'Marital Status of Women', 'data' => $maritalFemale],
+            ['id' => 'ss_allowance_female', 'title' => 'महिला — सामाजिक सुरक्षा भत्ता', 'title_en' => 'Women Social Security',  'data' => $ssAllowanceFemale],
+            ['id' => 'female_disability',   'title' => 'महिला — अपाङ्गताको प्रकार',     'title_en' => 'Female Disability Types', 'data' => $femaleDisability],
+        ], fn($f) => !empty($f['data'])));
+
+        return Inertia::render('Public/Reports/Show', [
+            'lg'          => $this->lgProps($lg),
+            'category'    => 'women-empowerment',
+            'title'       => 'महिला सशक्तीकरण',
+            'title_en'    => 'Women Empowerment',
+            ...$this->filterProps($lg, $request),
+            'tables'      => array_values(array_filter([
+                ['id' => 'lit_by_gender', 'title' => 'साक्षरता — लिङ्गअनुसार',           'title_en' => 'Literacy by Gender',          'data' => $litByGender],
+                ['id' => 'cit_by_gender', 'title' => 'नागरिकता — लिङ्गअनुसार (१६+)',     'title_en' => 'Citizenship by Gender (16+)', 'data' => $citizenshipByGender],
+            ], fn($t) => !empty($t['data']['grand_total']))),
+            'frequencies' => $frequencies,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 16. Digital & Connectivity
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function digitalConnectivity(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
+        $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
+        $mq      = $this->memberQuery($wardIds, $request);
+        $uq      = fn() => HouseholdUtility::whereHas('household', fn($q) =>
+            $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
+        );
+        $ck      = CrossTabService::cacheKey('digital', $lg->id, $request->only(['ward_id', 'settlement_id']));
+
+        $phoneByGender = CrossTabService::tab(
+            clone $mq,
+            'has_phone',
+            'gender',
+            ['1' => 'फोन छ', '0' => 'फोन छैन'],
+            CrossTabService::genderLabels(),
+            $ck . '_phone_gender'
+        );
+
+        $emailByGender = CrossTabService::tab(
+            clone $mq,
+            'has_email',
+            'gender',
+            ['1' => 'इमेल छ', '0' => 'इमेल छैन'],
+            CrossTabService::genderLabels(),
+            $ck . '_email_gender'
+        );
+
+        $phoneByAge = CrossTabService::tab(
+            clone $mq,
+            'has_phone',
+            CrossTabService::ageGroupExpr(),
+            ['1' => 'फोन छ', '0' => 'फोन छैन'],
+            CrossTabService::ageGroupLabels(),
+            $ck . '_phone_age'
+        );
+
+        $internetFreq = CrossTabService::freq($uq(), 'internet_type', CrossTabService::optionLabels('internet_type'), $ck . '_internet');
+
+        $total    = (clone $mq)->count();
+        $boolFreq = function (string $col, string $yes, string $no) use ($mq, $total): array {
+            $yesCount = (clone $mq)->where($col, true)->count();
+            $noCount  = $total - $yesCount;
+            return array_values(array_filter([
+                $yesCount ? ['key' => 'yes', 'label' => $yes, 'count' => $yesCount] : null,
+                $noCount  ? ['key' => 'no',  'label' => $no,  'count' => $noCount]  : null,
+            ]));
+        };
+
+        $phoneFreq = $boolFreq('has_phone', 'फोन/मोबाइल छ', 'फोन/मोबाइल छैन');
+        $emailFreq = $boolFreq('has_email', 'इमेल खाता छ',   'इमेल खाता छैन');
+
+        $frequencies = array_values(array_filter([
+            ['id' => 'phone',    'title' => 'फोन/मोबाइल स्वामित्व',         'title_en' => 'Phone Ownership',          'data' => $phoneFreq],
+            ['id' => 'email',    'title' => 'इमेल खाता स्थिति',              'title_en' => 'Email Account',            'data' => $emailFreq],
+            ['id' => 'internet', 'title' => 'इन्टरनेट सेवा (परिवारस्तर)',   'title_en' => 'Internet Type (Household)', 'data' => $internetFreq],
+        ], fn($f) => !empty($f['data'])));
+
+        return Inertia::render('Public/Reports/Show', [
+            'lg'          => $this->lgProps($lg),
+            'category'    => 'digital-connectivity',
+            'title'       => 'डिजिटल तथा सञ्चार पहुँच',
+            'title_en'    => 'Digital & Connectivity',
+            ...$this->filterProps($lg, $request),
+            'tables'      => array_values(array_filter([
+                ['id' => 'phone_gender', 'title' => 'फोन — लिङ्गअनुसार',      'title_en' => 'Phone by Gender',    'data' => $phoneByGender],
+                ['id' => 'email_gender', 'title' => 'इमेल — लिङ्गअनुसार',     'title_en' => 'Email by Gender',    'data' => $emailByGender],
+                ['id' => 'phone_age',    'title' => 'फोन — उमेर समूहअनुसार',   'title_en' => 'Phone by Age Group', 'data' => $phoneByAge],
+            ], fn($t) => !empty($t['data']['grand_total']))),
+            'frequencies' => $frequencies,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 17. Social Security & Economic Access
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function socialSecurity(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
+        $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
+        $mq      = $this->memberQuery($wardIds, $request);
+        $eq      = fn() => HouseholdEconomic::whereHas('household', fn($q) =>
+            $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
+        );
+        $ck      = CrossTabService::cacheKey('social_sec', $lg->id, $request->only(['ward_id', 'settlement_id']));
+
+        // ss_allowance is boolean 0/1
+        $ssTotalCount  = (clone $mq)->count();
+        $ssRecipients  = (clone $mq)->where('ss_allowance', true)->count();
+        $ssNonRecip    = $ssTotalCount - $ssRecipients;
+        $ssFreq = array_values(array_filter([
+            $ssRecipients ? ['key' => 'yes', 'label' => 'सामाजिक सुरक्षा भत्ता पाउँछ', 'count' => $ssRecipients] : null,
+            $ssNonRecip   ? ['key' => 'no',  'label' => 'भत्ता पाउँदैनन्',               'count' => $ssNonRecip]   : null,
+        ]));
+
+        $ssByGender = CrossTabService::tab(
+            clone $mq,
+            'ss_allowance',
+            'gender',
+            ['1' => 'सामाजिक सुरक्षा भत्ता छ', '0' => 'भत्ता छैन'],
+            CrossTabService::genderLabels(),
+            $ck . '_ss_gender'
+        );
+
+        $eqTotal  = $eq()->count();
+        $boolFreq = function (string $col, string $yes, string $no) use ($eq, $eqTotal): array {
+            $yesCount = (clone $eq())->where($col, true)->count();
+            $noCount  = $eqTotal - $yesCount;
+            return array_values(array_filter([
+                $yesCount ? ['key' => 'yes', 'label' => $yes, 'count' => $yesCount] : null,
+                $noCount  ? ['key' => 'no',  'label' => $no,  'count' => $noCount]  : null,
+            ]));
+        };
+
+        $bankFreq    = $boolFreq('has_bank_account', 'बैंक खाता छ',         'बैंक खाता छैन');
+        $povertyFreq = $boolFreq('poverty_card',     'लक्षित वर्ग कार्ड छ', 'कार्ड छैन');
+
+        $insuranceFreq = CrossTabService::freq($eq(), 'has_insurance', CrossTabService::optionLabels('has_insurance'), $ck . '_insurance');
+
+        $disabilityCardFreq = CrossTabService::freq(
+            clone($mq)->where('disability_status', true)->whereNotNull('disability_card')->where('disability_card', '!=', ''),
+            'disability_card',
+            CrossTabService::optionLabels('disability_card'),
+            $ck . '_dis_card'
+        );
+
+        $wards = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
+        $wardColDef = CrossTabService::wardColDef($wards);
+
+        $bankByWard = CrossTabService::tab(
+            HouseholdEconomic::whereHas('household', fn($q) =>
+                $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
+            )->join('households', 'household_economic.household_id', '=', 'households.id')
+             ->join('wards', 'households.ward_id', '=', 'wards.id'),
+            'has_bank_account',
+            'wards.ward_number',
+            ['1' => 'बैंक खाता छ', '0' => 'बैंक खाता छैन'],
+            $wardColDef,
+            $ck . '_bank_ward'
+        );
+
+        $frequencies = array_values(array_filter([
+            ['id' => 'ss_allowance',    'title' => 'सामाजिक सुरक्षा भत्ताका प्रकार', 'title_en' => 'Social Security Allowance Types', 'data' => $ssFreq],
+            ['id' => 'bank_account',    'title' => 'बैंक खाता स्थिति',                'title_en' => 'Bank Account Coverage',           'data' => $bankFreq],
+            ['id' => 'poverty_card',    'title' => 'लक्षित वर्ग परिचयपत्र',            'title_en' => 'Poverty / Target Card',           'data' => $povertyFreq],
+            ['id' => 'insurance',       'title' => 'बीमा स्थिति',                      'title_en' => 'Insurance Status',                'data' => $insuranceFreq],
+            ['id' => 'disability_card', 'title' => 'अपाङ्गता परिचयपत्र',               'title_en' => 'Disability Card (by Color)',      'data' => $disabilityCardFreq],
+        ], fn($f) => !empty($f['data'])));
+
+        return Inertia::render('Public/Reports/Show', [
+            'lg'          => $this->lgProps($lg),
+            'category'    => 'social-security',
+            'title'       => 'सामाजिक सुरक्षा तथा आर्थिक पहुँच',
+            'title_en'    => 'Social Security & Economic Access',
+            ...$this->filterProps($lg, $request),
+            'tables'      => array_values(array_filter([
+                ['id' => 'ss_gender', 'title' => 'सामाजिक सुरक्षा — लिङ्गअनुसार', 'title_en' => 'Social Security by Gender', 'data' => $ssByGender],
+                ['id' => 'bank_ward', 'title' => 'बैंक खाता — वडाअनुसार',           'title_en' => 'Bank Account by Ward',      'data' => $bankByWard],
+            ], fn($t) => !empty($t['data']['grand_total']))),
+            'frequencies' => $frequencies,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 18. Livestock Detail
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function livestockDetail(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
+        $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
+        $ck      = CrossTabService::cacheKey('livestock_det', $lg->id, $request->only(['ward_id']));
+
+        $lq = fn() => HouseholdLivestock::whereHas('household', fn($q) =>
+            $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
+        );
+
+        $aq = fn() => HouseholdAgriculture::whereHas('household', fn($q) =>
+            $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
+        );
+
+        $livestockFreq = CrossTabService::freq($lq(), 'livestock_type', CrossTabService::optionLabels('livestock_kind'), $ck . '_type');
+        $agriLoanFreq  = CrossTabService::freq($aq(), 'has_agri_loan',  CrossTabService::optionLabels('has_agri_loan'),  $ck . '_agri_loan');
+        $farmChallFreq = $this->jsonArrayFreq($aq(), 'Farm_Challenges', CrossTabService::optionLabels('farm_challenge'),  $ck . '_farm_ch');
+
+        $wards = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
+        $wardColDef = CrossTabService::wardColDef($wards);
+
+        $livestockByWard = CrossTabService::tab(
+            HouseholdLivestock::whereHas('household', fn($q) =>
+                $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
+            )->join('households', 'household_livestock.household_id', '=', 'households.id')
+             ->join('wards', 'households.ward_id', '=', 'wards.id'),
+            'livestock_type',
+            'wards.ward_number',
+            CrossTabService::optionLabels('livestock_kind'),
+            $wardColDef,
+            $ck . '_type_ward'
+        );
+
+        $frequencies = array_values(array_filter([
+            ['id' => 'livestock_type', 'title' => 'पशुपालनको प्रकार',    'title_en' => 'Livestock Type',       'data' => $livestockFreq],
+            ['id' => 'agri_loan',      'title' => 'कृषि ऋण',              'title_en' => 'Agricultural Loan',    'data' => $agriLoanFreq],
+            ['id' => 'farm_challenge', 'title' => 'कृषि चुनौतीहरू',       'title_en' => 'Farming Challenges',   'data' => $farmChallFreq],
+        ], fn($f) => !empty($f['data'])));
+
+        return Inertia::render('Public/Reports/Show', [
+            'lg'          => $this->lgProps($lg),
+            'category'    => 'livestock-detail',
+            'title'       => 'पशुधन विवरण',
+            'title_en'    => 'Livestock Detail',
+            ...$this->filterProps($lg, $request),
+            'tables'      => array_values(array_filter([
+                ['id' => 'livestock_ward', 'title' => 'पशुपालन — वडाअनुसार', 'title_en' => 'Livestock by Ward', 'data' => $livestockByWard],
+            ], fn($t) => !empty($t['data']['grand_total']))),
+            'frequencies' => $frequencies,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 19. Land & Agricultural Income
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function landAgriculture(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
+        $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
+        $ck      = CrossTabService::cacheKey('land_agri', $lg->id, $request->only(['ward_id']));
+
+        $aq = fn() => HouseholdAgriculture::whereHas('household', fn($q) =>
+            $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
+        );
+        $eq = fn() => HouseholdEconomic::whereHas('household', fn($q) =>
+            $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
+        );
+
+        $ownsLandFreq   = CrossTabService::freq($aq(), 'owns_land',            CrossTabService::optionLabels('owns_land'),         $ck . '_land');
+        $irrigationFreq = CrossTabService::freq($aq(), 'irrigation_source',    CrossTabService::optionLabels('irrigation_source'), $ck . '_irr');
+        $sellsFreq      = CrossTabService::freq($aq(), 'sells_produce',        CrossTabService::optionLabels('sells_produce'),     $ck . '_sells');
+        $agriCatFreq    = $this->jsonArrayFreq($aq(), 'agri_categories',       CrossTabService::optionLabels('agri_category'),     $ck . '_agri_cat');
+        $incomeFreq     = CrossTabService::freq($eq(), 'primary_income_source', CrossTabService::optionLabels('income_source'),    $ck . '_income');
+
+        $wards = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
+        $wardColDef = CrossTabService::wardColDef($wards);
+
+        $landByWard = CrossTabService::tab(
+            HouseholdAgriculture::whereHas('household', fn($q) =>
+                $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
+            )->join('households', 'household_agriculture.household_id', '=', 'households.id')
+             ->join('wards', 'households.ward_id', '=', 'wards.id'),
+            'owns_land',
+            'wards.ward_number',
+            CrossTabService::optionLabels('owns_land'),
+            $wardColDef,
+            $ck . '_land_ward'
+        );
+
+        $frequencies = array_values(array_filter([
+            ['id' => 'owns_land',     'title' => 'जमिन स्वामित्व',      'title_en' => 'Land Ownership',        'data' => $ownsLandFreq],
+            ['id' => 'irrigation',    'title' => 'सिंचाइ स्रोत',         'title_en' => 'Irrigation Source',     'data' => $irrigationFreq],
+            ['id' => 'sells_produce', 'title' => 'उपज बिक्री',           'title_en' => 'Produce Sales',         'data' => $sellsFreq],
+            ['id' => 'agri_category', 'title' => 'बाली/कृषि श्रेणी',     'title_en' => 'Crop / Agri Category',  'data' => $agriCatFreq],
+            ['id' => 'income_source', 'title' => 'प्राथमिक आय स्रोत',    'title_en' => 'Primary Income Source', 'data' => $incomeFreq],
+        ], fn($f) => !empty($f['data'])));
+
+        return Inertia::render('Public/Reports/Show', [
+            'lg'          => $this->lgProps($lg),
+            'category'    => 'land-agriculture',
+            'title'       => 'भूमि तथा कृषि आय',
+            'title_en'    => 'Land & Agricultural Income',
+            ...$this->filterProps($lg, $request),
+            'tables'      => array_values(array_filter([
+                ['id' => 'land_ward', 'title' => 'जमिन स्वामित्व — वडाअनुसार', 'title_en' => 'Land Ownership by Ward', 'data' => $landByWard],
+            ], fn($t) => !empty($t['data']['grand_total']))),
+            'frequencies' => $frequencies,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 20. Development Index (Ward-level comparison)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function developmentIndex(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
+        $allWardIds = $this->wardIds($lg, null);
+        $ck         = CrossTabService::cacheKey('dev_index', $lg->id, []);
+
+        $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
+        $wardColDef = CrossTabService::wardColDef($wards);
+
+        $litExpr = "CASE WHEN LOWER(education_level) NOT IN ('illitrate','illiterate') AND education_level IS NOT NULL AND education_level != '' THEN 'साक्षर' ELSE 'निरक्षर' END";
+
+        $litByWard = CrossTabService::tab(
+            HouseholdMember::whereHas('household', fn($q) =>
+                $q->whereIn('ward_id', $allWardIds)->where('status', 'published')
+            )->whereNotNull('education_level')->where('education_level', '!=', '')
+             ->join('households', 'household_members.household_id', '=', 'households.id')
+             ->join('wards', 'households.ward_id', '=', 'wards.id'),
+            $litExpr,
+            'wards.ward_number',
+            ['साक्षर' => 'साक्षर', 'निरक्षर' => 'निरक्षर'],
+            $wardColDef,
+            $ck . '_lit_ward'
+        );
+
+        $empByWard = CrossTabService::tab(
+            HouseholdMember::whereHas('household', fn($q) =>
+                $q->whereIn('ward_id', $allWardIds)->where('status', 'published')
+            )->whereNotNull('employment_status')->where('employment_status', '!=', '')
+             ->join('households', 'household_members.household_id', '=', 'households.id')
+             ->join('wards', 'households.ward_id', '=', 'wards.id'),
+            'employment_status',
+            'wards.ward_number',
+            CrossTabService::optionLabels('employment_status'),
+            $wardColDef,
+            $ck . '_emp_ward'
+        );
+
+        $bankByWard = CrossTabService::tab(
+            HouseholdEconomic::whereHas('household', fn($q) =>
+                $q->whereIn('ward_id', $allWardIds)->where('status', 'published')
+            )->join('households', 'household_economic.household_id', '=', 'households.id')
+             ->join('wards', 'households.ward_id', '=', 'wards.id'),
+            'has_bank_account',
+            'wards.ward_number',
+            ['1' => 'बैंक खाता छ', '0' => 'बैंक खाता छैन'],
+            $wardColDef,
+            $ck . '_bank_ward'
+        );
+
+        $toiletByWard = CrossTabService::tab(
+            HouseholdUtility::whereHas('household', fn($q) =>
+                $q->whereIn('ward_id', $allWardIds)->where('status', 'published')
+            )->join('households', 'household_utilities.household_id', '=', 'households.id')
+             ->join('wards', 'households.ward_id', '=', 'wards.id'),
+            'toilet_type',
+            'wards.ward_number',
+            CrossTabService::optionLabels('toilet_type'),
+            $wardColDef,
+            $ck . '_toilet_ward'
+        );
+
+        $electricByWard = CrossTabService::tab(
+            HouseholdUtility::whereHas('household', fn($q) =>
+                $q->whereIn('ward_id', $allWardIds)->where('status', 'published')
+            )->join('households', 'household_utilities.household_id', '=', 'households.id')
+             ->join('wards', 'households.ward_id', '=', 'wards.id'),
+            'electricity_source',
+            'wards.ward_number',
+            CrossTabService::optionLabels('electricity_source'),
+            $wardColDef,
+            $ck . '_elec_ward'
+        );
+
+        $waterByWard = CrossTabService::tab(
+            HouseholdUtility::whereHas('household', fn($q) =>
+                $q->whereIn('ward_id', $allWardIds)->where('status', 'published')
+            )->join('households', 'household_utilities.household_id', '=', 'households.id')
+             ->join('wards', 'households.ward_id', '=', 'wards.id'),
+            'water_source',
+            'wards.ward_number',
+            CrossTabService::optionLabels('water_source'),
+            $wardColDef,
+            $ck . '_water_ward'
+        );
+
+        return Inertia::render('Public/Reports/Show', [
+            'lg'          => $this->lgProps($lg),
+            'category'    => 'development-index',
+            'title'       => 'विकास सूचक — वडागत तुलना',
+            'title_en'    => 'Development Index — Ward Comparison',
+            ...$this->filterProps($lg, $request),
+            'tables'      => array_values(array_filter([
+                ['id' => 'lit_ward',    'title' => 'साक्षरता — वडाअनुसार',       'title_en' => 'Literacy by Ward',       'data' => $litByWard],
+                ['id' => 'emp_ward',    'title' => 'रोजगारी — वडाअनुसार',        'title_en' => 'Employment by Ward',     'data' => $empByWard],
+                ['id' => 'bank_ward',   'title' => 'बैंक खाता — वडाअनुसार',      'title_en' => 'Bank Account by Ward',   'data' => $bankByWard],
+                ['id' => 'toilet_ward', 'title' => 'शौचालय — वडाअनुसार',         'title_en' => 'Toilet Type by Ward',    'data' => $toiletByWard],
+                ['id' => 'elec_ward',   'title' => 'विद्युत स्रोत — वडाअनुसार',  'title_en' => 'Electricity by Ward',    'data' => $electricByWard],
+                ['id' => 'water_ward',  'title' => 'पानी स्रोत — वडाअनुसार',     'title_en' => 'Water Source by Ward',   'data' => $waterByWard],
+            ], fn($t) => !empty($t['data']['grand_total']))),
+            'frequencies' => [],
         ]);
     }
 

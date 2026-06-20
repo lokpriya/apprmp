@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col" style="height: calc(100vh - 56px);">
+  <div class="flex flex-col" style="height: calc(100dvh - 56px);">
 
     <!-- ── Toolbar ── -->
     <div class="bg-white border-b border-[#e6e7e9] px-4 sm:px-6 py-3 flex flex-wrap items-center gap-3 shrink-0">
@@ -63,7 +63,46 @@
     <!-- ── Map + Legend wrapper ── -->
     <div class="flex-1 relative">
       <!-- Map -->
-      <div ref="mapEl" class="absolute inset-0 z-0"></div>
+      <div ref="mapEl" class="absolute inset-0 z-0" aria-label="संस्था नक्सा" role="img"></div>
+
+      <!-- Tile / network error overlay -->
+      <div v-if="mapError"
+        class="absolute inset-0 z-[2000] flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm">
+        <div class="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
+          <i class="fa-solid fa-triangle-exclamation text-red-400 text-2xl"></i>
+        </div>
+        <p class="font-semibold text-[#1d273b] mb-1">नक्सा लोड भएन</p>
+        <p class="text-sm text-gray-400 text-center max-w-xs">{{ mapError }}</p>
+        <button @click="retryMap"
+          class="mt-4 px-4 py-2 rounded-lg bg-[#206bc4] text-white text-sm font-medium hover:bg-[#1a5ba8] transition">
+          पुनः प्रयास गर्नुहोस्
+        </button>
+      </div>
+
+      <!-- GeoJSON boundary notice (non-blocking) -->
+      <div v-if="geojsonFailed"
+        class="absolute top-3 left-1/2 -translate-x-1/2 z-[1500] bg-amber-50 border border-amber-200
+               rounded-lg px-3 py-1.5 text-[12px] text-amber-700 flex items-center gap-2 shadow-sm whitespace-nowrap">
+        <i class="fa-solid fa-circle-info text-amber-500 text-[10px]"></i>
+        नक्सा सिमाना लोड भएन — मार्कर उपलब्ध छन्
+        <button @click="geojsonFailed = false" class="ml-1 text-amber-400 hover:text-amber-600">
+          <i class="fa-solid fa-xmark text-[10px]"></i>
+        </button>
+      </div>
+
+      <!-- Empty state — no points after filter -->
+      <div v-if="!mapError && !props.totalPoints"
+        class="absolute inset-0 z-[1000] flex flex-col items-center justify-center pointer-events-none">
+        <div class="bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 px-8 py-6 text-center max-w-xs">
+          <div class="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+            <i class="fa-solid fa-building-circle-xmark text-gray-400 text-xl"></i>
+          </div>
+          <p class="font-semibold text-[#1d273b] mb-1">कुनै संस्था फेला परेन</p>
+          <p class="text-xs text-gray-400 leading-relaxed">
+            {{ selWard || selType ? 'यस फिल्टरमा कुनै GPS संस्था छैन — फिल्टर हटाउनुहोस्।' : 'GPS सहित दर्ता भएको कुनै संस्था छैन।' }}
+          </p>
+        </div>
+      </div>
 
       <!-- ── Legend — bottom-right overlay ── -->
       <div v-if="Object.keys(visibleTypeColors).length"
@@ -120,10 +159,12 @@ const props = defineProps({
 })
 
 // ── State ──────────────────────────────────────────────────────────────────
-const mapEl   = ref(null)
-const selWard = ref(String(props.filters.ward_id ?? ''))
-const selType = ref(String(props.filters.type_id ?? ''))
-const cluster = ref(true)
+const mapEl       = ref(null)
+const selWard     = ref(String(props.filters.ward_id ?? ''))
+const selType     = ref(String(props.filters.type_id ?? ''))
+const cluster     = ref(true)
+const mapError    = ref('')
+const geojsonFailed = ref(false)
 
 let L       = null
 let map     = null
@@ -149,15 +190,22 @@ const typeLabels = computed(() => {
   return m
 })
 
-// Only types present in current filtered points
+// Only types present in current filtered points (coerce to string for safe Set lookup)
 const visibleTypeColors = computed(() => {
-  const seen = new Set(props.points.map(p => p.type_id))
+  const seen = new Set(props.points.map(p => String(p.type_id)))
   const result = {}
   props.types.forEach(tp => {
-    if (seen.has(tp.id)) result[tp.id] = typeColorMap.value[tp.id]
+    if (seen.has(String(tp.id))) result[tp.id] = typeColorMap.value[tp.id]
   })
   return result
 })
+
+function retryMap() {
+  mapError.value = ''
+  geojsonFailed.value = false
+  if (map) { map.remove(); map = null; markers = []; mcGroup = null }
+  initMap()
+}
 
 // ── Navigation ─────────────────────────────────────────────────────────────
 function applyFilters() {
@@ -215,10 +263,15 @@ async function initMap() {
     zoomControl: true,
   })
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
-  }).addTo(map)
+    errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  })
+  tileLayer.on('tileerror', () => {
+    if (!mapError.value) mapError.value = 'इन्टरनेट कनेक्सन वा नक्सा सर्भर उपलब्ध छैन।'
+  })
+  tileLayer.addTo(map)
 
   const geojsonUrl = toRawGithubUrl(cfg.geojson_url)
   const wardProp   = cfg.ward_number_property ?? 'WARD_NO'
@@ -279,7 +332,7 @@ async function initMap() {
         legend.addTo(map)
       }
     } catch {
-      // GeoJSON unavailable — markers still show without choropleth
+      geojsonFailed.value = true
     }
   }
 

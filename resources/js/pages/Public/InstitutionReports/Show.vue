@@ -65,7 +65,7 @@
         <h2 class="text-[14px] font-semibold text-[#1d273b] mb-4">{{ t('instReports.conditionTitle') }}</h2>
         <div class="space-y-2.5 max-w-lg">
           <div v-for="row in conditionFreq" :key="row.value" class="flex items-center gap-3">
-            <div class="text-[12px] text-[#626976] w-28 shrink-0 capitalize">{{ row.value }}</div>
+            <div class="text-[12px] text-[#626976] w-28 shrink-0">{{ row.label ?? row.value }}</div>
             <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
               <div class="h-2 rounded-full bg-[#6366f1]" :style="`width:${row.percentage}%`"></div>
             </div>
@@ -406,6 +406,7 @@ const staffCards = [
   { key: 'permanent', label: t('instReports.permanent'),     color: '#0ca678' },
   { key: 'contract',  label: t('instReports.contract'),      color: '#f59f00' },
   { key: 'dalit',     label: t('instReports.dalit'),         color: '#e74c3c' },
+  { key: 'janajati',  label: t('instReports.janajati'),      color: '#ae3ec9' },
 ]
 
 const facilityIcons = {
@@ -466,6 +467,7 @@ const ALL_CATEGORIES = [
   { href: '/public/institution-reports/services',       icon: '🤝', labelKey: 'instReports.cat.services',     route: 'services' },
   { href: '/public/institution-reports/staff',          icon: '👤', labelKey: 'instReports.cat.staff',        route: 'staff' },
   { href: '/public/institution-reports/health',         icon: '🏥', labelKey: 'instReports.cat.health',       route: 'health' },
+  { href: '/public/institution-reports/school',         icon: '🎓', labelKey: 'instReports.cat.school',       route: 'school' },
 ]
 
 const otherCategories = computed(() => ALL_CATEGORIES.filter(c => c.route !== props.category))

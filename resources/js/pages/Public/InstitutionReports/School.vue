@@ -669,13 +669,13 @@ const maxCategoryCount = computed(() => props.byTeacherCategory.reduce((m, r) =>
 
 // ── Ownership label/color ──────────────────────────────────────────────────
 const ownershipMap = {
-  government:  { label: { ne: 'सरकारी', en: 'Government' }, cls: 'bg-blue-50 text-blue-700' },
-  private:     { label: { ne: 'निजी',   en: 'Private'     }, cls: 'bg-orange-50 text-orange-700' },
-  community:   { label: { ne: 'सामुदायिक', en: 'Community' }, cls: 'bg-green-50 text-green-700' },
-  cooperative: { label: { ne: 'सहकारी', en: 'Cooperative' }, cls: 'bg-purple-50 text-purple-700' },
-  ngo:         { label: { ne: 'गैसस',   en: 'NGO'         }, cls: 'bg-teal-50 text-teal-700' },
-  religious:   { label: { ne: 'धार्मिक', en: 'Religious'  }, cls: 'bg-amber-50 text-amber-700' },
-  other:       { label: { ne: 'अन्य',   en: 'Other'       }, cls: 'bg-gray-100 text-gray-600' },
+  govt:        { label: { ne: 'सरकारी',    en: 'Government'  }, cls: 'bg-blue-50 text-blue-700' },
+  private:     { label: { ne: 'निजी',      en: 'Private'     }, cls: 'bg-orange-50 text-orange-700' },
+  community:   { label: { ne: 'सामुदायिक', en: 'Community'   }, cls: 'bg-green-50 text-green-700' },
+  cooperative: { label: { ne: 'सहकारी',    en: 'Cooperative' }, cls: 'bg-purple-50 text-purple-700' },
+  ngo:         { label: { ne: 'गैसस',      en: 'NGO'         }, cls: 'bg-teal-50 text-teal-700' },
+  joint:       { label: { ne: 'संयुक्त',   en: 'Joint'       }, cls: 'bg-amber-50 text-amber-700' },
+  other:       { label: { ne: 'अन्य',      en: 'Other'       }, cls: 'bg-gray-100 text-gray-600' },
 }
 function ownershipLabel(val) {
   const m = ownershipMap[val]

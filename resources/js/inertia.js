@@ -1,5 +1,5 @@
 import { createApp, h } from 'vue';
-import { createInertiaApp } from '@inertiajs/vue3';
+import { createInertiaApp, router } from '@inertiajs/vue3';
 import { registerSW } from 'virtual:pwa-register';
 
 // Register service worker — silently updates in background, never blocks navigation
@@ -23,9 +23,17 @@ createInertiaApp({
         createApp({ render: () => h(App, props) })
             .use(plugin)
             .mount(el);
+
+        // Subtle fade-in on every page navigation
+        router.on('navigate', () => {
+            el.style.animation = 'none';
+            requestAnimationFrame(() => { el.style.animation = ''; });
+        });
     },
 
     progress: {
-        color: '#6366f1',
+        color: '#206bc4',
+        includeCSS: true,
+        showSpinner: false,
     },
 });

@@ -2,7 +2,7 @@
   <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
 
     <!-- ── Page header ──────────────────────────────────────────────────── -->
-    <div class="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+    <div class="mb-5 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
       <div>
         <p class="text-xs font-semibold uppercase tracking-widest text-rose-400 mb-1">
           {{ lg?.name_np ?? 'स्थानीय तह' }}
@@ -14,7 +14,7 @@
       </div>
 
       <!-- View toggle -->
-      <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1 self-start sm:self-auto">
+      <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1 self-start sm:self-auto shrink-0">
         <button @click="viewMode = 'card'"
           :class="['flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all',
                    viewMode === 'card' ? 'bg-white text-[#1d273b] shadow-sm' : 'text-gray-500 hover:text-gray-700']">
@@ -28,20 +28,67 @@
       </div>
     </div>
 
-    <!-- ── Empty state ──────────────────────────────────────────────────── -->
+    <!-- ── Toolbar: Search + Sort ────────────────────────────────────────── -->
+    <div v-if="props.representatives.length"
+      class="mb-5 flex flex-col sm:flex-row gap-3">
+
+      <!-- Search -->
+      <div class="relative flex-1 max-w-sm">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[12px]"></i>
+        <input v-model="search" type="text" placeholder="नाम खोज्नुहोस्..."
+          class="w-full pl-9 pr-8 py-2 text-[13px] border border-[#e6e7e9] rounded-lg bg-white
+                 focus:outline-none focus:border-rose-400 focus:ring-1 focus:ring-rose-100 transition" />
+        <button v-if="search" @click="search = ''"
+          class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition">
+          <i class="fa-solid fa-xmark text-[11px]"></i>
+        </button>
+      </div>
+
+      <!-- Sort -->
+      <div class="flex items-center gap-2 shrink-0">
+        <span class="text-[12px] text-gray-400 whitespace-nowrap">क्रमबद्ध:</span>
+        <div class="flex gap-1">
+          <button v-for="opt in sortOptions" :key="opt.key"
+            @click="sortBy = opt.key"
+            :class="['px-3 py-2 text-[12px] font-medium rounded-lg border transition-all',
+                     sortBy === opt.key
+                       ? 'bg-rose-600 border-rose-600 text-white'
+                       : 'bg-white border-[#e6e7e9] text-gray-600 hover:border-rose-300 hover:text-rose-600']">
+            {{ opt.label }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Result count -->
+      <div v-if="search || sortBy !== 'default'"
+        class="flex items-center shrink-0 text-[12px] text-gray-400">
+        <span class="bg-rose-50 text-rose-600 font-semibold px-2.5 py-1 rounded-full border border-rose-100">
+          {{ filtered.length }} / {{ props.representatives.length }}
+        </span>
+      </div>
+    </div>
+
+    <!-- ── Empty state (no data at all) ─────────────────────────────────── -->
     <div v-if="!props.representatives.length"
       class="flex flex-col items-center justify-center py-24 text-gray-300 gap-4">
       <i class="fa-solid fa-people-group text-5xl"></i>
       <p class="text-base font-medium text-gray-400">जनप्रतिनिधि विवरण उपलब्ध छैन</p>
     </div>
 
-    <!-- ══════════════════════════════════════════════════════════════════ -->
-    <!-- ── CARD VIEW  (2-col horizontal cards) ─────────────────────────── -->
-    <!-- ══════════════════════════════════════════════════════════════════ -->
-    <div v-else-if="viewMode === 'card'"
-      class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+    <!-- ── No search results ─────────────────────────────────────────────── -->
+    <div v-else-if="!filtered.length"
+      class="flex flex-col items-center justify-center py-20 gap-3 text-gray-400">
+      <i class="fa-solid fa-magnifying-glass text-4xl text-gray-200"></i>
+      <p class="text-sm">"{{ search }}" नामको जनप्रतिनिधि फेला परेन।</p>
+      <button @click="search = ''" class="text-rose-500 text-sm underline">खोज हटाउनुहोस्</button>
+    </div>
 
-      <div v-for="rep in props.representatives" :key="rep.id"
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!-- ── CARD VIEW ─────────────────────────────────────────────────── -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <div v-else-if="viewMode === 'card'" class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+
+      <div v-for="rep in filtered" :key="rep.id"
         class="rep-card bg-white rounded-xl border border-[#eaedf1] shadow-sm flex overflow-hidden
                transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
 
@@ -62,8 +109,9 @@
             <i v-else class="fa-solid fa-user text-rose-300 text-3xl"></i>
           </div>
 
-          <!-- Name -->
-          <p class="mt-3 text-[14px] font-bold text-[#1d273b] text-center leading-snug">{{ rep.name }}</p>
+          <!-- Name with search highlight -->
+          <p class="mt-3 text-[14px] font-bold text-[#1d273b] text-center leading-snug"
+            v-html="highlight(rep.name)"></p>
 
           <!-- Tags -->
           <div class="mt-2 flex flex-wrap justify-center gap-1.5">
@@ -130,11 +178,11 @@
     </div>
 
     <!-- ══════════════════════════════════════════════════════════════════ -->
-    <!-- ── LIST VIEW ────────────────────────────────────────────────────── -->
+    <!-- ── LIST VIEW ──────────────────────────────────────────────────── -->
     <!-- ══════════════════════════════════════════════════════════════════ -->
     <div v-else class="space-y-2">
 
-      <div v-for="rep in props.representatives" :key="rep.id"
+      <div v-for="rep in filtered" :key="rep.id"
         class="bg-white border border-[#e6e7e9] rounded-xl shadow-sm overflow-hidden">
 
         <!-- Accordion header -->
@@ -149,7 +197,7 @@
 
           <!-- Name + meta -->
           <div class="flex-1 min-w-0">
-            <p class="text-[14px] font-semibold text-[#1d273b] truncate">{{ rep.name }}</p>
+            <p class="text-[14px] font-semibold text-[#1d273b] truncate" v-html="highlight(rep.name)"></p>
             <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
               <span class="text-xs text-rose-600 font-medium">{{ positionLabel(rep.position) }}</span>
               <span v-if="rep.ward" class="text-xs text-gray-400">
@@ -202,7 +250,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, h } from 'vue'
+import { ref, reactive, computed, h } from 'vue'
 import { useLocale } from '@/i18n/index.js'
 import PublicLayout from '@/layouts/PublicLayout.vue'
 
@@ -216,10 +264,61 @@ const props = defineProps({
   surveyOptsForRep: { type: Object, default: () => ({}) },
 })
 
+// ── UI state ────────────────────────────────────────────────────────────────
 const viewMode = ref('card')
 const openList = reactive({})
+const search   = ref('')
+const sortBy   = ref('default')
+
 function toggleList(id) { openList[id] = !openList[id] }
 
+// ── Sort options ─────────────────────────────────────────────────────────────
+const POSITION_ORDER = [
+  'pramukh', 'upa_pramukh', 'adhyaksha', 'upa_adhyaksha',
+  'ward_adhyaksha', 'mahila_sadashya', 'dalit_mahila', 'sadashya',
+]
+
+const sortOptions = [
+  { key: 'default',  label: 'पूर्वनिर्धारित' },
+  { key: 'position', label: 'पदअनुसार' },
+  { key: 'ward',     label: 'वडाअनुसार' },
+  { key: 'name',     label: 'नामअनुसार' },
+]
+
+// ── Filtered + sorted list ───────────────────────────────────────────────────
+const filtered = computed(() => {
+  let list = [...props.representatives]
+
+  // Search by name
+  const q = search.value.trim().toLowerCase()
+  if (q) {
+    list = list.filter(r => r.name?.toLowerCase().includes(q))
+  }
+
+  // Sort
+  if (sortBy.value === 'position') {
+    list = list.sort((a, b) => {
+      const ai = POSITION_ORDER.indexOf(a.position ?? '')
+      const bi = POSITION_ORDER.indexOf(b.position ?? '')
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+    })
+  } else if (sortBy.value === 'ward') {
+    list = list.sort((a, b) => (a.ward?.ward_number ?? 99) - (b.ward?.ward_number ?? 99))
+  } else if (sortBy.value === 'name') {
+    list = list.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'ne'))
+  }
+
+  return list
+})
+
+// ── Search highlight ─────────────────────────────────────────────────────────
+function highlight(text) {
+  if (!search.value.trim() || !text) return text
+  const q = search.value.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return text.replace(new RegExp(q, 'gi'), m => `<mark class="bg-rose-100 text-rose-700 rounded px-0.5">${m}</mark>`)
+}
+
+// ── Label helpers ────────────────────────────────────────────────────────────
 const POSITIONS = {
   pramukh:         'प्रमुख',
   upa_pramukh:     'उप-प्रमुख',
@@ -253,14 +352,12 @@ const DataRow = {
 </script>
 
 <style scoped>
-/* Profile side fixed width */
 .profile-side { width: 190px; }
 @media (max-width: 480px) {
   .rep-card       { flex-direction: column; }
   .profile-side   { width: 100%; border-right: none; border-bottom: 1px solid #eaedf1; }
 }
 
-/* Section heading */
 .section-label {
   font-size: 11px;
   font-weight: 700;
@@ -272,7 +369,6 @@ const DataRow = {
   padding-bottom: 6px;
 }
 
-/* Data label / value rows */
 .data-label {
   color: #6c757d;
   white-space: nowrap;
@@ -294,5 +390,4 @@ const DataRow = {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-
 </style>

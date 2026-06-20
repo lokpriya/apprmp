@@ -1039,8 +1039,78 @@
             </template>
           </div>
 
+          <!-- ── सूचना पट्टी (Notice Bar) ────────────────────────────── -->
+          <div class="mt-8 pt-6 border-t border-gray-100">
+            <div class="flex items-center gap-2 mb-4">
+              <i class="fa-solid fa-bullhorn text-amber-500 text-sm"></i>
+              <h3 class="text-[14px] font-semibold text-[#1d273b]">सार्वजनिक सूचना पट्टी</h3>
+              <span class="text-[11px] text-gray-400 ml-1">(Notice Ticker Bar — सार्वजनिक पृष्ठको तल)</span>
+            </div>
+
+            <!-- Enable toggle -->
+            <div class="flex items-center justify-between bg-amber-50 border border-amber-100 rounded-xl px-5 py-4 mb-4">
+              <div>
+                <p class="text-[13px] font-semibold text-[#1d273b]">सूचना पट्टी सक्रिय गर्नुहोस्</p>
+                <p class="text-[12px] text-gray-400 mt-0.5">सक्षम भएमा सार्वजनिक पृष्ठहरूको तल स्क्रोलिङ सूचना देखिनेछ</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" v-model="welcomeForm.notice_bar_enabled" class="sr-only peer" />
+                <div class="w-10 h-6 bg-gray-200 peer-checked:bg-amber-500 rounded-full transition-colors
+                            after:content-[''] after:absolute after:top-0.5 after:left-0.5
+                            after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all
+                            peer-checked:after:translate-x-4"></div>
+              </label>
+            </div>
+
+            <!-- Text content -->
+            <div class="mb-4">
+              <label class="form-label">सूचनाको पाठ <span class="text-gray-400 font-normal">(Scrolling Text)</span></label>
+              <textarea v-model="welcomeForm.notice_bar_text" rows="2" maxlength="500"
+                :disabled="!welcomeForm.notice_bar_enabled || locked"
+                placeholder="जस्तै: वडा नं. ३ को तथ्याङ्क अद्यावधिक भयो। नयाँ घरधुरी सर्वेक्षण डेटा थपियो।"
+                class="form-input mt-1 w-full resize-none disabled:opacity-50"></textarea>
+              <p class="text-xs text-gray-400 text-right mt-0.5">{{ (welcomeForm.notice_bar_text || '').length }} / 500</p>
+            </div>
+
+            <!-- Background colour -->
+            <div class="flex items-center gap-4">
+              <div class="flex-1">
+                <label class="form-label">पृष्ठभूमि रङ</label>
+                <div class="flex items-center gap-3 mt-1">
+                  <input type="color" v-model="welcomeForm.notice_bar_bg"
+                    :disabled="!welcomeForm.notice_bar_enabled || locked"
+                    class="w-10 h-10 rounded-lg border border-gray-200 p-0.5 cursor-pointer disabled:opacity-50" />
+                  <span class="text-[12px] text-gray-500 font-mono">{{ welcomeForm.notice_bar_bg }}</span>
+                  <!-- Quick presets -->
+                  <div class="flex gap-1.5 ml-2">
+                    <button v-for="col in ['#1a2d45','#7c3aed','#0f766e','#b45309','#be123c']"
+                      :key="col" type="button"
+                      @click="welcomeForm.notice_bar_bg = col"
+                      :disabled="!welcomeForm.notice_bar_enabled || locked"
+                      class="w-6 h-6 rounded-full border-2 transition disabled:opacity-40"
+                      :style="`background:${col};border-color:${welcomeForm.notice_bar_bg===col ? '#6366f1' : 'transparent'}`"
+                      :title="col"></button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Live preview -->
+              <div v-if="welcomeForm.notice_bar_enabled && welcomeForm.notice_bar_text"
+                class="flex-1 rounded-lg overflow-hidden border border-gray-200">
+                <div class="flex items-center h-9" :style="`background:${welcomeForm.notice_bar_bg}`">
+                  <span class="shrink-0 text-[10px] font-bold uppercase px-3 border-r text-white/60"
+                    style="border-color:rgba(255,255,255,0.15)">सूचना</span>
+                  <span class="text-[12px] px-4 truncate" style="color:rgba(255,255,255,0.88)">
+                    {{ welcomeForm.notice_bar_text }}
+                  </span>
+                </div>
+                <p class="text-[10px] text-center text-gray-400 py-1 bg-gray-50">पूर्वावलोकन (Preview)</p>
+              </div>
+            </div>
+          </div>
+
           <!-- Save button -->
-          <div class="flex justify-end">
+          <div class="flex justify-end mt-6">
             <button type="submit" :disabled="welcomeForm.processing || locked"
               class="btn-primary">
               <i v-if="welcomeForm.processing" class="fa-solid fa-spinner fa-spin text-xs"></i>
@@ -3460,9 +3530,12 @@ function savePhotoDir() {
 // ── Welcome config form ────────────────────────────────────────────────────
 const wc = props.welcomeConfig
 const welcomeForm = useForm({
-  show_banner:       wc.show_banner   ?? true,
-  message:           wc.message       ?? '',
-  message_body:      wc.message_body  ?? '',
+  show_banner:         wc.show_banner         ?? true,
+  message:             wc.message             ?? '',
+  message_body:        wc.message_body        ?? '',
+  notice_bar_enabled:  wc.notice_bar?.enabled ?? false,
+  notice_bar_text:     wc.notice_bar?.text    ?? '',
+  notice_bar_bg:       wc.notice_bar?.bg      ?? '#1a2d45',
   chairperson: {
     name:        wc.chairperson?.name        ?? '',
     designation: wc.chairperson?.designation ?? 'अध्यक्ष',

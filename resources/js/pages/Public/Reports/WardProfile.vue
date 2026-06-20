@@ -1,4 +1,5 @@
 <template>
+  <Head :title="`वडा ${props.ward.ward_number} — वडा प्रोफाइल`" />
   <div class="w-full px-4 sm:px-6 py-6 space-y-6">
 
     <!-- Print-only header -->
@@ -33,9 +34,9 @@
             वडा {{ w.ward_number }}
           </option>
         </select>
-        <button @click="printPage"
+        <button @click="printPage" aria-label="यो प्रोफाइल PDF मा प्रिन्ट गर्नुहोस्"
           class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#1d273b] hover:bg-[#2d3a4f] text-white text-[12px] font-medium rounded-md transition-colors">
-          <i class="fa-solid fa-print text-[11px]"></i> PDF / प्रिन्ट
+          <i class="fa-solid fa-print text-[11px]" aria-hidden="true"></i> PDF / प्रिन्ट
         </button>
         <a href="/public/reports/ward-summary" class="inline-flex items-center gap-1.5 text-[12px] text-[#206bc4] hover:underline">
           <i class="fa-solid fa-arrow-left text-[10px]"></i> वडागत सारांश
@@ -54,55 +55,83 @@
           <p class="text-[11px] text-[#9aa0ac]">Ward Overview</p>
         </div>
       </div>
+
+      <!-- Empty state — no published data for this ward -->
+      <div v-if="!o.households && !o.population"
+        class="mt-4 rounded-xl bg-amber-50 border border-amber-100 px-5 py-4 flex items-start gap-3">
+        <i class="fa-solid fa-circle-info text-amber-400 mt-0.5 shrink-0"></i>
+        <div>
+          <p class="text-sm font-semibold text-amber-800">यस वडामा प्रकाशित तथ्याङ्क उपलब्ध छैन</p>
+          <p class="text-xs text-amber-600 mt-0.5">वडा नं. {{ props.ward.ward_number }} का घरधुरी सर्वेक्षण डेटा अझै प्रकाशित भएको छैन।</p>
+        </div>
+      </div>
+
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-3">
         <div class="bg-white border border-[#e6e7e9] rounded-md p-4">
           <p class="text-[11px] font-semibold uppercase tracking-wide text-[#9aa0ac] mb-1">घरधुरी</p>
           <p class="text-2xl font-bold text-amber-600">{{ fmt(o.households) }}</p>
+          <p class="text-[10px] text-[#9aa0ac] mt-0.5">घर</p>
         </div>
         <div class="bg-white border border-[#e6e7e9] rounded-md p-4">
           <p class="text-[11px] font-semibold uppercase tracking-wide text-[#9aa0ac] mb-1">जनसंख्या</p>
           <p class="text-2xl font-bold text-[#1d273b]">{{ fmt(o.population) }}</p>
+          <p class="text-[10px] text-[#9aa0ac] mt-0.5">व्यक्ति</p>
         </div>
         <div class="bg-white border border-[#e6e7e9] rounded-md p-4">
           <p class="text-[11px] font-semibold uppercase tracking-wide text-[#9aa0ac] mb-1">पुरुष</p>
           <p class="text-2xl font-bold text-blue-600">{{ fmt(o.male) }}</p>
+          <p class="text-[10px] text-[#9aa0ac] mt-0.5">व्यक्ति</p>
         </div>
         <div class="bg-white border border-[#e6e7e9] rounded-md p-4">
           <p class="text-[11px] font-semibold uppercase tracking-wide text-[#9aa0ac] mb-1">महिला</p>
           <p class="text-2xl font-bold text-pink-500">{{ fmt(o.female) }}</p>
+          <p class="text-[10px] text-[#9aa0ac] mt-0.5">व्यक्ति</p>
         </div>
         <div class="bg-white border border-[#e6e7e9] rounded-md p-4">
           <p class="text-[11px] font-semibold uppercase tracking-wide text-[#9aa0ac] mb-1">औसत घरधुरी साइज</p>
           <p class="text-2xl font-bold text-[#1d273b]">{{ o.avg_hh_size }}</p>
+          <p class="text-[10px] text-[#9aa0ac] mt-0.5">सदस्य / घर</p>
         </div>
         <div class="bg-white border border-[#e6e7e9] rounded-md p-4">
           <p class="text-[11px] font-semibold uppercase tracking-wide text-[#9aa0ac] mb-1">साक्षरता दर</p>
           <p class="text-2xl font-bold" :class="litColor(o.literacy_pct)">{{ o.literacy_pct }}%</p>
+          <p class="text-[10px] text-[#9aa0ac] mt-0.5">१५+ उमेरका</p>
         </div>
         <div class="bg-white border border-[#e6e7e9] rounded-md p-4">
           <p class="text-[11px] font-semibold uppercase tracking-wide text-[#9aa0ac] mb-1">संस्थाहरू</p>
           <p class="text-2xl font-bold text-violet-600">{{ fmt(o.institutions) }}</p>
+          <p class="text-[10px] text-[#9aa0ac] mt-0.5">GPS दर्ता</p>
         </div>
         <div class="bg-white border border-[#e6e7e9] rounded-md p-4">
           <p class="text-[11px] font-semibold uppercase tracking-wide text-[#9aa0ac] mb-1">व्यवसायहरू</p>
           <p class="text-2xl font-bold text-emerald-600">{{ fmt(o.businesses) }}</p>
+          <p class="text-[10px] text-[#9aa0ac] mt-0.5">दर्ता</p>
         </div>
         <div class="bg-white border border-[#e6e7e9] rounded-md p-4">
           <p class="text-[11px] font-semibold uppercase tracking-wide text-[#9aa0ac] mb-1">ज्येष्ठ नागरिक (६०+)</p>
           <p class="text-2xl font-bold text-orange-500">{{ fmt(o.elderly) }}</p>
+          <p class="text-[10px] text-[#9aa0ac] mt-0.5">व्यक्ति</p>
         </div>
         <div class="bg-white border border-[#e6e7e9] rounded-md p-4">
           <p class="text-[11px] font-semibold uppercase tracking-wide text-[#9aa0ac] mb-1">अपाङ्गता भएका</p>
           <p class="text-2xl font-bold text-red-500">{{ fmt(o.disabled) }}</p>
+          <p class="text-[10px] text-[#9aa0ac] mt-0.5">व्यक्ति</p>
         </div>
         <div class="bg-white border border-[#e6e7e9] rounded-md p-4">
           <p class="text-[11px] font-semibold uppercase tracking-wide text-[#9aa0ac] mb-1">विदेशमा</p>
           <p class="text-2xl font-bold text-sky-600">{{ fmt(o.abroad) }}</p>
+          <p class="text-[10px] text-[#9aa0ac] mt-0.5">व्यक्ति</p>
         </div>
         <div class="bg-white border border-[#e6e7e9] rounded-md p-4">
-          <p class="text-[11px] font-semibold uppercase tracking-wide text-[#9aa0ac] mb-1">लिंग अनुपात</p>
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-[#9aa0ac] mb-1 flex items-center gap-1">
+            लिंग अनुपात
+            <span title="प्रति १०० महिलामा पुरुषको संख्या। १०० भन्दा बढी = पुरुष बढी; कम = महिला बढी।"
+              class="cursor-help text-[#9aa0ac] hover:text-[#206bc4] transition" aria-label="लिंग अनुपात बारे जानकारी">
+              <i class="fa-solid fa-circle-info text-[9px]"></i>
+            </span>
+          </p>
           <p class="text-2xl font-bold text-[#626976]">{{ o.sex_ratio }}</p>
-          <p class="text-[10px] text-[#9aa0ac] mt-0.5">प्रति १०० महिला</p>
+          <p class="text-[10px] text-[#9aa0ac] mt-0.5">प्रति १०० महिला पुरुष</p>
         </div>
       </div>
     </div>
@@ -149,7 +178,7 @@
           </thead>
           <tbody>
             <tr v-for="r in props.ethnicityData.slice(0,10)" :key="r.val" class="border-b border-[#e6e7e9] last:border-0">
-              <td class="px-4 py-2 text-[12px] text-[#1d273b] capitalize">{{ r.val }}</td>
+              <td class="px-4 py-2 text-[12px] text-[#1d273b]">{{ r.label ?? r.val }}</td>
               <td class="px-4 py-2 text-right text-[12px] tabular-nums text-[#1d273b]">{{ fmt(r.cnt) }}</td>
               <td class="px-4 py-2 text-right text-[11px] tabular-nums text-[#626976]">{{ popPct(r.cnt) }}%</td>
             </tr>
@@ -178,7 +207,7 @@
           </thead>
           <tbody>
             <tr v-for="r in props.religionData" :key="r.val" class="border-b border-[#e6e7e9] last:border-0">
-              <td class="px-4 py-2 text-[12px] text-[#1d273b] capitalize">{{ r.val }}</td>
+              <td class="px-4 py-2 text-[12px] text-[#1d273b]">{{ r.label ?? r.val }}</td>
               <td class="px-4 py-2 text-right text-[12px] tabular-nums text-[#1d273b]">{{ fmt(r.cnt) }}</td>
               <td class="px-4 py-2 text-right text-[11px] tabular-nums text-[#626976]">{{ popPct(r.cnt) }}%</td>
             </tr>
@@ -204,7 +233,7 @@
           </thead>
           <tbody>
             <tr v-for="r in props.motherTongue" :key="r.val" class="border-b border-[#e6e7e9] last:border-0">
-              <td class="px-4 py-2 text-[12px] text-[#1d273b] capitalize">{{ r.val }}</td>
+              <td class="px-4 py-2 text-[12px] text-[#1d273b]">{{ r.label ?? r.val }}</td>
               <td class="px-4 py-2 text-right text-[12px] tabular-nums text-[#1d273b]">{{ fmt(r.cnt) }}</td>
               <td class="px-4 py-2 text-right text-[11px] tabular-nums text-[#626976]">{{ popPct(r.cnt) }}%</td>
             </tr>
@@ -499,6 +528,7 @@
 
 <script setup>
 import { computed, defineComponent, h } from 'vue'
+import { Head } from '@inertiajs/vue3'
 import PublicLayout from '@/layouts/PublicLayout.vue'
 
 defineOptions({ layout: PublicLayout })
@@ -528,7 +558,7 @@ const FreqSmallTable = defineComponent({
         ]),
         h('tbody', props.rows && props.rows.length
           ? props.rows.map(r => h('tr', { key: r.val, class: 'border-b border-[#e6e7e9] last:border-0' }, [
-              h('td', { class: 'px-4 py-2 text-[12px] text-[#1d273b] capitalize' }, String(r.val ?? '')),
+              h('td', { class: 'px-4 py-2 text-[12px] text-[#1d273b]' }, String(r.label ?? r.val ?? '')),
               h('td', { class: 'px-4 py-2 text-right text-[12px] tabular-nums text-[#1d273b]' }, Number(r.cnt ?? 0).toLocaleString()),
               h('td', { class: 'px-4 py-2 text-right text-[11px] tabular-nums text-[#626976]' },
                 props.total > 0 ? `${Math.round(r.cnt / props.total * 100)}%` : '0%'),

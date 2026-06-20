@@ -372,6 +372,9 @@ class SettingsController extends Controller
             'cao.designation'             => 'nullable|string|max:100',
             'cao.contact'                 => 'nullable|string|max:30',
             'cao.email'                   => 'nullable|email|max:100',
+            'notice_bar_enabled'          => 'boolean',
+            'notice_bar_text'             => 'nullable|string|max:500',
+            'notice_bar_bg'               => 'nullable|string|max:20',
         ]);
 
         $existing = $lg->welcome_config ?? [];
@@ -384,8 +387,16 @@ class SettingsController extends Controller
                 'chairperson'      => array_merge($existing['chairperson']      ?? [], $data['chairperson']      ?? []),
                 'vice_chairperson' => array_merge($existing['vice_chairperson'] ?? [], $data['vice_chairperson'] ?? []),
                 'cao'              => array_merge($existing['cao']              ?? [], $data['cao']              ?? []),
+                'notice_bar'       => [
+                    'enabled' => (bool) ($data['notice_bar_enabled'] ?? false),
+                    'text'    => trim($data['notice_bar_text'] ?? ''),
+                    'bg'      => $data['notice_bar_bg'] ?? '#1a2d45',
+                ],
             ]),
         ]);
+
+        // Bust the public notice bar cache so visitors see updates immediately
+        \Illuminate\Support\Facades\Cache::forget('public_notice_bar');
 
         return redirect()->route('admin.settings.index', ['tab' => 'welcome'])
             ->with('success', 'स्वागत सन्देश सेटिङ सुरक्षित भयो।');

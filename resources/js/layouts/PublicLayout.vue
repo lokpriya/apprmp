@@ -1,4 +1,11 @@
 <template>
+  <!-- Skip-to-content for keyboard users -->
+  <a href="#main-content"
+    class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9999]
+           focus:px-4 focus:py-2 focus:bg-[#206bc4] focus:text-white focus:rounded-lg
+           focus:text-sm focus:font-semibold focus:shadow-lg focus:outline-none">
+    मुख्य सामग्रीमा जानुहोस् (Skip to main content)
+  </a>
   <div class="min-h-screen bg-[#f4f6fb] font-sans">
 
     <!-- ═══════════════════════════════════════════════
@@ -70,15 +77,26 @@
         </button>
       </nav>
 
-      <!-- Sidebar footer — profile CTA -->
+      <!-- Sidebar footer — Feedback CTA -->
       <div class="p-3 border-t border-white/8 shrink-0">
-        <a href="/public/profile"
-          class="block rounded bg-white/5 hover:bg-white/8 ring-1 ring-white/8
-                 px-3 py-2.5 no-underline transition-colors">
-          <div class="text-[12px] font-semibold text-white/80">{{ t('profile.label') }}</div>
-          <div class="text-[11px] text-white/40 mt-0.5 leading-snug">
-            {{ t('dashboard.profileCTADesc') }}
+        <a href="/public/feedback"
+          class="group flex items-center gap-2.5 rounded-xl no-underline transition-all duration-200
+                 px-3 py-3 min-h-[44px] hover:bg-white/8"
+          style="background:rgba(32,107,196,0.18)">
+          <!-- People + star icon -->
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors
+                      bg-[#206bc4] group-hover:bg-[#1a5aab]">
+            <span class="relative flex items-center justify-center w-full h-full">
+              <i class="fa-solid fa-user-group text-white text-[13px]"></i>
+              <i class="fa-solid fa-star text-yellow-300 text-[7px] absolute -top-0.5 right-1.5"></i>
+            </span>
           </div>
+          <div class="min-w-0">
+            <div class="text-[12px] font-bold text-white leading-tight">सुझाव दिनुहोस्</div>
+            <div class="text-[10px] text-white/55 mt-0.5 truncate">नागरिक प्रतिक्रिया</div>
+          </div>
+          <i class="fa-solid fa-chevron-right text-white/30 text-[9px] ml-auto
+                    group-hover:text-white/60 group-hover:translate-x-0.5 transition-all duration-200"></i>
         </a>
       </div>
     </aside>
@@ -162,7 +180,7 @@
       </div>
 
       <!-- Page content -->
-      <div class="flex-1 flex flex-col">
+      <div id="main-content" class="flex-1 flex flex-col">
         <slot />
       </div>
 
@@ -170,7 +188,13 @@
       <footer class="bg-white border-t border-[#e6e7e9] py-4">
         <div class="px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[12px] text-[#9aa0ac]">
           <span>{{ t('footer.dataNote') }}</span>
-          <span>&copy; {{ year }} {{ lg?.name_en ?? 'Local Government' }}</span>
+          <div class="flex items-center gap-3">
+            <span v-if="dataLastUpdated" class="flex items-center gap-1">
+              <i class="fa-solid fa-calendar-check text-[10px]"></i>
+              तथ्याङ्क: {{ formatDataDate(dataLastUpdated) }}
+            </span>
+            <span>&copy; {{ year }} {{ lg?.name_en ?? 'Local Government' }}</span>
+          </div>
         </div>
       </footer>
     </div>
@@ -217,32 +241,114 @@
             </a>
           </nav>
 
-          <!-- Footer link -->
+          <!-- Footer link — Feedback CTA -->
           <div class="p-3 border-t border-white/8 shrink-0">
-            <a href="/public/profile"
-              class="block rounded bg-white/5 hover:bg-white/8 ring-1 ring-white/8
-                     px-3 py-2.5 no-underline transition-colors">
-              <div class="text-[12px] font-semibold text-white/80">{{ t('profile.label') }}</div>
-              <div class="text-[11px] text-white/40 mt-0.5 leading-snug">{{ t('dashboard.profileCTADesc') }}</div>
+            <a href="/public/feedback"
+              class="group flex items-center gap-2.5 rounded-xl no-underline transition-all duration-200
+                     px-3 py-2.5 hover:bg-white/8"
+              style="background:rgba(32,107,196,0.18)">
+              <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-[#206bc4]">
+                <span class="relative flex items-center justify-center w-full h-full">
+                  <i class="fa-solid fa-user-group text-white text-[13px]"></i>
+                  <i class="fa-solid fa-star text-yellow-300 text-[7px] absolute -top-0.5 right-1.5"></i>
+                </span>
+              </div>
+              <div class="min-w-0">
+                <div class="text-[12px] font-bold text-white leading-tight">सुझाव दिनुहोस्</div>
+                <div class="text-[10px] text-white/55 mt-0.5 truncate">नागरिक प्रतिक्रिया</div>
+              </div>
+              <i class="fa-solid fa-chevron-right text-white/30 text-[9px] ml-auto"></i>
             </a>
           </div>
         </div>
       </div>
     </transition>
 
+    <!-- ── Back-to-top button ── -->
+    <Transition enter-from-class="opacity-0 scale-90" enter-active-class="transition duration-200"
+                leave-active-class="transition duration-150" leave-to-class="opacity-0 scale-90">
+      <button v-if="showBackToTop" @click="scrollToTop"
+        class="fixed bottom-14 right-4 z-[990] w-10 h-10 rounded-full bg-[#206bc4] text-white shadow-lg
+               flex items-center justify-center hover:bg-[#1a5ba8] transition-colors"
+        aria-label="माथि जानुहोस्">
+        <i class="fa-solid fa-chevron-up text-sm"></i>
+      </button>
+    </Transition>
+
+    <!-- ── Notice ticker bar ── -->
+    <NoticeTicker />
+
+    <!-- ── Flash toasts ── -->
+    <Teleport to="body">
+      <div class="fixed bottom-16 right-4 z-[9999] flex flex-col gap-2 pointer-events-none" style="max-width:360px">
+
+        <!-- Success toast -->
+        <Transition enter-from-class="opacity-0 translate-y-2 scale-95"
+                    enter-active-class="transition duration-200 ease-out"
+                    leave-active-class="transition duration-150 ease-in"
+                    leave-to-class="opacity-0 translate-y-1 scale-95">
+          <div v-if="pubFlash.success && !dismissedPubFlash.success"
+            class="pointer-events-auto relative bg-white rounded-xl border border-gray-100 shadow-xl px-4 py-3 flex items-start gap-3 overflow-hidden">
+            <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-circle-check text-green-600 text-sm"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-[#1d273b] leading-snug">सफल!</p>
+              <p class="text-xs text-gray-500 mt-0.5 leading-relaxed">{{ pubFlash.success }}</p>
+            </div>
+            <button @click="dismissPubFlash('success')" class="text-gray-300 hover:text-gray-500 transition shrink-0 mt-0.5">
+              <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
+            <div class="absolute bottom-0 left-0 h-[3px] rounded-b-xl bg-green-500"
+              :style="{ width: pubToastProgress.success + '%', transition: pubToastActive.success ? 'width 4000ms linear' : 'none' }"></div>
+          </div>
+        </Transition>
+
+        <!-- Error toast -->
+        <Transition enter-from-class="opacity-0 translate-y-2 scale-95"
+                    enter-active-class="transition duration-200 ease-out"
+                    leave-active-class="transition duration-150 ease-in"
+                    leave-to-class="opacity-0 translate-y-1 scale-95">
+          <div v-if="pubFlash.error && !dismissedPubFlash.error"
+            class="pointer-events-auto bg-white rounded-xl border border-gray-100 shadow-xl px-4 py-3 flex items-start gap-3">
+            <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+              <i class="fa-solid fa-circle-exclamation text-red-500 text-sm"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-[#1d273b] leading-snug">त्रुटि</p>
+              <p class="text-xs text-gray-500 mt-0.5 leading-relaxed">{{ pubFlash.error }}</p>
+            </div>
+            <button @click="dismissPubFlash('error')" class="text-gray-300 hover:text-gray-500 transition shrink-0 mt-0.5">
+              <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
+          </div>
+        </Transition>
+
+      </div>
+    </Teleport>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import { useLocale } from '@/i18n/index.js'
 import { sidebarSections, sidebarActive } from '@/composables/useSidebar.js'
+import NoticeTicker from '@/components/NoticeTicker.vue'
 
-const page       = usePage()
-const lg         = computed(() => page.props.lg)
-const year       = new Date().getFullYear()
-const mobileOpen = ref(false)
+const page            = usePage()
+const lg              = computed(() => page.props.lg)
+const dataLastUpdated = computed(() => page.props.dataLastUpdated ?? null)
+const year            = new Date().getFullYear()
+const mobileOpen      = ref(false)
+const showBackToTop   = ref(false)
+
+function formatDataDate(iso) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleDateString('ne-NP', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }) }
 
 // PWA install prompt
 const deferredPrompt    = ref(null)
@@ -258,6 +364,8 @@ onMounted(() => {
     showInstallBanner.value = false
     deferredPrompt.value = null
   })
+  const onScroll = () => { showBackToTop.value = window.scrollY > 400 }
+  window.addEventListener('scroll', onScroll, { passive: true })
 })
 
 async function installPWA() {
@@ -272,6 +380,37 @@ function dismissBanner() {
   showInstallBanner.value = false
 }
 
+// ── Public flash toasts ──────────────────────────────────────────────────────
+const pubFlash         = computed(() => ({
+  success: page.props.flash?.success ?? null,
+  error:   page.props.flash?.error   ?? null,
+}))
+const dismissedPubFlash = ref({ success: false, error: false })
+const pubToastProgress  = ref({ success: 100, error: 100 })
+const pubToastActive    = ref({ success: false, error: false })
+const _pubToastTimers   = { success: null, error: null }
+
+function dismissPubFlash(type) {
+  dismissedPubFlash.value[type] = true
+  pubToastActive.value[type]    = false
+  clearTimeout(_pubToastTimers[type])
+}
+
+function triggerPubToast(type) {
+  dismissedPubFlash.value[type] = false
+  pubToastProgress.value[type]  = 100
+  pubToastActive.value[type]    = false
+  clearTimeout(_pubToastTimers[type])
+  requestAnimationFrame(() => {
+    pubToastActive.value[type]   = true
+    pubToastProgress.value[type] = 0
+    _pubToastTimers[type] = setTimeout(() => dismissPubFlash(type), 4200)
+  })
+}
+
+watch(() => pubFlash.value.success, v => v && triggerPubToast('success'))
+watch(() => pubFlash.value.error,   v => v && triggerPubToast('error'))
+
 defineProps({ profileFilledCount: { type: Number, default: 0 } })
 
 const { locale, t, setLocale } = useLocale()
@@ -284,7 +423,6 @@ const navLinks = [
   { key: 'employees',       href: '/public/employees',           icon: 'fa-solid fa-id-badge',         dotColor: '#0891b2' },
   { key: 'reports',         href: '/public/reports',                          icon: 'fa-solid fa-table-list',       dotColor: '#0ca678' },
   { key: 'pyramid',         href: '/public/reports/population-pyramid',       icon: 'fa-solid fa-chart-bar',        dotColor: '#6366f1' },
-  { key: 'wardSummary',     href: '/public/reports/ward-summary',             icon: 'fa-solid fa-table',            dotColor: '#10b981' },
   { key: 'map',             href: '/public/map',                              icon: 'fa-solid fa-map-location-dot', dotColor: '#f59f00' },
   { key: 'instReports',     href: '/public/institution-reports', icon: 'fa-solid fa-landmark',         dotColor: '#a855f7' },
   { key: 'instMap',         href: '/public/institution-map',     icon: 'fa-solid fa-map-pin',          dotColor: '#e64980' },

@@ -9,7 +9,11 @@
 
 @section('content')
 @php
-  $ol = fn($cat, $val) => ($val && $opts->get($cat)?->get($val)) ? $opts->get($cat)->get($val) : ($val ?? '—');
+  $ol = function($cat, $val) use ($opts) {
+    if ($val === null || $val === '') return '—';
+    $map = $opts->get($cat);
+    return $map?->get(strtolower((string)$val)) ?? $map?->get((string)$val) ?? $val;
+  };
   $yn = fn($v) => $v ? 'छ' : 'छैन';
 @endphp
 

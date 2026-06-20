@@ -140,8 +140,10 @@ class InstitutionReportController extends Controller
         $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
         $wardColDef = CrossTabService::wardColDef($wards);
 
-        // Type labels from DB
-        $typeLabels = InstitutionType::pluck('name_en', 'name_en')->toArray();
+        // Type labels from DB — key=name_en (used in SQL), value=Nepali label
+        $typeLabels = InstitutionType::all()
+            ->mapWithKeys(fn($t) => [$t->name_en => $t->name_np ?: $t->name_en])
+            ->toArray();
 
         $typeByWard = CrossTabService::tab(
             Institution::whereIn('institutions.ward_id', $wardIds)
@@ -200,13 +202,13 @@ class InstitutionReportController extends Controller
         $ck      = CrossTabService::cacheKey('inst_own', $lg->id, $request->only(['ward_id']));
 
         $ownershipLabels = [
-            'government'   => 'सरकारी / Government',
-            'private'      => 'निजी / Private',
-            'community'    => 'सामुदायिक / Community',
-            'cooperative'  => 'सहकारी / Cooperative',
-            'ngo'          => 'गैसस / NGO',
-            'religious'    => 'धार्मिक / Religious',
-            'other'        => 'अन्य / Other',
+            'govt'        => 'सरकारी / Government',
+            'private'     => 'निजी / Private',
+            'community'   => 'सामुदायिक / Community',
+            'cooperative' => 'सहकारी / Cooperative',
+            'ngo'         => 'गैसस / NGO',
+            'joint'       => 'संयुक्त / Joint',
+            'other'       => 'अन्य / Other',
         ];
 
         $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
@@ -315,6 +317,7 @@ class InstitutionReportController extends Controller
 
         usort($facilityData, fn($a, $b) => $b['count'] - $a['count']);
 
+        $condLabels    = CrossTabService::optionLabels('inst_building_condition');
         $conditionFreq = [];
         $conditions = $infra()
             ->whereNotNull('condition')->where('condition', '!=', '')
@@ -322,8 +325,10 @@ class InstitutionReportController extends Controller
             ->groupBy('condition')->orderByDesc('count')->get();
         $condTotal = $conditions->sum('count');
         foreach ($conditions as $r) {
+            $canonKey = array_key_first(array_filter(array_keys($condLabels), fn($k) => strtolower($k) === strtolower($r->condition))) ?? null;
             $conditionFreq[] = [
                 'value'      => $r->condition,
+                'label'      => ($canonKey ? ($condLabels[$canonKey] ?? $r->condition) : ($condLabels[$r->condition] ?? ucfirst($r->condition))),
                 'count'      => $r->count,
                 'percentage' => $condTotal > 0 ? round($r->count / $condTotal * 100, 1) : 0,
             ];
@@ -358,7 +363,7 @@ class InstitutionReportController extends Controller
         );
 
         $serviceTypeFreq = CrossTabService::freq(
-            $svcBase(), 'service_type', [], $ck . '_svctype'
+            $svcBase(), 'service_type', CrossTabService::optionLabels('inst_service_type'), $ck . '_svctype'
         );
 
         $freeRows  = $svcBase()->select('is_free', DB::raw('count(*) as count'))->groupBy('is_free')->get();

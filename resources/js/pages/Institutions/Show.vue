@@ -823,7 +823,7 @@
           <div class="p-3 space-y-2">
             <div v-if="photoUrl" class="rounded-md overflow-hidden border border-[#e6e7e9] bg-gray-100">
               <img :src="photoUrl" :alt="`Photo ${institution.photo_number}`"
-                class="w-full object-cover" style="max-height:200px;"
+                class="w-full object-cover" style="max-height:320px;"
                 @error="e => { if (photoUrlFallback && e.target.src !== photoUrlFallback) { e.target.src = photoUrlFallback } else { e.target.closest('div').style.display='none' } }" />
             </div>
             <div v-else-if="institution.photo_number" class="rounded-md border border-dashed border-amber-200 bg-amber-50 flex flex-col items-center justify-center py-5 gap-1.5">
@@ -1035,13 +1035,15 @@ const photoUrl = computed(() => {
   const base = usePage().props.auth?.lg?.photo_dir?.institution_base_url
   const num  = props.institution.photo_number
   if (!base || !num) return null
-  return `${base}/${num}.png?v=${encodeURIComponent(num)}`
+  const hasExt = /\.[a-zA-Z]{3,4}$/.test(num)
+  return `${base}/${hasExt ? num : num + '.jpg'}?v=${encodeURIComponent(num)}`
 })
 const photoUrlFallback = computed(() => {
   const base = usePage().props.auth?.lg?.photo_dir?.institution_base_url
   const num  = props.institution.photo_number
   if (!base || !num) return null
-  return `${base}/${num}.jpeg?v=${encodeURIComponent(num)}`
+  const hasExt = /\.[a-zA-Z]{3,4}$/.test(num)
+  return hasExt ? null : `${base}/${num}.png?v=${encodeURIComponent(num)}`
 })
 
 // ── Inline sub-components ─────────────────────────────────────────────────

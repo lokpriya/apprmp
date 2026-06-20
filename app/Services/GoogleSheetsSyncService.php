@@ -46,6 +46,8 @@ class GoogleSheetsSyncService
     private function headingToKey(string $h): string
     {
         $s = strtolower(trim((string)$h));
+        // Strip leading "01|", "02|", "123|" style Kobo prefixes
+        $s = preg_replace('/^\d+\|/', '', $s);
         $s = preg_replace('/[\s\-\/\\\\\.]+/', '_', $s);
         $s = preg_replace('/[^a-z0-9_]/', '', $s);
         return trim($s, '_');
@@ -562,8 +564,12 @@ class GoogleSheetsSyncService
             }
         }
 
-        // Disaster sheet → survey_data.social.death
+        // Disaster sheet → household_disaster table + survey_data.social.death
         if ($disasterRow = $related['disasterRow'] ?? null) {
+            $household->disaster()->updateOrCreate(
+                ['household_id' => $household->id],
+                $this->rowToDisasterData($disasterRow)
+            );
             $deathVal = $this->parseBoolYesNo($disasterRow['has_death_this_year'] ?? null);
             if ($deathVal !== null) {
                 $surveyData['social']['death'] = $deathVal;
@@ -894,16 +900,14 @@ class GoogleSheetsSyncService
         // Education: match by grade
         $educRows = $related['educRows'] ?? [];
         if (!empty($educRows)) {
-            $existing  = $institution->education()->get()->keyBy('grade');
+            $existing   = $institution->education()->get()->keyBy('grade');
             $seenGrades = [];
             foreach ($educRows as $row) {
                 $grade = trim($row['grade'] ?? '');
                 if (!$grade) continue;
                 $seenGrades[$grade] = true;
                 $data = $this->rowToEducationData($row);
-                isset($existing[$grade])
-                    ? $existing[$grade]->update($data)
-                    : $institution->education()->create($data);
+                $institution->education()->updateOrCreate(['grade' => $grade], $data);
             }
             foreach ($existing as $grade => $educ) {
                 if (!isset($seenGrades[$grade])) $educ->delete();
@@ -1154,15 +1158,37 @@ class GoogleSheetsSyncService
     private function rowToAgricultureData(array $row): array
     {
         return [
-            // 'agriculture' column = yes/no toggle for whether the HH practices agriculture
-            'agriculture'            => trim($row['agriculture']            ?? '') ?: null,
-            'agri_categories'        => $this->parseJsonArray($row['agri_category'] ?? null),
-            'use_of_chem_fertilizer' => trim($row['use_of_chem_fertilizer'] ?? '') ?: null,
-            'Farm_Challenges'        => $this->parseJsonArray($row['farm_challenge'] ?? null),
-            'owns_land'              => $this->parseBool($row['owns_land']  ?? null) ?? false,
-            'land_area_ropani'       => is_numeric($row['land_area_ropani']      ?? '') ? (float)$row['land_area_ropani']      : null,
-            'irrigated_area_ropani'  => is_numeric($row['irrigated_area_ropani'] ?? '') ? (float)$row['irrigated_area_ropani'] : null,
-            'annual_agri_income'     => is_numeric($row['annual_agri_income']    ?? '') ? (int)$row['annual_agri_income']      : null,
+            'agriculture'              => trim($row['agriculture']            ?? '') ?: null,
+            'agri_categories'          => $this->parseJsonArray($row['agri_category'] ?? null),
+            'use_of_chem_fertilizer'   => trim($row['use_of_chem_fertilizer'] ?? '') ?: null,
+            'uses_chemical_fertilizer' => $this->parseBool($row['uses_chemical_fertilizer'] ?? $row['use_of_chem_fertilizer'] ?? null) ?? false,
+            'uses_organic_fertilizer'  => $this->parseBool($row['uses_organic_fertilizer']  ?? null) ?? false,
+            'sells_produce'            => $this->parseBool($row['sells_produce']             ?? null) ?? false,
+            'has_agri_loan'            => $this->parseBool($row['has_agri_loan']             ?? null) ?? false,
+            'irrigation_source'        => trim($row['irrigation_source']       ?? '') ?: null,
+            'Farm_Challenges'          => $this->parseJsonArray($row['farm_challenge'] ?? null),
+            'owns_land'                => $this->parseBool($row['owns_land']   ?? null) ?? false,
+            'land_area_ropani'         => is_numeric($row['land_area_ropani']      ?? '') ? (float)$row['land_area_ropani']      : null,
+            'irrigated_area_ropani'    => is_numeric($row['irrigated_area_ropani'] ?? '') ? (float)$row['irrigated_area_ropani'] : null,
+            'annual_agri_income'       => is_numeric($row['annual_agri_income']    ?? '') ? (int)$row['annual_agri_income']      : null,
+        ];
+    }
+
+    private function rowToDisasterData(array $row): array
+    {
+        return [
+            'has_death_this_year'   => trim($row['has_death_this_year']   ?? '') ?: null,
+            'risk_types'            => $this->parseJsonArray($row['disaster_type']         ?? $row['risk_types']         ?? null),
+            'is_flood_zone'         => $this->parseBool($row['is_flood_zone']              ?? null) ?? false,
+            'is_landslide_zone'     => $this->parseBool($row['is_landslide_zone']          ?? null) ?? false,
+            'is_drought_zone'       => $this->parseBool($row['is_drought_zone']            ?? null) ?? false,
+            'has_evacuation_plan'   => $this->parseBool($row['has_evacuation_plan']        ?? null) ?? false,
+            'disaster_training'     => $this->parseBool($row['disaster_training']          ?? null) ?? false,
+            'affected_last_3years'  => trim($row['affected_last_3years']  ?? '') ?: null,
+            'received_relief'       => trim($row['received_relief']       ?? '') ?: null,
+            'risk_reduction_plan'   => trim($row['risk_reduction_plan']   ?? '') ?: null,
+            'nearest_relief_center' => trim($row['nearest_relief_center'] ?? '') ?: null,
+            'natural_disasters'     => $this->parseJsonArray($row['natural_disasters']     ?? null),
         ];
     }
 
@@ -1182,19 +1208,56 @@ class GoogleSheetsSyncService
             'is_literate'       => $this->parseBool($row['is_literate']       ?? null) ?? false,
             'occupation_type'   => $this->opt('occupation_type',   $row['occupation_type']   ?? null),
             'employment_status' => $this->opt('employment_status', $row['employment_status'] ?? null),
-            'disability_status' => $this->parseBool($row['disability_status'] ?? null) ?? false,
-            'disability_type'   => $this->opt('disability_type',   $row['disability_type']   ?? null),
-            'blood_group'       => trim($row['blood_group']       ?? '') ?: null,
-            'residence_status'  => $this->opt('residence_status',  $row['residence_status']  ?? null),
-            'contact_phone'     => trim($row['contact_phone']     ?? '') ?: null,
-            'is_household_head' => $this->parseBool($row['is_household_head'] ?? null) ?? false,
-            'has_citizenship'   => $this->parseBool($row['has_citizenship']   ?? null) ?? false,
-            'has_voters_card'   => $this->parseBool($row['has_voters_card']   ?? null) ?? false,
-            'has_national_id_card' => $this->parseBool($row['has_national_id_card'] ?? null) ?? false,
-            'has_passport'      => $this->parseBool($row['has_passport']      ?? null) ?? false,
-            'has_birth_certificate' => $this->parseBool($row['has_birth_certificate'] ?? null) ?? false,
-            'ss_allowance'          => $this->parseBool($row['social_security_allowance'] ?? null) ?? false,
-            'remarks'               => trim($row['remarks'] ?? '') ?: null,
+            'disability_status'       => $this->parseBool($row['disability_status']       ?? null) ?? false,
+            'disability_type'         => $this->opt('disability_type', $row['disability_type'] ?? null),
+            'disability_card'         => trim($row['disability_card']       ?? '') ?: null,
+            'disability_card_color'   => trim($row['disability_card_color'] ?? '') ?: null,
+            'chronic_illness'         => $this->parseBool($row['chronic_illness']         ?? null) ?? false,
+            'chronic_illness_types'   => $this->parseJsonArray($row['chronic_illness_types'] ?? null),
+            'smoking_drinking'        => $this->parseBool($row['smoking_drinking']        ?? null) ?? false,
+            'child_labor'             => $this->parseBool($row['child_labor']             ?? null) ?? false,
+            'blood_group'             => trim($row['blood_group']       ?? '') ?: null,
+            'blood_group_tested'      => trim($row['blood_group_tested'] ?? '') ?: null,
+            'has_phone'               => $this->parseBool($row['has_phone']               ?? null),
+            'residence_status'        => $this->opt('residence_status', $row['residence_status'] ?? null),
+            'addrslocation'           => trim($row['addrslocation']       ?? '') ?: null,
+            'residing_district'       => trim($row['residing_district']   ?? '') ?: null,
+            'ageofmarriage'           => is_numeric($row['ageofmarriage'] ?? '') ? (int)$row['ageofmarriage'] : null,
+            'vocational_training'     => $this->parseBool($row['vocational_training']     ?? null) ?? false,
+            'vt_subject'              => trim($row['vt_subject']           ?? '') ?: null,
+            'vt_duration_min'         => is_numeric($row['vt_duration_min'] ?? '') ? (int)$row['vt_duration_min'] : null,
+            'vt_duration_max'         => is_numeric($row['vt_duration_max'] ?? '') ? (int)$row['vt_duration_max'] : null,
+            'techtraining'            => $this->parseBool($row['techtraining']            ?? null) ?? false,
+            'techtraining_subject'    => trim($row['techtraining_subject']  ?? '') ?: null,
+            'sa_training'             => $this->parseBool($row['sa_training']             ?? null) ?? false,
+            'sa_training_subject'     => trim($row['sa_training_subject']   ?? '') ?: null,
+            'contact_phone'           => trim($row['contact_phone']        ?? '') ?: null,
+            'is_household_head'       => $this->parseBool($row['is_household_head']       ?? null) ?? false,
+            'has_citizenship'         => $this->parseBool($row['has_citizenship']         ?? null) ?? false,
+            'has_voters_card'         => $this->parseBool($row['has_voters_card']         ?? null) ?? false,
+            'has_national_id_card'    => $this->parseBool($row['has_national_id_card']    ?? null) ?? false,
+            'has_passport'            => $this->parseBool($row['has_passport']            ?? null) ?? false,
+            'has_pan'                 => $this->parseBool($row['has_pan']                 ?? null) ?? false,
+            'has_drivers_license'     => $this->parseBool($row['has_drivers_license']     ?? null) ?? false,
+            'drivers_license_category'=> trim($row['drivers_license_category'] ?? '') ?: null,
+            'has_birth_certificate'      => $this->parseBool($row['has_birth_certificate']      ?? null) ?? false,
+            // Child health (0–3 yrs)
+            'colostrum'                  => $this->parseBool($row['colostrum']                  ?? null),
+            'vit_a_dewormin'             => $this->parseBool($row['vit_a_dewormin']             ?? null),
+            'fullmilkcourse'             => $this->parseBool($row['fullmilkcourse']             ?? null),
+            'childhealthcheckup'         => $this->parseBool($row['childhealthcheckup']         ?? null),
+            'diarrhea_before_two_weeks'  => $this->parseBool($row['diarrhea_before_two_weeks']  ?? null),
+            'fever_resp'                 => $this->parseBool($row['fever_resp']                 ?? null),
+            'childvaccine'               => $this->parseJsonArray($row['childvaccine']          ?? null),
+            'vitaminA'                   => $this->parseBool($row['vitaminA']                   ?? null),
+            'childbornplace'             => trim($row['childbornplace']   ?? '') ?: null,
+            // Child development (6–15 yrs)
+            'phy_dev_6_15'               => $this->parseBool($row['phy_dev_6_15']               ?? null),
+            'allergy_infection_6_15'     => $this->parseBool($row['allergy_infection_6_15']     ?? null),
+            'watch_mobile_tv_6_15'       => $this->parseBool($row['watch_mobile_tv_6_15']       ?? null),
+            'school_interest_6_15'       => trim($row['school_interest_6_15']   ?? '') ?: null,
+            'ss_allowance'               => $this->parseBool($row['social_security_allowance']  ?? null) ?? false,
+            'remarks'                 => trim($row['remarks'] ?? '') ?: null,
         ];
     }
 
@@ -1512,11 +1575,17 @@ class GoogleSheetsSyncService
     private function requiredHouseholdErrors(array $row, int $rowNum): array
     {
         $errs = [];
+        if (!trim((string)($row['unique_code'] ?? ''))) {
+            $errs[] = "Row {$rowNum}: unique_code (घरधुरी कोड) आवश्यक छ";
+        }
         if (!trim((string)($row['respondent_name'] ?? ''))) {
             $errs[] = "Row {$rowNum}: respondent_name (उत्तरदाताको नाम) आवश्यक छ";
         }
         if (!trim((string)($row['survey_date'] ?? ''))) {
             $errs[] = "Row {$rowNum}: survey_date (सर्वेक्षण मिति) आवश्यक छ";
+        }
+        if (!is_numeric($row['total_members'] ?? '') || (int)$row['total_members'] < 1) {
+            $errs[] = "Row {$rowNum}: total_members (कुल सदस्य) आवश्यक छ र १ भन्दा बढी हुनुपर्छ";
         }
         return $errs;
     }
@@ -1532,6 +1601,9 @@ class GoogleSheetsSyncService
         }
         if (!trim((string)($row['survey_date'] ?? ''))) {
             $errs[] = "Row {$rowNum}: survey_date (सर्वेक्षण मिति) आवश्यक छ";
+        }
+        if (!trim((string)($row['institution_type'] ?? ''))) {
+            $errs[] = "Row {$rowNum}: institution_type (संस्थाको प्रकार) आवश्यक छ";
         }
         return $errs;
     }

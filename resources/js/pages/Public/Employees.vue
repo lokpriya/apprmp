@@ -2,7 +2,7 @@
   <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
 
     <!-- Page header -->
-    <div class="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+    <div class="mb-5 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
       <div>
         <p class="text-xs font-semibold uppercase tracking-widest text-cyan-500 mb-1">
           {{ lg?.name_np ?? 'स्थानीय तह' }}
@@ -14,7 +14,7 @@
       </div>
 
       <!-- View toggle -->
-      <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1 self-start sm:self-auto">
+      <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1 self-start sm:self-auto shrink-0">
         <button @click="viewMode = 'card'"
           :class="['flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all',
                    viewMode === 'card' ? 'bg-white text-[#1d273b] shadow-sm' : 'text-gray-500 hover:text-gray-700']">
@@ -28,11 +28,59 @@
       </div>
     </div>
 
-    <!-- Empty state -->
+    <!-- ── Toolbar: Search + Sort ────────────────────────────────────────── -->
+    <div v-if="props.employees.length"
+      class="mb-5 flex flex-col sm:flex-row gap-3">
+
+      <!-- Search -->
+      <div class="relative flex-1 max-w-sm">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[12px]"></i>
+        <input v-model="search" type="text" placeholder="नाम खोज्नुहोस्..."
+          class="w-full pl-9 pr-8 py-2 text-[13px] border border-[#e6e7e9] rounded-lg bg-white
+                 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-100 transition" />
+        <button v-if="search" @click="search = ''"
+          class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition">
+          <i class="fa-solid fa-xmark text-[11px]"></i>
+        </button>
+      </div>
+
+      <!-- Sort -->
+      <div class="flex items-center gap-2 shrink-0">
+        <span class="text-[12px] text-gray-400 whitespace-nowrap">क्रमबद्ध:</span>
+        <div class="flex gap-1">
+          <button v-for="opt in sortOptions" :key="opt.key"
+            @click="sortBy = opt.key"
+            :class="['px-3 py-2 text-[12px] font-medium rounded-lg border transition-all',
+                     sortBy === opt.key
+                       ? 'bg-cyan-600 border-cyan-600 text-white'
+                       : 'bg-white border-[#e6e7e9] text-gray-600 hover:border-cyan-300 hover:text-cyan-600']">
+            {{ opt.label }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Result count -->
+      <div v-if="search || sortBy !== 'default'"
+        class="flex items-center shrink-0 text-[12px] text-gray-400">
+        <span class="bg-cyan-50 text-cyan-600 font-semibold px-2.5 py-1 rounded-full border border-cyan-100">
+          {{ filtered.length }} / {{ props.employees.length }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Empty state (no data) -->
     <div v-if="!props.employees.length"
       class="flex flex-col items-center justify-center py-24 text-gray-300 gap-4">
       <i class="fa-solid fa-id-badge text-5xl"></i>
       <p class="text-base font-medium text-gray-400">कर्मचारी विवरण उपलब्ध छैन</p>
+    </div>
+
+    <!-- No search results -->
+    <div v-else-if="!filtered.length"
+      class="flex flex-col items-center justify-center py-20 gap-3 text-gray-400">
+      <i class="fa-solid fa-magnifying-glass text-4xl text-gray-200"></i>
+      <p class="text-sm">"{{ search }}" नामको कर्मचारी फेला परेन।</p>
+      <button @click="search = ''" class="text-cyan-500 text-sm underline">खोज हटाउनुहोस्</button>
     </div>
 
     <!-- ══════════════════════════════════════════════════════════════════ -->
@@ -40,7 +88,7 @@
     <!-- ══════════════════════════════════════════════════════════════════ -->
     <div v-else-if="viewMode === 'card'" class="grid grid-cols-1 xl:grid-cols-2 gap-5">
 
-      <div v-for="emp in props.employees" :key="emp.id"
+      <div v-for="emp in filtered" :key="emp.id"
         class="emp-card bg-white rounded-xl border border-[#eaedf1] shadow-sm flex overflow-hidden
                transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
 
@@ -55,8 +103,9 @@
             <i v-else class="fa-solid fa-user text-cyan-300 text-3xl"></i>
           </div>
 
-          <!-- Name -->
-          <p class="mt-3 text-[14px] font-bold text-[#1d273b] text-center leading-snug">{{ emp.name }}</p>
+          <!-- Name with highlight -->
+          <p class="mt-3 text-[14px] font-bold text-[#1d273b] text-center leading-snug"
+            v-html="highlight(emp.name)"></p>
 
           <!-- Position/Department tags -->
           <div class="mt-2 flex flex-wrap justify-center gap-1.5">
@@ -145,7 +194,7 @@
     <!-- ══════════════════════════════════════════════════════════════════ -->
     <div v-else class="space-y-2">
 
-      <div v-for="emp in props.employees" :key="emp.id"
+      <div v-for="emp in filtered" :key="emp.id"
         class="bg-white border border-[#e6e7e9] rounded-xl shadow-sm overflow-hidden">
 
         <!-- Accordion header -->
@@ -158,7 +207,7 @@
           </div>
 
           <div class="flex-1 min-w-0">
-            <p class="text-[14px] font-semibold text-[#1d273b] truncate">{{ emp.name }}</p>
+            <p class="text-[14px] font-semibold text-[#1d273b] truncate" v-html="highlight(emp.name)"></p>
             <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
               <span v-if="emp.position"   class="text-xs text-cyan-600 font-medium">{{ emp.position }}</span>
               <span v-if="emp.department" class="text-xs text-gray-400"><i class="fa-solid fa-building text-[9px] mr-0.5"></i>{{ emp.department }}</span>
@@ -211,7 +260,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, h } from 'vue'
+import { ref, reactive, computed, h } from 'vue'
 import { useLocale } from '@/i18n/index.js'
 import PublicLayout from '@/layouts/PublicLayout.vue'
 
@@ -225,10 +274,52 @@ const props = defineProps({
   surveyOptsForEmp: { type: Object, default: () => ({}) },
 })
 
+// ── UI state ────────────────────────────────────────────────────────────────
 const viewMode = ref('card')
 const openList = reactive({})
+const search   = ref('')
+const sortBy   = ref('default')
+
 function toggleList(id) { openList[id] = !openList[id] }
 
+// ── Sort options ─────────────────────────────────────────────────────────────
+const sortOptions = [
+  { key: 'default',    label: 'पूर्वनिर्धारित' },
+  { key: 'position',   label: 'पदअनुसार'        },
+  { key: 'department', label: 'शाखाअनुसार'      },
+  { key: 'name',       label: 'नामअनुसार'        },
+]
+
+// ── Filtered + sorted list ───────────────────────────────────────────────────
+const filtered = computed(() => {
+  let list = [...props.employees]
+
+  // Search by name
+  const q = search.value.trim().toLowerCase()
+  if (q) {
+    list = list.filter(e => e.name?.toLowerCase().includes(q))
+  }
+
+  // Sort
+  if (sortBy.value === 'position') {
+    list = list.sort((a, b) => (a.position ?? '').localeCompare(b.position ?? '', 'ne'))
+  } else if (sortBy.value === 'department') {
+    list = list.sort((a, b) => (a.department ?? '').localeCompare(b.department ?? '', 'ne'))
+  } else if (sortBy.value === 'name') {
+    list = list.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'ne'))
+  }
+
+  return list
+})
+
+// ── Search highlight ─────────────────────────────────────────────────────────
+function highlight(text) {
+  if (!search.value.trim() || !text) return text
+  const q = search.value.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return text.replace(new RegExp(q, 'gi'), m => `<mark class="bg-cyan-100 text-cyan-700 rounded px-0.5">${m}</mark>`)
+}
+
+// ── Label helpers ─────────────────────────────────────────────────────────────
 function genderLabel(v) { return { male: 'पुरुष', female: 'महिला', other: 'अन्य' }[v] ?? v }
 function fmtDate(v)     { return v ? String(v).slice(0, 10) : '—' }
 function optLabel(category, value) {

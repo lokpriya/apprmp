@@ -96,6 +96,26 @@ class HandleInertiaRequests extends Middleware
                 'as_role' => $request->user()?->role,
             ] : null,
 
+            // Feedback badge — cached 60 s; bust on submit/update/delete
+            'feedbackNewCount' => fn () => $request->user()?->hasPermission('feedback.view')
+                ? \Illuminate\Support\Facades\Cache::remember('public_feedback_new_count', 60, fn () =>
+                    \App\Models\PublicFeedback::where('status', 'new')->count()
+                  )
+                : 0,
+
+            // Public notice ticker — cached 5 min; bust cache when admin saves welcome settings
+            'noticeBar' => fn () => Cache::remember('public_notice_bar', 300, function () {
+                $lg = LocalGovernment::first();
+                $nb = $lg?->welcome_config['notice_bar'] ?? null;
+                if (!($nb['enabled'] ?? false) || empty(trim($nb['text'] ?? ''))) return null;
+                return ['text' => $nb['text'], 'bg' => $nb['bg'] ?? '#1a2d45'];
+            }),
+
+            // Last published date — public data freshness indicator, cached 10 min
+            'dataLastUpdated' => fn () => Cache::remember('public_data_last_updated', 600, function () {
+                return \App\Models\Household::where('status', 'published')->max('updated_at');
+            }),
+
             'flash' => [
                 'success'                         => fn () => $request->session()->get('success'),
                 'error'                           => fn () => $request->session()->get('error'),

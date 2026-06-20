@@ -119,6 +119,16 @@ class RolePermissions
                 ],
             ],
             [
+                'key'   => 'feedback',
+                'label' => 'नागरिक सुझाव',
+                'icon'  => 'fa-solid fa-lightbulb',
+                'perms' => [
+                    'feedback.view'   => ['label' => 'सुझाव हेर्ने',           'en' => 'View Feedback'],
+                    'feedback.manage' => ['label' => 'स्थिति परिवर्तन गर्ने', 'en' => 'Change Status / Add Note'],
+                    'feedback.delete' => ['label' => 'सुझाव मेट्ने',          'en' => 'Delete Feedback'],
+                ],
+            ],
+            [
                 'key'   => 'settings',
                 'label' => 'सेटिङ्ग',
                 'icon'  => 'fa-solid fa-gear',
@@ -168,6 +178,8 @@ class RolePermissions
                 'import.households','import.institutions','import.businesses',
                 // Google Sync
                 'google_sync.view','google_sync.preview','google_sync.apply',
+                // Feedback
+                'feedback.view','feedback.manage','feedback.delete',
                 // Settings
                 'settings.general','settings.wards','settings.survey_options',
                 'settings.representatives','settings.employees','settings.gallery',
@@ -194,6 +206,8 @@ class RolePermissions
                 'reports.view','reports.export',
                 // Import (ward-scoped)
                 'import.households','import.institutions','import.businesses',
+                // Feedback (view only by default — manage/delete off)
+                'feedback.view',
             ],
 
             'ward_reviewer' => [

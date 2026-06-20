@@ -115,6 +115,9 @@
           <NavItem href="/admin/progress"                 icon="fa-solid fa-chart-line"                    label="प्रगति ड्यासबोर्ड" :collapsed="collapsed" />
           <NavItem href="/admin/data-export"              icon="fa-solid fa-file-excel"                    label="तथ्याङ्क निर्यात"   :collapsed="collapsed" />
           <NavItem href="/admin/audit-logs"               icon="fa-solid fa-clock-rotate-left"             label="अडिट लग"           :collapsed="collapsed" />
+          <NavItem v-if="['ward_admin','municipal_admin','super_admin'].includes(userRole)"
+                   href="/admin/feedback" icon="fa-solid fa-lightbulb" label="नागरिक सुझाव"
+                   :collapsed="collapsed" :badge="feedbackNewCount || null" badge-color="bg-amber-500" />
           <NavItem href="/admin/users"                    icon="fa-solid fa-users"                         label="प्रयोगकर्ता"       :collapsed="collapsed" />
           <NavItem href="/admin/ward-assignments"         icon="fa-solid fa-map-pin"                       label="वडा तोकाई"         :collapsed="collapsed" />
           <NavItem href="/admin/google-sync"              icon="fa-brands fa-google"                       label="Google Sync"       :collapsed="collapsed" />
@@ -198,7 +201,7 @@
         <!-- Page Title -->
         <div class="flex-1 min-w-0">
           <h1 class="text-[15px] font-semibold text-[#1d273b] truncate">
-            {{ page.props.title ?? '' }}
+            {{ page.props.title || 'प्रशासन' }}
           </h1>
         </div>
 
@@ -219,6 +222,7 @@
             <span
               v-if="editRequestsCount > 0"
               class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none"
+              aria-live="polite" aria-atomic="true" :aria-label="`${editRequestsCount} सम्पादन अनुरोध`"
             >{{ editRequestsCount > 99 ? '99+' : editRequestsCount }}</span>
           </a>
         </div>
@@ -241,6 +245,7 @@
             <span
               v-if="notificationsCount > 0"
               class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none"
+              aria-live="polite" aria-atomic="true" :aria-label="`${notificationsCount} सूचना`"
             >{{ notificationsCount > 99 ? '99+' : notificationsCount }}</span>
           </button>
 
@@ -350,6 +355,13 @@
                 class="flex items-center gap-3 px-4 py-2.5 text-[13px] text-[#626976] hover:bg-gray-50 transition-colors">
                 <i class="fa-solid fa-clock-rotate-left w-4 text-[#9aa0ac] text-center text-xs"></i>
                 अडिट लग
+              </a>
+              <a v-if="['ward_admin','municipal_admin','super_admin'].includes(userRole)"
+                href="/admin/feedback"
+                class="flex items-center gap-3 px-4 py-2.5 text-[13px] text-[#626976] hover:bg-gray-50 transition-colors">
+                <i class="fa-solid fa-lightbulb w-4 text-[#9aa0ac] text-center text-xs"></i>
+                नागरिक सुझाव
+                <span v-if="feedbackNewCount" class="ml-auto inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-amber-500 text-white text-[10px] font-semibold">{{ feedbackNewCount }}</span>
               </a>
               <a href="/admin/users"
                 class="flex items-center gap-3 px-4 py-2.5 text-[13px] text-[#626976] hover:bg-gray-50 transition-colors">
@@ -771,6 +783,7 @@ const NavItem = {
     label:    { type: String,  required: true },
     collapsed:{ type: Boolean, default: false },
     external: { type: Boolean, default: false },
+    badge:    { type: Number,  default: null },
   },
   setup(props) {
     const page = usePage()
@@ -791,18 +804,32 @@ const NavItem = {
         active ? 'bg-white/10 text-white' : 'text-white/65 hover:bg-white/6 hover:text-white/90',
       ]
       const iconBoxClass = [
-        'w-9 h-9 rounded flex items-center justify-center shrink-0 transition-colors',
+        'w-9 h-9 rounded flex items-center justify-center shrink-0 transition-colors relative',
         active ? 'bg-[#206bc4] text-white' : 'bg-white/10 text-white/65 group-hover:bg-white/20',
       ]
 
+      const iconChildren = [
+        h('i', { class: [props.icon, 'text-[13px]'] }),
+        // Badge dot on icon when collapsed
+        (props.collapsed && props.badge)
+          ? h('span', {
+              class: 'absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center',
+            }, props.badge > 99 ? '99+' : String(props.badge))
+          : null,
+      ]
+
       return h(tag, { href: props.href, class: wrapClass, title: props.collapsed ? props.label : '' }, [
-        h('div', { class: iconBoxClass }, [
-          h('i', { class: [props.icon, 'text-[13px]'] }),
-        ]),
+        h('div', { class: iconBoxClass }, iconChildren),
         !props.collapsed
           ? h('span', { class: 'text-[14px] font-medium truncate leading-none flex-1' }, props.label)
           : null,
-        (!props.collapsed && active)
+        // Badge pill next to label when expanded
+        (!props.collapsed && props.badge)
+          ? h('span', {
+              class: 'ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0',
+            }, props.badge > 99 ? '99+' : String(props.badge))
+          : null,
+        (!props.collapsed && active && !props.badge)
           ? h('span', { class: 'w-1 h-4 rounded-full bg-[#206bc4] shrink-0' })
           : null,
       ])
@@ -1006,6 +1033,9 @@ function toggleCollapse() {
   collapsed.value = !collapsed.value
   localStorage.setItem('sidebar_collapsed', String(collapsed.value))
 }
+
+// ── Feedback badge ─────────────────────────────────────────────────
+const feedbackNewCount = computed(() => page.props.feedbackNewCount ?? 0)
 
 // ── Impersonation ──────────────────────────────────────────────────
 const impersonating = computed(() => page.props.impersonating ?? null)

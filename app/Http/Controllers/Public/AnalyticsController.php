@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
+use App\Services\CrossTabService;
 use App\Models\Household;
 use App\Models\HouseholdHousing;
 use App\Models\HouseholdMember;
@@ -92,7 +93,8 @@ class AnalyticsController extends Controller
                 ->values()
             : collect();
 
-        $ck = 'analytics_dashboard.' . $lg->id . '.' . ($selectedWardId ?? '0') . '.' . ($selectedSettlementId ?? '0');
+        $v  = Cache::get('analytics_version', 0);
+        $ck = 'analytics_dashboard.' . $lg->id . '.' . ($selectedWardId ?? '0') . '.' . ($selectedSettlementId ?? '0') . '.' . $v;
         $d  = Cache::remember($ck, 1800, fn() => $this->computeDashboardData(
             $activeWardIds, $allWardIds, $selectedSettlementId, $wards, $lg
         ));
@@ -238,15 +240,15 @@ class AnalyticsController extends Controller
         $wardSummary = $wards->map(fn($ward) => [
             'ward_id'     => $ward->id,
             'ward_number' => $ward->ward_number,
-            'households'  => $wardHouseholds->get($ward->id, 0),
-            'male'        => $wardGender->get($ward->id, collect())->firstWhere('gender', 'male')?->cnt ?? 0,
-            'female'      => $wardGender->get($ward->id, collect())->firstWhere('gender', 'female')?->cnt ?? 0,
-            'total'       => $wardGender->get($ward->id, collect())->sum('cnt'),
+            'households'  => (int) ($wardHouseholds->get($ward->id, 0)),
+            'male'        => (int) ($wardGender->get($ward->id, collect())->firstWhere('gender', 'male')?->cnt  ?? 0),
+            'female'      => (int) ($wardGender->get($ward->id, collect())->firstWhere('gender', 'female')?->cnt ?? 0),
+            'total'       => (int) ($wardGender->get($ward->id, collect())->sum('cnt')),
         ])->values();
 
         $litRow = HouseholdMember::alive()->whereHas('household', $hhBase)
-            ->whereNotNull('is_literate')
-            ->select(DB::raw('SUM(CASE WHEN is_literate=1 THEN 1 ELSE 0 END) as lit'), DB::raw('count(*) as tot'))
+            ->whereNotNull('education_level')->where('education_level', '!=', '')
+            ->select(DB::raw("SUM(CASE WHEN LOWER(education_level) NOT IN ('illitrate','illiterate') THEN 1 ELSE 0 END) as lit"), DB::raw('count(*) as tot'))
             ->first();
         $litRate = ($litRow && $litRow->tot > 0) ? round($litRow->lit / $litRow->tot * 100, 1) : 0;
 
@@ -267,18 +269,85 @@ class AnalyticsController extends Controller
             'bank_account_pct' => $bankPct,
         ];
 
+        // Key by lowercase value so strtolower lookup works for canonical values
         $surveyLabels = SurveyOption::whereIn('category', [
             'water_source', 'toilet_type', 'electricity_source', 'cooking_fuel',
             'income_source', 'occupation_type', 'education_level', 'business_type',
         ])->select('category', 'value', 'label_ne', 'label_en')
-            ->get()->groupBy('category')->map(fn($g) => $g->keyBy('value'));
+            ->get()->groupBy('category')->map(fn($g) => $g->keyBy(fn($o) => strtolower($o->value)));
 
-        $attachLabels = function (array $rows, string $cat) use ($surveyLabels): array {
-            $map = $surveyLabels->get($cat, collect());
-            return array_map(function ($row) use ($map) {
-                $opt = $map->get($row['value'] ?? '');
-                $row['label_ne'] = $opt?->label_ne ?? null;
-                $row['label_en'] = $opt?->label_en ?? null;
+        // Hardcoded fallback for old Kobo raw values that don't match canonical survey_options keys
+        $dashKoboFallback = [
+            'occupation_type' => [
+                'agricultureandanimalhusbandry' => 'कृषि तथा पशुपालन',
+                'business'                      => 'व्यापार/व्यवसाय',
+                'governmentemployee'            => 'सरकारी जागिर',
+                'employmentinprivatesector'     => 'निजी क्षेत्र जागिर',
+                'foreignemployment'             => 'वैदेशिक रोजगार',
+                'dailywage'                     => 'दैनिक मजदुरी',
+                'selfemployment'                => 'स्वरोजगार',
+                'supportfamilyjobs'             => 'घरेलु काम',
+                'student'                       => 'विद्यार्थी',
+                'unemployed'                    => 'बेरोजगार',
+                'other'                         => 'अन्य',
+            ],
+            'income_source' => [
+                'selfemployment' => 'स्वरोजगार',
+                'other_income'   => 'अन्य',
+            ],
+            'education_level' => [
+                'illitrate'          => 'निरक्षर',
+                'literate'           => 'साक्षर',
+                'basiceducation1_5'  => 'आधारभूत (कक्षा १-५)',
+                'basiceducation6_8'  => 'आधारभूत (कक्षा ६-८)',
+                'secondaryschool'    => 'माध्यमिक (कक्षा ९-१०)',
+                'slc'                => 'SLC/SEE',
+                'intermediate'       => '+२/प्रवीणता',
+                'mphil'              => 'एमफिल',
+                'phd'                => 'पिएचडी',
+                'other'              => 'अन्य',
+            ],
+            'water_source' => [
+                'tap_house'     => 'धाराको पानी (घरभित्र)',
+                'tap_public'    => 'धाराको पानी (बाहिर)',
+                'tubewell'      => 'ट्युबवेल/हाते धारा',
+                'covered_well'  => 'ढाकिएको कुवा',
+                'open_well'     => 'खुला कुवा',
+                'jaruwa'        => 'मूलको पानी/जरुवा',
+                'bottledwater'  => 'जार/बोतलको पानी',
+                'river'         => 'नदी/खोला',
+            ],
+            'toilet_type' => [
+                'standard_septictank'   => 'फ्लस (सेप्टिक ट्याङ्क)',
+                'standard_publicdrainage' => 'फ्लस (सार्वजनिक ढल)',
+                'normal'                => 'साधारण शौचालय',
+                'no_toilet'             => 'शौचालय छैन',
+            ],
+            'electricity_source' => [
+                'natonalelectricgrid' => 'राष्ट्रिय ग्रिड',
+                'microhydro'          => 'लघु जलविद्युत',
+                'kerosene'            => 'मट्टितेल',
+                'solarenergy'         => 'सोलार',
+            ],
+            'cooking_fuel' => [
+                'lp_gas' => 'ग्याँस (LPG)',
+                'guitha'  => 'गुइँठा',
+            ],
+        ];
+
+        $attachLabels = function (array $rows, string $cat) use ($surveyLabels, $dashKoboFallback): array {
+            $map      = $surveyLabels->get($cat, collect());
+            $fallback = $dashKoboFallback[$cat] ?? [];
+            return array_map(function ($row) use ($map, $fallback) {
+                $key = strtolower((string)($row['value'] ?? ''));
+                $opt = $map->get($key);
+                if ($opt) {
+                    $row['label_ne'] = $opt->label_ne;
+                    $row['label_en'] = $opt->label_en;
+                } else {
+                    $row['label_ne'] = $fallback[$key] ?? null;
+                    $row['label_en'] = null;
+                }
                 return $row;
             }, $rows);
         };
@@ -310,11 +379,19 @@ class AnalyticsController extends Controller
             ->groupBy('value')->orderByDesc('count')->get()
             ->map(fn($r) => ['value' => $r->value, 'count' => (int)$r->count])->toArray(), 'education_level');
 
+        // Derive literacy from education_level: illitrate/Illitrate = निरक्षर, everything else = साक्षर
         $litByGender = HouseholdMember::alive()->whereHas('household', $hhBase)
-            ->whereNotNull('gender')->whereNotNull('is_literate')
-            ->select('gender', DB::raw('SUM(CASE WHEN is_literate=1 THEN 1 ELSE 0 END) as lit'), DB::raw('count(*) as tot'))
+            ->whereNotNull('gender')
+            ->whereNotNull('education_level')->where('education_level', '!=', '')
+            ->select('gender',
+                DB::raw("SUM(CASE WHEN LOWER(education_level) IN ('illitrate','illiterate') THEN 1 ELSE 0 END) as illit"),
+                DB::raw('COUNT(*) as tot'))
             ->groupBy('gender')->get()
-            ->map(fn($r) => ['gender' => $r->gender, 'lit' => (int)$r->lit, 'tot' => (int)$r->tot])->toArray();
+            ->map(fn($r) => [
+                'gender' => $r->gender,
+                'lit'    => (int)$r->tot - (int)$r->illit,
+                'tot'    => (int)$r->tot,
+            ])->toArray();
 
         $businessData = $attachLabels(DB::table('member_businesses')
             ->join('households', 'member_businesses.household_id', '=', 'households.id')
@@ -325,20 +402,21 @@ class AnalyticsController extends Controller
             ->groupBy('value')->orderByDesc('count')->limit(8)->get()
             ->map(fn($r) => ['value' => $r->value, 'count' => (int)$r->count])->toArray(), 'business_type');
 
-        $migCounts = DB::table('member_migration')
-            ->join('household_members', 'member_migration.member_id', '=', 'household_members.id')
-            ->join('households', 'household_members.household_id', '=', 'households.id')
-            ->whereIn('households.ward_id', $activeWardIds)->where('households.status', 'published')
-            ->when($selectedSettlementId, fn($q) => $q->where('households.settlement_id', $selectedSettlementId))
-            ->where('household_members.is_deceased', false)
-            ->whereIn('member_migration.migration_status', ['abroad', 'internal'])
-            ->select('member_migration.migration_status', DB::raw('count(*) as cnt'))
-            ->groupBy('member_migration.migration_status')
-            ->pluck('cnt', 'migration_status');
+        // Migration counts from addrslocation (Kobo stores full Nepali text here;
+        // member_migration table is not populated by the current sync version)
+        $migCounts = HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->whereNotNull('addrslocation')
+            ->whereIn('addrslocation', [
+                'विदेशमा बसेको (६ महिना भन्दा बढी समय देखि)',
+                'स्वदेशमा अन्यत्र (६ महिना भन्दा बढी समय देखि)',
+            ])
+            ->select('addrslocation', DB::raw('count(*) as cnt'))
+            ->groupBy('addrslocation')
+            ->pluck('cnt', 'addrslocation');
 
         $migrationData = [
-            'abroad'   => (int) ($migCounts->get('abroad',   0)),
-            'internal' => (int) ($migCounts->get('internal', 0)),
+            'abroad'   => (int) ($migCounts->get('विदेशमा बसेको (६ महिना भन्दा बढी समय देखि)',    0)),
+            'internal' => (int) ($migCounts->get('स्वदेशमा अन्यत्र (६ महिना भन्दा बढी समय देखि)', 0)),
         ];
 
         $trainRow = HouseholdMember::alive()->whereHas('household', $hhBase)
@@ -521,8 +599,9 @@ class AnalyticsController extends Controller
             ->join('households', 'household_members.household_id', '=', 'households.id')
             ->whereIn('households.ward_id', $allWardIds)->where('households.status', 'published')
             ->where('household_members.is_deceased', false)
+            ->whereNotNull('household_members.education_level')->where('household_members.education_level', '!=', '')
             ->select('households.ward_id',
-                DB::raw('SUM(CASE WHEN household_members.is_literate = 1 THEN 1 ELSE 0 END) as literate'),
+                DB::raw("SUM(CASE WHEN LOWER(household_members.education_level) NOT IN ('illitrate','illiterate') THEN 1 ELSE 0 END) as literate"),
                 DB::raw('count(*) as total'))
             ->groupBy('households.ward_id')->get()->keyBy('ward_id');
 
@@ -533,13 +612,13 @@ class AnalyticsController extends Controller
             return [
                 'ward_id'        => $ward->id,
                 'ward_number'    => $ward->ward_number,
-                'households'     => $wardHouseholds->get($ward->id, 0),
-                'male'           => $wardGender->get($ward->id, collect())->firstWhere('gender', 'male')?->cnt  ?? 0,
-                'female'         => $wardGender->get($ward->id, collect())->firstWhere('gender', 'female')?->cnt ?? 0,
-                'other'          => $wardGender->get($ward->id, collect())->firstWhere('gender', 'other')?->cnt  ?? 0,
+                'households'     => (int) ($wardHouseholds->get($ward->id, 0)),
+                'male'           => (int) ($wardGender->get($ward->id, collect())->firstWhere('gender', 'male')?->cnt  ?? 0),
+                'female'         => (int) ($wardGender->get($ward->id, collect())->firstWhere('gender', 'female')?->cnt ?? 0),
+                'other'          => (int) ($wardGender->get($ward->id, collect())->firstWhere('gender', 'other')?->cnt  ?? 0),
                 'total'          => $wardGender->get($ward->id, collect())->sum('cnt'),
-                'institutions'   => $wardInstitutions->get($ward->id, 0),
-                'businesses'     => $wardBusinesses->get($ward->id, 0),
+                'institutions'   => (int) ($wardInstitutions->get($ward->id, 0)),
+                'businesses'     => (int) ($wardBusinesses->get($ward->id, 0)),
                 'literate'       => (int) ($lit?->literate ?? 0),
                 'literate_total' => (int) ($lit?->total    ?? 0),
             ];
@@ -548,7 +627,22 @@ class AnalyticsController extends Controller
         return Inertia::render('Public/Reports/WardSummary', [
             'lg'          => $this->lgProps($lg),
             'wardSummary' => $wardSummary,
+            'wards'       => $wards->map(fn($w) => ['id' => $w->id, 'ward_number' => $w->ward_number])->values(),
+            'settlements' => [],
+            'filters'     => [],
         ]);
+    }
+
+    // ── Ward Profile default — redirect to first available ward ──────────────
+    public function wardProfileDefault(Request $request)
+    {
+        $lg = $this->defaultLg();
+        $firstId = $lg
+            ? \App\Models\Ward::where('local_government_id', $lg->id)
+                ->orderBy('ward_number')->value('id')
+            : null;
+        if (!$firstId) return redirect()->route('public.reports.ward-summary');
+        return redirect()->route('public.reports.ward-profile.ward', ['wardId' => $firstId]);
     }
 
     // ── Ward Profile page (comprehensive per-ward printable report) ───────────
@@ -557,11 +651,200 @@ class AnalyticsController extends Controller
         $lg = $this->defaultLg();
         if (!$lg) return redirect()->route('public.dashboard');
 
-        $ward = Ward::findOrFail($wardId);
-        if ($ward->local_government_id !== $lg->id) abort(404);
+        // Accept ward_number (e.g. /ward/1) or database id — ward_number is preferred for public URLs
+        $ward = Ward::where('local_government_id', $lg->id)
+            ->where(function ($q) use ($wardId) {
+                $q->where('ward_number', $wardId)->orWhere('id', $wardId);
+            })->first();
+        if (!$ward) abort(404);
 
         $wid    = [$ward->id];
         $hhBase = fn($q) => $q->whereIn('ward_id', $wid)->where('status', 'published');
+
+        // ── Pre-load all option labels for this page (single query, case-insensitive lookup)
+        $rawOptions = DB::table('survey_options')
+            ->select('category', 'value', 'label_ne')
+            ->get();
+        $optLabels = [];  // category → [ lowercase_value => label_ne ]
+        foreach ($rawOptions as $o) {
+            $optLabels[$o->category][strtolower($o->value)] = $o->label_ne;
+        }
+        // mother_tongue uses category 'language' in survey_options
+        if (isset($optLabels['language'])) {
+            $optLabels['mother_tongue'] = $optLabels['language'];
+        }
+        // primary_income_source uses category 'income_source'
+        if (isset($optLabels['income_source'])) {
+            $optLabels['primary_income_source'] = $optLabels['income_source'];
+        }
+        // Kobo raw values that don't match canonical survey_options keys — merged as fallbacks.
+        // Keys are lowercase; existing survey_options entries take precedence (only fills gaps).
+        $koboFallback = [
+            // ── Old Kobo-style occupation values ───────────────────────────────
+            'occupation_type' => [
+                'agricultureandanimalhusbandry' => 'कृषि तथा पशुपालन',
+                'business'       => 'व्यापार/व्यवसाय',
+                'governmentemployee'        => 'सरकारी जागिर',
+                'employmentinprivatesector' => 'निजी क्षेत्र जागिर',
+                'foreignemployment'         => 'वैदेशिक रोजगार',
+                'dailywage'                 => 'दैनिक मजदुरी',
+                'selfemployment'            => 'स्वरोजगार',
+                'supportfamilyjobs'         => 'घरेलु काम',
+                'student'    => 'विद्यार्थी',
+                'unemployed' => 'बेरोजगार',
+                'other'      => 'अन्य',
+            ],
+            // ── Ethnicity: Kobo raw CamelCase not matching canonical snake_case ─
+            'ethnicity' => [
+                'brahmin'   => 'ब्राह्मण',          'chettri'   => 'क्षेत्री',
+                'rai'       => 'राई',                'limbu'     => 'लिम्बु',
+                'magar'     => 'मगर',                'tamang'    => 'तामांग',
+                'gurung'    => 'गुरुङ',              'newar'     => 'नेवार',
+                'thakuri'   => 'ठकुरी',              'tharu'     => 'थारु',
+                'kaami'     => 'कामी/बिश्वकर्मा',   'damai'     => 'दमाई',
+                'sarki'     => 'सार्की',             'yadav'     => 'यादव',
+                'musalmaan' => 'मुसलमान',            'rajbansi'  => 'राजबंशी',
+                'sunuwar'   => 'सुनुवार',            'sherpa'    => 'शेर्पा',
+                'kunwar'    => 'कुँवर',              'ghale'     => 'घले',
+                'bhujel'    => 'भुजेल',              'hayu'      => 'हायू',
+                'gaaine'    => 'गाइने',              'dom'       => 'डोम',
+                'kumaal'    => 'कुमाल',              'other'     => 'अन्य',
+            ],
+            // ── Religion: values absent from survey_options ─────────────────────
+            'religion' => [
+                'hindu'         => 'हिन्दू',          'buddhist'  => 'बौद्ध',
+                'kirant'        => 'किराँत',           'christian' => 'क्रिस्चियन',
+                'muslim'        => 'मुस्लिम',          'jain'      => 'जैन',
+                'prakriti'      => 'प्रकृति',          'athiest'   => 'नास्तिक',
+                'swargik_maarg' => 'स्वर्गिक मार्ग',  'sikh'      => 'शिख',
+                'bone'          => 'बोन',              'bai'       => 'बाइ',
+                'other'         => 'अन्य',
+            ],
+            // ── Mother tongue: values absent from survey_options ────────────────
+            'mother_tongue' => [
+                'nepali'     => 'नेपाली',           'bantawa'   => 'बान्तवा (राई)',
+                'limbu'      => 'लिम्बु',           'maithili'  => 'मैथली',
+                'bhojpuri'   => 'भोजपुरी',          'hindi'     => 'हिन्दी',
+                'tharu'      => 'थारु',             'rajbansi'  => 'राजबंशी',
+                'tamang'     => 'तामांग',           'nepalbhasa'=> 'नेपाल भाषा',
+                'newar'      => 'नेपाल भाषा (नेवारी)', 'magar' => 'मगर',
+                'gurung'     => 'गुरुङ',            'rai'       => 'राई',
+                'sherpa'     => 'शेर्पा',           'doteli'    => 'डोटेली',
+                'urdu'       => 'उर्दु',            'awadhi'    => 'अवधि',
+                'surjapuri'  => 'सुर्जापुरी',       'bajjika'   => 'बाजिका',
+                'sataar'     => 'सतार',             'english'   => 'अंग्रेजी',
+                'other'      => 'अन्य',
+            ],
+            // ── Relation to head: old Kobo CamelCase values ─────────────────────
+            'relation_to_head' => [
+                'headofhouse_self'   => 'घरमुली आफै',
+                'husband'            => 'श्रीमान',
+                'wife'               => 'श्रीमती',
+                'daughterinlaw'      => 'बुहारी',
+                'greatgrandson'      => 'पनाती',
+                'greatgranddaughter' => 'पनातिनी',
+            ],
+            // ── Marital status: old Kobo values ────────────────────────────────
+            'marital_status' => [
+                'singlemarried' => 'विवाहित',
+                'multimarried'  => 'बहु विवाह',
+                'remarried'     => 'पुनः विवाह',
+                'widow'         => 'विधुर/विधवा',
+                'seperated'     => 'अलग',
+            ],
+            // ── Education level: Phase1 seeder values (CamelCase) ───────────────
+            'education_level' => [
+                'illitrate'         => 'निरक्षर',
+                'literate'          => 'साक्षर',
+                'basiceducation1_5' => 'आधारभूत (कक्षा १-५)',
+                'basiceducation6_8' => 'आधारभूत (कक्षा ६-८)',
+                'secondaryschool'   => 'माध्यमिक (कक्षा ९-१०)',
+                'slc'               => 'SLC/SEE',
+                'intermediate'      => '+२/प्रवीणता',
+                'mphil'             => 'एमफिल',
+                'phd'               => 'पिएचडी',
+                'other'             => 'अन्य',
+            ],
+            // ── Disability type: old Kobo values ───────────────────────────────
+            'disability_type' => [
+                'blind'              => 'दृष्टिसम्बन्धी',
+                'deaf'               => 'श्रवणसम्बन्धी',
+                'speech'             => 'स्वर बोलाई',
+                'multiple_disability'=> 'बहुअपाङ्गता',
+            ],
+            // ── Water source: old Kobo values ──────────────────────────────────
+            'water_source' => [
+                'tap_house'   => 'धाराको पानी (घरभित्र)',
+                'tap_public'  => 'धाराको पानी (बाहिर)',
+                'tubewell'    => 'ट्युबवेल/हाते धारा',
+                'covered_well'=> 'ढाकिएको कुवा',
+                'open_well'   => 'खुला कुवा',
+                'jaruwa'      => 'मूलको पानी/जरुवा',
+                'bottledwater'=> 'जार/बोतलको पानी',
+                'river'       => 'नदी/खोला',
+            ],
+            // ── Toilet type: old Kobo values ───────────────────────────────────
+            'toilet_type' => [
+                'standard_septictank'    => 'फ्लस (सेप्टिक ट्याङ्क)',
+                'standard_publicdrainage'=> 'फ्लस (सार्वजनिक ढल)',
+                'normal'                 => 'साधारण शौचालय',
+                'no_toilet'              => 'शौचालय छैन',
+            ],
+            // ── Electricity source: old Kobo values ────────────────────────────
+            'electricity_source' => [
+                'natonalelectricgrid' => 'राष्ट्रिय ग्रिड',
+                'microhydro'          => 'लघु जलविद्युत',
+                'kerosene'            => 'मट्टितेल',
+                'solarenergy'         => 'सोलार',
+            ],
+            // ── Cooking fuel: old Kobo values ──────────────────────────────────
+            'cooking_fuel' => [
+                'lp_gas' => 'ग्याँस (LPG)',
+                'guitha' => 'गुइँठा',
+            ],
+            // ── Roof type: old Kobo values ─────────────────────────────────────
+            'roof_type' => [
+                'straw'       => 'फुस/खर',
+                'cgi_sheet'   => 'जस्ता',
+                'tiles_stone' => 'टायल/ढुंगा',
+                'wood'        => 'काठ',
+                'mud'         => 'माटो',
+            ],
+            // ── Wall type: old Kobo values ─────────────────────────────────────
+            'wall_type' => [
+                'mud_and_stone'   => 'माटो र ढुंगा/इट्टा',
+                'cement_and_stone'=> 'सिमेन्ट र ढुंगा/इट्टा',
+                'center_bera'     => 'सेन्टर बेरा',
+            ],
+            // ── Income source: old Kobo values ─────────────────────────────────
+            'primary_income_source' => [
+                'selfemployment' => 'स्वरोजगार',
+                'other_income'   => 'अन्य',
+            ],
+            'income_source' => [
+                'selfemployment' => 'स्वरोजगार',
+                'other_income'   => 'अन्य',
+            ],
+        ];
+        foreach ($koboFallback as $cat => $fallback) {
+            foreach ($fallback as $k => $label) {
+                if (!isset($optLabels[$cat][$k])) {
+                    $optLabels[$cat][$k] = $label;
+                }
+            }
+        }
+        // Helper: resolve label for a val within a category
+        // Replaces val with the Nepali label in-place so existing Vue code (r.val) shows labels.
+        // Also keeps label key for new Vue code (r.label ?? r.val) — both paths work.
+        $addLabels = function (array $rows, string $category) use ($optLabels): array {
+            $map = $optLabels[$category] ?? [];
+            foreach ($rows as &$r) {
+                $resolved = $map[strtolower((string)($r['val'] ?? ''))] ?? $r['val'];
+                $r['label'] = $resolved;
+                $r['val']   = $resolved;
+            }
+            return $rows;
+        };
 
         // ── 1. Overview ─────────────────────────────────────────────────────
         $hhCount = DB::table('households')->whereIn('ward_id', $wid)->where('status', 'published')->count();
@@ -578,18 +861,15 @@ class AnalyticsController extends Controller
         $femaleCount = (int) ($genderCounts->get('female', 0));
 
         $litRow = HouseholdMember::alive()->whereHas('household', $hhBase)
-            ->select(DB::raw('SUM(CASE WHEN is_literate=1 THEN 1 ELSE 0 END) as lit'), DB::raw('count(*) as tot'))
+            ->whereNotNull('education_level')->where('education_level', '!=', '')
+            ->select(DB::raw("SUM(CASE WHEN LOWER(education_level) NOT IN ('illitrate','illiterate') THEN 1 ELSE 0 END) as lit"), DB::raw('count(*) as tot'))
             ->first();
         $litRate = ($litRow && $litRow->tot > 0) ? round($litRow->lit / $litRow->tot * 100, 1) : 0;
 
         $elderlyCount   = HouseholdMember::alive()->whereHas('household', $hhBase)->where('age', '>=', 60)->count();
         $disabledCount  = HouseholdMember::alive()->whereHas('household', $hhBase)->where('disability_status', true)->count();
-        $abroadCount    = DB::table('member_migration')
-            ->join('household_members', 'member_migration.member_id', '=', 'household_members.id')
-            ->join('households', 'household_members.household_id', '=', 'households.id')
-            ->whereIn('households.ward_id', $wid)->where('households.status', 'published')
-            ->where('household_members.is_deceased', false)
-            ->where('member_migration.migration_status', 'abroad')->count();
+        $abroadCount    = HouseholdMember::alive()->whereHas('household', $hhBase)
+            ->where('addrslocation', 'विदेशमा बसेको (६ महिना भन्दा बढी समय देखि)')->count();
         $institutionCount = DB::table('institutions')->whereIn('ward_id', $wid)->where('status', 'published')->count();
         $businessCount    = DB::table('member_businesses')->whereIn('ward_id', $wid)->where('status', 'published')->count();
 
@@ -624,34 +904,44 @@ class AnalyticsController extends Controller
             ->groupBy('grp')->orderBy('grp')->pluck('cnt', 'grp')->toArray();
 
         // ── 3. Ethnicity + Religion + Mother tongue ──────────────────────────
-        $ethnicityData = HouseholdMember::alive()->whereHas('household', $hhBase)
-            ->whereNotNull('ethnicity')->where('ethnicity', '!=', '')
-            ->select('ethnicity as val', DB::raw('count(*) as cnt'))
-            ->groupBy('ethnicity')->orderByDesc('cnt')->get()
-            ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray();
+        $ethnicityData = $addLabels(
+            HouseholdMember::alive()->whereHas('household', $hhBase)
+                ->whereNotNull('ethnicity')->where('ethnicity', '!=', '')
+                ->select('ethnicity as val', DB::raw('count(*) as cnt'))
+                ->groupBy('ethnicity')->orderByDesc('cnt')->get()
+                ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray(),
+            'ethnicity'
+        );
 
-        $religionData = HouseholdMember::alive()->whereHas('household', $hhBase)
-            ->whereNotNull('religion')->where('religion', '!=', '')
-            ->select('religion as val', DB::raw('count(*) as cnt'))
-            ->groupBy('religion')->orderByDesc('cnt')->get()
-            ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray();
+        $religionData = $addLabels(
+            HouseholdMember::alive()->whereHas('household', $hhBase)
+                ->whereNotNull('religion')->where('religion', '!=', '')
+                ->select('religion as val', DB::raw('count(*) as cnt'))
+                ->groupBy('religion')->orderByDesc('cnt')->get()
+                ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray(),
+            'religion'
+        );
 
-        $motherTongueData = HouseholdMember::alive()->whereHas('household', $hhBase)
-            ->whereNotNull('mother_tongue')->where('mother_tongue', '!=', '')
-            ->select('mother_tongue as val', DB::raw('count(*) as cnt'))
-            ->groupBy('mother_tongue')->orderByDesc('cnt')->limit(10)->get()
-            ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray();
+        $motherTongueData = $addLabels(
+            HouseholdMember::alive()->whereHas('household', $hhBase)
+                ->whereNotNull('mother_tongue')->where('mother_tongue', '!=', '')
+                ->select('mother_tongue as val', DB::raw('count(*) as cnt'))
+                ->groupBy('mother_tongue')->orderByDesc('cnt')->limit(10)->get()
+                ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray(),
+            'mother_tongue'
+        );
 
         // ── 4. Housing ───────────────────────────────────────────────────────
         $housingBase = fn() => DB::table('household_housing')
             ->join('households', 'household_housing.household_id', '=', 'households.id')
             ->whereIn('households.ward_id', $wid)->where('households.status', 'published');
 
-        $housingBreakdown = function (string $col) use ($housingBase): array {
-            return $housingBase()->whereNotNull("household_housing.{$col}")->where("household_housing.{$col}", '!=', '')
+        $housingBreakdown = function (string $col) use ($housingBase, $addLabels): array {
+            $rows = $housingBase()->whereNotNull("household_housing.{$col}")->where("household_housing.{$col}", '!=', '')
                 ->select("household_housing.{$col} as val", DB::raw('count(*) as cnt'))
                 ->groupBy("household_housing.{$col}")->orderByDesc('cnt')->get()
                 ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray();
+            return $addLabels($rows, $col);
         };
 
         $permitRow = $housingBase()->select(
@@ -673,11 +963,12 @@ class AnalyticsController extends Controller
             ->join('households', 'household_utilities.household_id', '=', 'households.id')
             ->whereIn('households.ward_id', $wid)->where('households.status', 'published');
 
-        $utilBreakdown = function (string $col) use ($utilBase): array {
-            return $utilBase()->whereNotNull("household_utilities.{$col}")->where("household_utilities.{$col}", '!=', '')
+        $utilBreakdown = function (string $col) use ($utilBase, $addLabels): array {
+            $rows = $utilBase()->whereNotNull("household_utilities.{$col}")->where("household_utilities.{$col}", '!=', '')
                 ->select("household_utilities.{$col} as val", DB::raw('count(*) as cnt'))
                 ->groupBy("household_utilities.{$col}")->orderByDesc('cnt')->get()
                 ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray();
+            return $addLabels($rows, $col);
         };
 
         $handwashRow = $utilBase()
@@ -695,22 +986,28 @@ class AnalyticsController extends Controller
         ];
 
         // ── 6. Education & Occupation ─────────────────────────────────────────
-        $eduLevel = HouseholdMember::alive()->whereHas('household', $hhBase)
-            ->whereNotNull('education_level')->where('education_level', '!=', '')
-            ->select('education_level as val', DB::raw('count(*) as cnt'))
-            ->groupBy('education_level')->orderByDesc('cnt')->get()
-            ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray();
+        $eduLevel = $addLabels(
+            HouseholdMember::alive()->whereHas('household', $hhBase)
+                ->whereNotNull('education_level')->where('education_level', '!=', '')
+                ->select('education_level as val', DB::raw('count(*) as cnt'))
+                ->groupBy('education_level')->orderByDesc('cnt')->get()
+                ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray(),
+            'education_level'
+        );
 
-        $occupationData = HouseholdMember::alive()->whereHas('household', $hhBase)
-            ->whereNotNull('occupation_type')->where('occupation_type', '!=', '')
-            ->select('occupation_type as val', DB::raw('count(*) as cnt'))
-            ->groupBy('occupation_type')->orderByDesc('cnt')->get()
-            ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray();
+        $occupationData = $addLabels(
+            HouseholdMember::alive()->whereHas('household', $hhBase)
+                ->whereNotNull('occupation_type')->where('occupation_type', '!=', '')
+                ->select('occupation_type as val', DB::raw('count(*) as cnt'))
+                ->groupBy('occupation_type')->orderByDesc('cnt')->get()
+                ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray(),
+            'occupation_type'
+        );
 
         $litByGender = HouseholdMember::alive()->whereHas('household', $hhBase)
-            ->whereNotNull('gender')
+            ->whereNotNull('gender')->whereNotNull('education_level')->where('education_level', '!=', '')
             ->select('gender',
-                DB::raw('SUM(CASE WHEN is_literate=1 THEN 1 ELSE 0 END) as lit'),
+                DB::raw("SUM(CASE WHEN LOWER(education_level) NOT IN ('illitrate','illiterate') THEN 1 ELSE 0 END) as lit"),
                 DB::raw('count(*) as tot'))
             ->groupBy('gender')->get()
             ->map(fn($r) => ['gender' => $r->gender, 'lit' => (int)$r->lit, 'tot' => (int)$r->tot])->toArray();
@@ -722,11 +1019,12 @@ class AnalyticsController extends Controller
             ->join('households', 'household_economic.household_id', '=', 'households.id')
             ->whereIn('households.ward_id', $wid)->where('households.status', 'published');
 
-        $econBreakdown = function (string $col) use ($econBase): array {
-            return $econBase()->whereNotNull("household_economic.{$col}")->where("household_economic.{$col}", '!=', '')
+        $econBreakdown = function (string $col) use ($econBase, $addLabels): array {
+            $rows = $econBase()->whereNotNull("household_economic.{$col}")->where("household_economic.{$col}", '!=', '')
                 ->select("household_economic.{$col} as val", DB::raw('count(*) as cnt'))
                 ->groupBy("household_economic.{$col}")->orderByDesc('cnt')->get()
                 ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray();
+            return $addLabels($rows, $col);
         };
 
         $econRow = $econBase()->select(
@@ -771,35 +1069,43 @@ class AnalyticsController extends Controller
         ];
 
         // ── 9. Migration ─────────────────────────────────────────────────────
-        $migBase = fn() => DB::table('member_migration')
-            ->join('household_members', 'member_migration.member_id', '=', 'household_members.id')
-            ->join('households', 'household_members.household_id', '=', 'households.id')
-            ->whereIn('households.ward_id', $wid)->where('households.status', 'published')
-            ->where('household_members.is_deceased', false);
+        // Migration from addrslocation (member_migration table not populated by current sync)
+        $memberBase = fn() => HouseholdMember::alive()->whereHas('household',
+            fn($q) => $q->whereIn('ward_id', $wid)->where('status', 'published')
+        );
 
-        $migCounts = $migBase()->where('member_migration.migration_status', '!=', 'not_migrated')
-            ->select('member_migration.migration_status', DB::raw('count(*) as cnt'))
-            ->groupBy('member_migration.migration_status')->pluck('cnt', 'migration_status');
+        $migCounts = $memberBase()
+            ->whereIn('addrslocation', [
+                'विदेशमा बसेको (६ महिना भन्दा बढी समय देखि)',
+                'स्वदेशमा अन्यत्र (६ महिना भन्दा बढी समय देखि)',
+            ])
+            ->select('addrslocation', DB::raw('count(*) as cnt'))
+            ->groupBy('addrslocation')->pluck('cnt', 'addrslocation');
 
-        $destCountries = $migBase()->where('member_migration.migration_status', 'abroad')
-            ->whereNotNull('member_migration.destination_country')->where('member_migration.destination_country', '!=', '')
-            ->select('member_migration.destination_country as country', DB::raw('count(*) as cnt'))
-            ->groupBy('member_migration.destination_country')->orderByDesc('cnt')->limit(8)->get()
+        // residing_country not yet captured; placeholder for when it is
+        $destCountries = $memberBase()
+            ->where('addrslocation', 'विदेशमा बसेको (६ महिना भन्दा बढी समय देखि)')
+            ->whereNotNull('residing_country')->where('residing_country', '!=', '')
+            ->select('residing_country as country', DB::raw('count(*) as cnt'))
+            ->groupBy('residing_country')->orderByDesc('cnt')->limit(8)->get()
             ->map(fn($r) => ['country' => $r->country, 'cnt' => (int)$r->cnt])->toArray();
 
         $migration = [
-            'abroad'          => (int) ($migCounts->get('abroad', 0)),
-            'internal'        => (int) ($migCounts->get('internal', 0)),
-            'dest_countries'  => $destCountries,
+            'abroad'         => (int) ($migCounts->get('विदेशमा बसेको (६ महिना भन्दा बढी समय देखि)',    0)),
+            'internal'       => (int) ($migCounts->get('स्वदेशमा अन्यत्र (६ महिना भन्दा बढी समय देखि)', 0)),
+            'dest_countries' => $destCountries,
         ];
 
         // ── 10. Health & Disability ───────────────────────────────────────────
-        $disabilityTypes = HouseholdMember::alive()->whereHas('household', $hhBase)
-            ->where('disability_status', true)
-            ->whereNotNull('disability_type')->where('disability_type', '!=', '')
-            ->select('disability_type as val', DB::raw('count(*) as cnt'))
-            ->groupBy('disability_type')->orderByDesc('cnt')->get()
-            ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray();
+        $disabilityTypes = $addLabels(
+            HouseholdMember::alive()->whereHas('household', $hhBase)
+                ->where('disability_status', true)
+                ->whereNotNull('disability_type')->where('disability_type', '!=', '')
+                ->select('disability_type as val', DB::raw('count(*) as cnt'))
+                ->groupBy('disability_type')->orderByDesc('cnt')->get()
+                ->map(fn($r) => ['val' => $r->val, 'cnt' => (int)$r->cnt])->toArray(),
+            'disability_type'
+        );
 
         $chronicCount = HouseholdMember::alive()->whereHas('household', $hhBase)->where('chronic_illness', true)->count();
 
