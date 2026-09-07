@@ -17,6 +17,7 @@
         "mews/purifier": "^3.4",
         "mpdf/mpdf": "^8.3",
         "pragmarx/google2fa": "^9.0",
+        "sentry/sentry-laravel": "^4.27",
         "spatie/laravel-activitylog": "^4.12"
     },
     "require-dev": {
