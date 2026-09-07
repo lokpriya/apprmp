@@ -6,6 +6,7 @@ use App\Models\Household;
 use App\Models\Institution;
 use App\Models\MemberBusiness;
 use App\Services\CompletenessScoreService;
+use App\Services\DataQualityService;
 use App\Services\WorkflowService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -42,12 +43,16 @@ class ReviewController extends Controller
         $filterMissingGps  = $request->boolean('missing_gps');
         $filterNoMembers   = $request->boolean('no_members');
         $filterLowComplete = $request->boolean('low_completeness');
+        $filterDataFlags   = $request->boolean('data_flags');
 
         // Base (no quality filters) for counts shown on chips
         $base = Household::whereIn('ward_id', $wardIds)->where('status', 'submitted');
         if ($filterWard && in_array((int)$filterWard, $wardIds)) {
             $base->where('ward_id', $filterWard);
         }
+
+        $flaggedBase = clone $base;
+        DataQualityService::applyFlaggedScope($flaggedBase);
 
         $qualityCounts = [
             'missing_gps'      => (clone $base)
@@ -62,6 +67,7 @@ class ReviewController extends Controller
                     ->orWhereNull('survey_date')
                     ->orWhereNull('respondent_name')
                 )->count(),
+            'data_flags'       => $flaggedBase->count(),
         ];
 
         $query = Household::with(['ward', 'settlement', 'enumerator', 'housing', 'utilities', 'economic', 'members'])
@@ -86,6 +92,9 @@ class ReviewController extends Controller
                 ->orWhereNull('respondent_name')
             );
         }
+        if ($filterDataFlags) {
+            DataQualityService::applyFlaggedScope($query);
+        }
 
         $households = $query->latest('submitted_at')
             ->paginate(20)
@@ -99,10 +108,8 @@ class ReviewController extends Controller
                 'enumerator'      => $hh->enumerator ? ['name' => $hh->enumerator->name] : null,
                 'submitted_at'    => $hh->submitted_at?->diffForHumans(),
                 'completeness'    => CompletenessScoreService::score($hh),
-                'flags'           => [
-                    'missing_gps' => !filled($hh->gps_lat) || !filled($hh->gps_lng),
-                    'no_members'  => $hh->members->isEmpty(),
-                ],
+                'flags'           => DataQualityService::flags($hh),
+                'member_count'    => $hh->members->where('is_deceased', false)->count(),
             ]);
 
         $wards = \App\Models\Ward::whereIn('id', $wardIds)
@@ -114,6 +121,7 @@ class ReviewController extends Controller
             'missing_gps'      => $filterMissingGps,
             'no_members'       => $filterNoMembers,
             'low_completeness' => $filterLowComplete,
+            'data_flags'       => $filterDataFlags,
         ];
 
         return Inertia::render('Review/Households', compact('households', 'wards', 'filters', 'qualityCounts'));
@@ -124,7 +132,8 @@ class ReviewController extends Controller
         $wardIds    = $this->scopedWardIds();
         $filterWard = $request->input('ward_id');
 
-        $query = Institution::with(['ward', 'settlement', 'institutionType', 'enumerator', 'infrastructure'])
+        $instTypeLabels = \App\Models\SurveyOption::where('category', 'institution_type')->pluck('label_ne', 'value');
+        $query = Institution::with(['ward', 'settlement', 'enumerator', 'infrastructure'])
             ->whereIn('ward_id', $wardIds)
             ->where('status', 'submitted');
 
@@ -140,7 +149,7 @@ class ReviewController extends Controller
                 'name_np'         => $i->name_np,
                 'name_en'         => $i->name_en,
                 'ward'            => $i->ward ? ['ward_number' => $i->ward->ward_number] : null,
-                'institutionType' => $i->institutionType ? ['name_np' => $i->institutionType->name_np] : null,
+                'institutionType' => $i->institution_type ? ['name_np' => $instTypeLabels[$i->institution_type] ?? $i->institution_type] : null,
                 'ownership_type'  => $i->ownership_type,
                 'enumerator'      => $i->enumerator ? ['name' => $i->enumerator->name] : null,
                 'submitted_at'    => $i->submitted_at?->diffForHumans(),

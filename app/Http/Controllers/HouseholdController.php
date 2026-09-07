@@ -10,6 +10,7 @@ use App\Models\Settlement;
 use App\Models\SurveyOption;
 use App\Models\Ward;
 use App\Services\CompletenessScoreService;
+use App\Services\DataQualityService;
 use App\Services\DuplicateDetectionService;
 use App\Services\HouseholdService;
 use App\Services\WorkflowService;
@@ -140,6 +141,8 @@ class HouseholdController extends Controller
                 'created_at'  => $fv->created_at?->format('Y-m-d'),
             ] : null,
             'surveyOptions' => SurveyOption::allGroupedForVue($lgId),
+            'dataFlags'     => DataQualityService::flags($household),
+            'flagMeta'      => DataQualityService::FLAG_META,
         ]);
     }
 
@@ -456,7 +459,7 @@ class HouseholdController extends Controller
     public function showMember(Household $household, HouseholdMember $member)
     {
         $this->authorize('view', $household);
-        abort_unless($member->household_id === $household->id, 404);
+        abort_unless((int)$member->household_id === (int)$household->id, 404);
 
         $member->load(['migration', 'health', 'business']);
         $household->load(['ward', 'settlement', 'enumerator']);
@@ -488,7 +491,7 @@ class HouseholdController extends Controller
     {
         abort_unless(auth()->user()->hasPermission('households.mark_deceased'), 403);
         $this->authorize('view', $household);
-        abort_unless($member->household_id === $household->id, 404);
+        abort_unless((int)$member->household_id === (int)$household->id, 404);
 
         $data = $request->validate([
             'death_date'    => 'nullable|date_format:Y-m-d',
@@ -515,7 +518,7 @@ class HouseholdController extends Controller
     {
         abort_unless(auth()->user()->hasPermission('households.mark_deceased'), 403);
         $this->authorize('view', $household);
-        abort_unless($member->household_id === $household->id, 404);
+        abort_unless((int)$member->household_id === (int)$household->id, 404);
 
         $member->update([
             'is_deceased'   => false,

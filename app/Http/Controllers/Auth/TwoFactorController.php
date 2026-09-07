@@ -77,6 +77,8 @@ class TwoFactorController extends Controller
             return response()->json(['message' => 'सेटअप सत्र समाप्त भयो। पुनः प्रयास गर्नुहोस्।'], 422);
         }
 
+        // Window 4 = ±2 min (9 valid codes). Must match verifyChallenge(), or a device
+        // with a drifted clock would pass setup and then fail every subsequent login.
         $valid = $this->google2fa->verifyKey($secret, $request->code, 4);
         if (!$valid) {
             return response()->json(['errors' => ['code' => 'कोड गलत छ। पुनः प्रयास गर्नुहोस्।']], 422);

@@ -20,7 +20,7 @@ class InstitutionService
                 'unique_code'         => $this->codeService->generateInstitutionCode($ward),
                 'ward_id'             => $data['ward_id'],
                 'settlement_id'       => $data['settlement_id'] ?: null,
-                'institution_type_id' => $data['institution_type_id'] ?: null,
+                'institution_type'    => $data['institution_type'] ?: null,
                 'name_np'             => $data['name_np'] ?: null,
                 'name_en'             => $data['name_en'],
                 'established_date'    => $data['established_date'] ?: null,
@@ -52,7 +52,7 @@ class InstitutionService
             $institution->update([
                 'sync_locked'         => true,
                 'settlement_id'       => $data['settlement_id'] ?: null,
-                'institution_type_id' => $data['institution_type_id'] ?: $institution->institution_type_id,
+                'institution_type'    => $data['institution_type'] ?: $institution->institution_type,
                 'name_np'             => $data['name_np'] ?: null,
                 'name_en'             => $data['name_en'] ?? $institution->name_en,
                 'established_date'    => $data['established_date'] ?: null,

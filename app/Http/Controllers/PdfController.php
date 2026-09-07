@@ -33,7 +33,7 @@ class PdfController extends Controller
         $this->authorize('view', $institution);
 
         $institution->load([
-            'ward.localGovernment', 'settlement', 'institutionType',
+            'ward.localGovernment', 'settlement',
             'infrastructure', 'staff', 'services', 'education', 'healthDetail',
         ]);
 

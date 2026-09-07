@@ -43,6 +43,25 @@ class SurveyOptionSeeder extends Seeder
     {
         return [
 
+            // ── Institution Types ─────────────────────────────────────────────
+            'institution_type' => [
+                ['school',          'विद्यालय',                    'School'],
+                ['health_post',     'स्वास्थ्य चौकी/अस्पताल',     'Health Post/Hospital'],
+                ['bank',            'बैंक/वित्तीय संस्था',         'Bank/Financial Inst.'],
+                ['cooperative',     'सहकारी',                      'Cooperative'],
+                ['govt_office',     'सरकारी कार्यालय',             'Govt. Office'],
+                ['ngo_cbo',         'गैसस/एनजीओ/सीबीओ',           'NGO/CBO'],
+                ['religious',       'धार्मिक स्थल',                'Religious Institution'],
+                ['market',          'बजार/बाणिज्य केन्द्र',        'Market/Trade Center'],
+                ['industry',        'उद्योग/कलकारखाना',            'Industry/Factory'],
+                ['community_infra', 'सामुदायिक भवन',               'Community Building'],
+                ['park_tourism',    'उद्यान/पर्यटन स्थल',          'Park/Tourism Site'],
+                ['media',           'मिडिया/सञ्चार',               'Media/Communication'],
+                ['forest_group',    'वन उपभोक्ता समूह',            'Forest User Group'],
+                ['sports_club',     'खेल संस्था/क्लब',             'Sports Club'],
+                ['other',           'अन्य',                        'Other'],
+            ],
+
             // ── House Details ────────────────────────────────────────────────
             'house_land_type' => [
                 ['Registered',    'दर्ता भएको',        'Registered'],
@@ -135,6 +154,11 @@ class SurveyOptionSeeder extends Seeder
                 ['musahar',        'मुसहर',             'Musahar'],
                 ['chamar',         'चमार',              'Chamar'],
                 ['dusadh',         'दुसाध',             'Dusadh'],
+                ['majhi',          'माझी',              'Majhi'],
+                ['jogi',           'जोगी',              'Jogi'],
+                ['madhesi',        'मधेसी',             'Madhesi'],
+                ['chaudhary',      'चौधरी',             'Chaudhary'],
+                ['lepcha',         'लेप्चा',            'Lepcha'],
                 ['other_dalit',    'अन्य दलित',         'Other Dalit'],
                 ['other_janajati', 'अन्य जनजाति',       'Other Janajati'],
                 ['other',          'अन्य',              'Other'],
@@ -322,6 +346,15 @@ class SurveyOptionSeeder extends Seeder
             ],
 
             // ── Agriculture ──────────────────────────────────────────────────
+            'agri_category' => [
+                ['food_crops',  'खाद्य बाली',   'Food Crops'],
+                ['pulses',      'दलहन बाली',   'Pulses'],
+                ['oil_seeds',   'तेलहन बाली',  'Oil Seeds'],
+                ['vegetables',  'तरकारी बाली', 'Vegetables'],
+                ['cash_crops',  'नगदे बाली',   'Cash Crops'],
+                ['fruits',      'फलफूल बाली',  'Fruits'],
+                ['other_crops', 'अन्य बाली',   'Other Crops'],
+            ],
             'crop_food' => [
                 ['Rice',      'धान',   'Rice'],
                 ['Maize',     'मकै',   'Maize'],
@@ -396,12 +429,13 @@ class SurveyOptionSeeder extends Seeder
                 ['Other',           'अन्य',          'Other'],
             ],
             'irrigation_source' => [
-                ['Canal',    'नहर',    'Canal/Irrigation Channel'],
-                ['Borewell', 'ट्यूबवेल','Borewell/Tubewell'],
-                ['River',    'नदी/खोला','River/Stream'],
-                ['Pond',     'पोखरी',  'Pond/Reservoir'],
-                ['Rainfall', 'वर्षा',  'Rainfall/Rainfed'],
-                ['Spring',   'मूल',   'Spring/Natural Source'],
+                ['Canal',     'नहर',             'Canal/Irrigation Channel'],
+                ['Borewell',  'ट्यूबवेल',        'Borewell/Tubewell'],
+                ['River',     'नदी/खोला',         'River/Stream'],
+                ['Pond',      'पोखरी',            'Pond/Reservoir'],
+                ['Rainfall',  'वर्षा',            'Rainfall/Rainfed'],
+                ['Spring',    'मूल',              'Spring/Natural Source'],
+                ['lift_pump', 'लिफ्ट/पम्प सेट', 'Lift/Pump Set'],
             ],
 
             // ── Livestock ────────────────────────────────────────────────────
@@ -878,6 +912,14 @@ class SurveyOptionSeeder extends Seeder
                 ['sometimes', 'कहिलेकाहीँ',    'Sometimes'],
                 ['rarely',    'बिरलै',           'Rarely'],
                 ['never',     'कहिल्यै नहुने',  'Never'],
+            ],
+
+            // ── Illness Frequency ────────────────────────────────────────────
+            'illness_frequency' => [
+                ['rarely', 'विरलै (वर्षमा १ पटक भन्दा कम)', 'Rarely (less than once a year)'],
+                ['1_2',    '१–२ पटक',                        '1–2 times'],
+                ['3_5',    '३–५ पटक',                        '3–5 times'],
+                ['6_plus', '६ पटक वा बढी',                   '6 or more times'],
             ],
         ];
     }

@@ -1,5 +1,6 @@
 <?php
 namespace App\Models;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -127,11 +128,48 @@ class HouseholdMember extends Model
         'vocational_training'        => 'boolean',
         'techtraining'               => 'boolean',
         'sa_training'                => 'boolean',
-        // Address
-        'residing_country'           => 'array',
         // Business
         'involveinbusiness'          => 'boolean',
     ];
+
+    /**
+     * The form binds this to a checkbox group (array), but bulk import and Google
+     * Sync write a single plain string, which a plain 'array' cast stores as a JSON
+     * scalar ("भारत") rather than a JSON array. Reading that back as a non-array made
+     * the frontend fall through to [] and silently wipe the value on the next save.
+     * Normalise every shape — JSON array, JSON scalar, bare string — to an array.
+     */
+    protected function residingCountry(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                if ($value === null || $value === '') {
+                    return [];
+                }
+                $decoded = json_decode($value, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    return [$value];
+                }
+                if (is_array($decoded)) {
+                    return array_values(array_filter($decoded, fn ($v) => $v !== null && $v !== ''));
+                }
+                return ($decoded === null || $decoded === '') ? [] : [(string) $decoded];
+            },
+            set: function ($value) {
+                if (is_string($value)) {
+                    $decoded = json_decode($value, true);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $value = $decoded;
+                    }
+                }
+                $list = array_values(array_filter(
+                    is_array($value) ? $value : [$value],
+                    fn ($v) => $v !== null && $v !== ''
+                ));
+                return $list ? json_encode($list, JSON_UNESCAPED_UNICODE) : null;
+            },
+        );
+    }
 
     public function scopeAlive($query) { return $query->where('is_deceased', false); }
 

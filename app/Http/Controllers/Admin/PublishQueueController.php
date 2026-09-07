@@ -41,7 +41,8 @@ class PublishQueueController extends Controller
                 'submitted_at'        => $hh->submitted_at?->format('Y-m-d'),
             ]);
 
-        $institutions = Institution::with(['ward', 'settlement', 'institutionType', 'enumerator', 'wardReviewer'])
+        $instTypeLabels = \App\Models\SurveyOption::where('category', 'institution_type')->pluck('label_ne', 'value');
+        $institutions = Institution::with(['ward', 'settlement', 'enumerator', 'wardReviewer'])
             ->whereIn('ward_id', $wardIds)
             ->whereIn('status', ['ward_approved', 'escalated'])
             ->latest('ward_reviewed_at')
@@ -53,7 +54,7 @@ class PublishQueueController extends Controller
                 'name_en'             => $i->name_en,
                 'status'              => $i->status,
                 'ward'                => $i->ward ? ['ward_number' => $i->ward->ward_number] : null,
-                'institutionType'     => $i->institutionType ? ['name_np' => $i->institutionType->name_np] : null,
+                'institutionType'     => $i->institution_type ? ['name_np' => $instTypeLabels[$i->institution_type] ?? $i->institution_type] : null,
                 'enumerator'          => $i->enumerator ? ['name' => $i->enumerator->name] : null,
                 'ward_reviewer'       => $i->wardReviewer ? ['name' => $i->wardReviewer->name] : null,
                 'ward_review_comment' => $i->ward_review_comment,

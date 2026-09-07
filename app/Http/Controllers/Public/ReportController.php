@@ -59,7 +59,7 @@ class ReportController extends Controller
      */
     private function memberQuery(array $wardIds, Request $request)
     {
-        $q = HouseholdMember::whereHas('household', fn ($hq) =>
+        $q = HouseholdMember::where('is_deceased', false)->whereHas('household', fn ($hq) =>
             $hq->whereIn('ward_id', $wardIds)->where('status', 'published')
         );
 
@@ -74,6 +74,30 @@ class ReportController extends Controller
         }
 
         return $q;
+    }
+
+    /**
+     * All-LG member query for municipal average comparison.
+     * Uses all LG ward IDs (ignores ward/settlement filter) but keeps age/gender filters.
+     */
+    private function lgMemberQuery(LocalGovernment $lg, Request $request): \Illuminate\Database\Eloquent\Builder
+    {
+        $q = HouseholdMember::where('is_deceased', false)->whereHas('household', fn ($hq) =>
+            $hq->whereIn('ward_id', $this->wardIds($lg))->where('status', 'published')
+        );
+        if ($request->filled('age_min')) $q->where('age', '>=', (int)$request->age_min);
+        if ($request->filled('age_max')) $q->where('age', '<=', (int)$request->age_max);
+        if ($request->filled('gender'))  $q->where('gender', $request->gender);
+        return $q;
+    }
+
+    /**
+     * Returns frequency comparison data (municipal scope). Returns [] when lgMq is null.
+     */
+    private function compFreq($lgMq, string $colExpr, array $labels, string $ck): array
+    {
+        if (!$lgMq) return [];
+        return CrossTabService::freq(clone $lgMq, $colExpr, $labels, $ck);
     }
 
     /**
@@ -105,6 +129,26 @@ class ReportController extends Controller
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Round Comparison — multi-round snapshot comparison
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function roundComparison(): \Inertia\Response
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) {
+            return Inertia::render('Public/Reports/RoundComparison', [
+                'lg'     => null,
+                'rounds' => [],
+            ]);
+        }
+
+        return Inertia::render('Public/Reports/RoundComparison', [
+            'lg'     => $this->lgProps($lg),
+            'rounds' => $lg->survey_config['rounds'] ?? [],
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // 1. Index — overview / landing
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -113,18 +157,22 @@ class ReportController extends Controller
         $lg = $this->defaultLg();
         if (!$lg) return Inertia::render('Public/Reports/Index', ['lg' => null]);
 
-        $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
-        $mq      = $this->memberQuery($wardIds, $request);
-        $ck      = CrossTabService::cacheKey('idx', $lg->id, $request->only(['ward_id', 'settlement_id']));
+        $wardIds      = $this->wardIds($lg, $request->integer('ward_id') ?: null);
+        $allWardIds   = $this->wardIds($lg);
+        $settlementId = $request->integer('settlement_id') ?: null;
+        $mq           = $this->memberQuery($wardIds, $request);
+        $ck           = CrossTabService::cacheKey('idx', $lg->id, $request->only(['ward_id', 'settlement_id']));
 
         $summary = [
-            'total_households'   => Household::whereIn('ward_id', $wardIds)->where('status', 'published')->count(),
+            'total_households'   => Household::whereIn('ward_id', $wardIds)->where('status', 'published')
+                ->when($settlementId, fn ($q) => $q->where('settlement_id', $settlementId))->count(),
             'total_population'   => (clone $mq)->count(),
             'total_male'         => (clone $mq)->where('gender', 'male')->count(),
             'total_female'       => (clone $mq)->where('gender', 'female')->count(),
             'total_other'        => (clone $mq)->where('gender', 'other')->count(),
-            'total_institutions' => Institution::whereIn('ward_id', $wardIds)->where('status', 'published')->count(),
-            'total_wards'        => count($wardIds),
+            'total_institutions' => Institution::whereIn('ward_id', $wardIds)->where('status', 'published')
+                ->when($settlementId, fn ($q) => $q->where('settlement_id', $settlementId))->count(),
+            'total_wards'        => count($allWardIds),
         ];
 
         $genderData = CrossTabService::freq(
@@ -175,19 +223,20 @@ class ReportController extends Controller
             'households'  => (int)($hhByWard->get($w->id, 0)),
         ])->values();
 
-        // Key indicators
-        $litCount = (clone $mq)
+        // Key indicators — literacy: literate ÷ members with education data (same formula as AnalyticsController)
+        $litRow = (clone $mq)
             ->whereNotNull('education_level')->where('education_level', '!=', '')
-            ->whereRaw("LOWER(education_level) NOT IN ('illitrate','illiterate')")
-            ->count();
+            ->selectRaw("SUM(CASE WHEN LOWER(education_level) NOT IN ('illitrate','illiterate') THEN 1 ELSE 0 END) as lit, COUNT(*) as tot")
+            ->first();
+        $litRate  = ($litRow && $litRow->tot > 0) ? round($litRow->lit / $litRow->tot * 100, 1) : 0;
         $totalPop = $summary['total_population'];
         $totalHH  = $summary['total_households'];
 
         $keyIndicators = [
-            'sex_ratio'    => $summary['total_female'] > 0
+            'sex_ratio'     => $summary['total_female'] > 0
                 ? round($summary['total_male'] / $summary['total_female'] * 100) : 0,
-            'literacy_rate' => $totalPop > 0 ? round($litCount / $totalPop * 100, 1) : 0,
-            'avg_hh_size'  => $totalHH > 0 ? round($totalPop / $totalHH, 2) : 0,
+            'literacy_rate' => $litRate,
+            'avg_hh_size'   => $totalHH > 0 ? round($totalPop / $totalHH, 1) : 0,
         ];
 
         return Inertia::render('Public/Reports/Index', [
@@ -214,6 +263,13 @@ class ReportController extends Controller
         $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
         $mq      = $this->memberQuery($wardIds, $request);
         $ck      = CrossTabService::cacheKey('demo', $lg->id, $request->only(['ward_id','settlement_id']));
+        $hasWard = $request->filled('ward_id');
+        $lgMq    = $hasWard ? $this->lgMemberQuery($lg, $request) : null;
+        // Municipal-comparison series needs its own namespace: keyed on the plain prefix
+        // with no filters it collides byte-for-byte with the unfiltered page's own key,
+        // and it must carry the filters lgMemberQuery() applies or a gendered request
+        // poisons the unfiltered chart.
+        $lgCk    = CrossTabService::cacheKey('demo_lg', $lg->id, $request->only(['age_min','age_max','gender']));
 
         $genderByAge = CrossTabService::tab(
             clone $mq,
@@ -309,28 +365,32 @@ class ReportController extends Controller
             ],
             'frequencies'      => [
                 [
-                    'id'      => 'ethnicity',
-                    'title'   => 'जातीय विवरण',
-                    'title_en'=> 'Ethnicity Distribution',
-                    'data'    => $ethnicityFreq,
+                    'id'         => 'ethnicity',
+                    'title'      => 'जातीय विवरण',
+                    'title_en'   => 'Ethnicity Distribution',
+                    'data'       => $ethnicityFreq,
+                    'comparison' => $this->compFreq($lgMq, 'ethnicity', CrossTabService::optionLabels('ethnicity'), $lgCk . '_ethnicity'),
                 ],
                 [
-                    'id'      => 'religion',
-                    'title'   => 'धर्म अनुसार जनसंख्या',
-                    'title_en'=> 'Religion Distribution',
-                    'data'    => $religionFreq,
+                    'id'         => 'religion',
+                    'title'      => 'धर्म अनुसार जनसंख्या',
+                    'title_en'   => 'Religion Distribution',
+                    'data'       => $religionFreq,
+                    'comparison' => $this->compFreq($lgMq, 'religion', CrossTabService::optionLabels('religion'), $lgCk . '_religion'),
                 ],
                 [
-                    'id'      => 'mother_tongue',
-                    'title'   => 'मातृभाषा अनुसार जनसंख्या',
-                    'title_en'=> 'Mother Tongue Distribution',
-                    'data'    => $motherTongueFreq,
+                    'id'         => 'mother_tongue',
+                    'title'      => 'मातृभाषा अनुसार जनसंख्या',
+                    'title_en'   => 'Mother Tongue Distribution',
+                    'data'       => $motherTongueFreq,
+                    'comparison' => $this->compFreq($lgMq, 'mother_tongue', CrossTabService::optionLabels('mother_tongue'), $lgCk . '_mother_tongue'),
                 ],
                 [
-                    'id'      => 'marital',
-                    'title'   => 'वैवाहिक अवस्था',
-                    'title_en'=> 'Marital Status',
-                    'data'    => $maritalFreq,
+                    'id'         => 'marital',
+                    'title'      => 'वैवाहिक अवस्था',
+                    'title_en'   => 'Marital Status',
+                    'data'       => $maritalFreq,
+                    'comparison' => $this->compFreq($lgMq, 'marital_status', CrossTabService::optionLabels('marital_status'), $lgCk . '_marital'),
                 ],
             ],
         ]);
@@ -347,6 +407,9 @@ class ReportController extends Controller
         $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
         $mq      = $this->memberQuery($wardIds, $request);
         $ck      = CrossTabService::cacheKey('edu', $lg->id, $request->only(['ward_id','settlement_id','gender']));
+        $hasWard = $request->filled('ward_id');
+        $lgMq    = $hasWard ? $this->lgMemberQuery($lg, $request) : null;
+        $lgCk    = CrossTabService::cacheKey('edu_lg', $lg->id, $request->only(['age_min','age_max','gender']));
 
         $eduByGender = CrossTabService::tab(
             clone $mq,
@@ -430,22 +493,25 @@ class ReportController extends Controller
             ],
             'frequencies' => [
                 [
-                    'id'      => 'edu_status',
-                    'title'   => 'शिक्षा अवस्था',
-                    'title_en'=> 'Education Status',
-                    'data'    => $eduStatusFreq,
+                    'id'         => 'edu_status',
+                    'title'      => 'शिक्षा अवस्था',
+                    'title_en'   => 'Education Status',
+                    'data'       => $eduStatusFreq,
+                    'comparison' => $this->compFreq($lgMq, 'education_status', CrossTabService::optionLabels('education_status'), $lgCk . '_edu_status'),
                 ],
                 [
-                    'id'      => 'school_type',
-                    'title'   => 'विद्यालयको प्रकार',
-                    'title_en'=> 'School Type',
-                    'data'    => $schoolTypeFreq,
+                    'id'         => 'school_type',
+                    'title'      => 'विद्यालयको प्रकार',
+                    'title_en'   => 'School Type',
+                    'data'       => $schoolTypeFreq,
+                    'comparison' => $this->compFreq($lgMq, 'school_type', CrossTabService::optionLabels('school_type'), $lgCk . '_school_type'),
                 ],
                 [
-                    'id'      => 'not_in_school',
-                    'title'   => 'विद्यालय नजाने कारण',
-                    'title_en'=> 'Reason Not in School',
-                    'data'    => $notInSchoolFreq,
+                    'id'         => 'not_in_school',
+                    'title'      => 'विद्यालय नजाने कारण',
+                    'title_en'   => 'Reason Not in School',
+                    'data'       => $notInSchoolFreq,
+                    'comparison' => $this->compFreq($lgMq, 'cause_not_school', CrossTabService::optionLabels('cause_not_school'), $lgCk . '_not_school'),
                 ],
             ],
         ]);
@@ -462,6 +528,9 @@ class ReportController extends Controller
         $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
         $mq      = $this->memberQuery($wardIds, $request);
         $ck      = CrossTabService::cacheKey('health', $lg->id, $request->only(['ward_id','settlement_id','gender']));
+        $hasWard = $request->filled('ward_id');
+        $lgMq    = $hasWard ? $this->lgMemberQuery($lg, $request) : null;
+        $lgCk    = CrossTabService::cacheKey('health_lg', $lg->id, $request->only(['age_min','age_max','gender']));
 
         // Boolean columns stored as 0/1 tinyint — normalise to 'yes'/'no' for rowDef matching
         $boolExpr = fn(string $col) => "IF({$col} = 1 OR LOWER({$col}) = 'yes', 'yes', 'no')";
@@ -563,34 +632,39 @@ class ReportController extends Controller
             ],
             'frequencies' => [
                 [
-                    'id'      => 'disability_type',
-                    'title'   => 'अपाङ्गताको प्रकार',
-                    'title_en'=> 'Type of Disability',
-                    'data'    => $disabilityTypeFreq,
+                    'id'         => 'disability_type',
+                    'title'      => 'अपाङ्गताको प्रकार',
+                    'title_en'   => 'Type of Disability',
+                    'data'       => $disabilityTypeFreq,
+                    'comparison' => $this->compFreq($lgMq ? (clone $lgMq)->where('disability_status', 1) : null, 'disability_type', CrossTabService::optionLabels('disability_type'), $lgCk . '_dis_type'),
                 ],
                 [
-                    'id'      => 'ss_allowance',
-                    'title'   => 'सामाजिक सुरक्षा भत्ता',
-                    'title_en'=> 'Social Security Allowance',
-                    'data'    => $ssAllowanceFreq,
+                    'id'         => 'ss_allowance',
+                    'title'      => 'सामाजिक सुरक्षा भत्ता',
+                    'title_en'   => 'Social Security Allowance',
+                    'data'       => $ssAllowanceFreq,
+                    'comparison' => $this->compFreq($lgMq, 'ss_allowance', CrossTabService::optionLabels('ss_allowance'), $lgCk . '_ss_allowance'),
                 ],
                 [
-                    'id'      => 'blood_group',
-                    'title'   => 'रक्त समूह',
-                    'title_en'=> 'Blood Group',
-                    'data'    => $bloodGroupFreq,
+                    'id'         => 'blood_group',
+                    'title'      => 'रक्त समूह',
+                    'title_en'   => 'Blood Group',
+                    'data'       => $bloodGroupFreq,
+                    'comparison' => $this->compFreq($lgMq, 'blood_group', CrossTabService::optionLabels('blood_group'), $lgCk . '_blood_group'),
                 ],
                 [
-                    'id'      => 'vaccine',
-                    'title'   => 'खोप स्थिति (उमेर ०–३)',
-                    'title_en'=> 'Vaccination Status (age 0–3)',
-                    'data'    => $vaccineFreq,
+                    'id'         => 'vaccine',
+                    'title'      => 'खोप स्थिति (उमेर ०–३)',
+                    'title_en'   => 'Vaccination Status (age 0–3)',
+                    'data'       => $vaccineFreq,
+                    'comparison' => $this->compFreq($lgMq ? (clone $lgMq)->where('age', '<=', 3) : null, 'childvaccine', CrossTabService::optionLabels('childvaccine'), $lgCk . '_vaccine'),
                 ],
                 [
-                    'id'      => 'vitamin_a',
-                    'title'   => 'भिटामिन A (उमेर ४–५)',
-                    'title_en'=> 'Vitamin A (age 4–5)',
-                    'data'    => $vitAFreq,
+                    'id'         => 'vitamin_a',
+                    'title'      => 'भिटामिन A (उमेर ४–५)',
+                    'title_en'   => 'Vitamin A (age 4–5)',
+                    'data'       => $vitAFreq,
+                    'comparison' => $this->compFreq($lgMq ? (clone $lgMq)->whereBetween('age', [4, 5]) : null, 'vitaminA', CrossTabService::optionLabels('vitaminA'), $lgCk . '_vita'),
                 ],
             ],
         ]);
@@ -607,6 +681,9 @@ class ReportController extends Controller
         $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
         $mq      = $this->memberQuery($wardIds, $request);
         $ck      = CrossTabService::cacheKey('emp', $lg->id, $request->only(['ward_id','settlement_id','gender']));
+        $hasWard = $request->filled('ward_id');
+        $lgMq    = $hasWard ? $this->lgMemberQuery($lg, $request) : null;
+        $lgCk    = CrossTabService::cacheKey('emp_lg', $lg->id, $request->only(['age_min','age_max','gender']));
 
         $occupationByGender = CrossTabService::tab(
             clone $mq,
@@ -688,28 +765,32 @@ class ReportController extends Controller
             ],
             'frequencies' => [
                 [
-                    'id'      => 'occupation',
-                    'title'   => 'पेसाको वितरण',
-                    'title_en'=> 'Occupation Distribution',
-                    'data'    => $occupationFreq,
+                    'id'         => 'occupation',
+                    'title'      => 'पेसाको वितरण',
+                    'title_en'   => 'Occupation Distribution',
+                    'data'       => $occupationFreq,
+                    'comparison' => $this->compFreq($lgMq, 'occupation_type', CrossTabService::optionLabels('occupation_type'), $lgCk . '_occ'),
                 ],
                 [
-                    'id'      => 'vt_subject',
-                    'title'   => 'व्यावसायिक तालिमको विषय',
-                    'title_en'=> 'Vocational Training Subject',
-                    'data'    => $vtSubjectFreq,
+                    'id'         => 'vt_subject',
+                    'title'      => 'व्यावसायिक तालिमको विषय',
+                    'title_en'   => 'Vocational Training Subject',
+                    'data'       => $vtSubjectFreq,
+                    'comparison' => $this->compFreq($lgMq ? (clone $lgMq)->where('vocational_training', 1) : null, 'vt_subject', CrossTabService::optionLabels('vt_subject'), $lgCk . '_vt_subject'),
                 ],
                 [
-                    'id'      => 'techtraining',
-                    'title'   => 'प्राविधिक तालिम',
-                    'title_en'=> 'Technical Training',
-                    'data'    => $techTrainingFreq,
+                    'id'         => 'techtraining',
+                    'title'      => 'प्राविधिक तालिम',
+                    'title_en'   => 'Technical Training',
+                    'data'       => $techTrainingFreq,
+                    'comparison' => $this->compFreq($lgMq, $boolExpr('techtraining'), ['yes' => 'प्राविधिक तालिम लिएको', 'no' => 'प्राविधिक तालिम नलिएको'], $lgCk . '_techtraining'),
                 ],
                 [
-                    'id'      => 'sa_training',
-                    'title'   => 'साक्षरता/अन्य तालिम',
-                    'title_en'=> 'Literacy / Other Training',
-                    'data'    => $saTrainingFreq,
+                    'id'         => 'sa_training',
+                    'title'      => 'साक्षरता/अन्य तालिम',
+                    'title_en'   => 'Literacy / Other Training',
+                    'data'       => $saTrainingFreq,
+                    'comparison' => $this->compFreq($lgMq, $boolExpr('sa_training'), ['yes' => 'साक्षरता/अन्य तालिम लिएको', 'no' => 'नलिएको'], $lgCk . '_sa_training'),
                 ],
             ],
         ]);
@@ -1081,6 +1162,9 @@ class ReportController extends Controller
         $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
         $mq      = $this->memberQuery($wardIds, $request);
         $ck      = CrossTabService::cacheKey('migr', $lg->id, $request->only(['ward_id', 'settlement_id', 'gender']));
+        $hasWard = $request->filled('ward_id');
+        $lgMq    = $hasWard ? $this->lgMemberQuery($lg, $request) : null;
+        $lgCk    = CrossTabService::cacheKey('migr_lg', $lg->id, $request->only(['age_min','age_max','gender']));
 
         // Kobo stores full Nepali text in addrslocation — map to shorter display labels
         $addrLabels = [
@@ -1133,7 +1217,9 @@ class ReportController extends Controller
 
         $abroadJobFreq    = $abroadCount ? CrossTabService::freq(clone $abroadMq, 'typeofabroadjob', CrossTabService::optionLabels('typeofabroadjob'), $ck . '_abroad_job')    : [];
         $abroadStatusFreq = $abroadCount ? CrossTabService::freq(clone $abroadMq, 'abroadjobstatus', CrossTabService::optionLabels('abroadjobstatus'), $ck . '_abroad_status') : [];
-        $countryFreq      = $abroadCount ? CrossTabService::freq(clone $abroadMq, 'residing_country', CrossTabService::optionLabels('residing_country'), $ck . '_country')      : [];
+        // residing_country is JSON-encoded in DB (array cast); decode with JSON_UNQUOTE for proper grouping
+        $countryExpr  = "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(residing_country, '$[0]')), JSON_UNQUOTE(residing_country))";
+        $countryFreq  = $abroadCount ? CrossTabService::freq(clone $abroadMq, $countryExpr, [], $ck . '_country') : [];
 
         // Build tables — only include abroad cross-tabs if there's data
         $tables = [
@@ -1153,7 +1239,7 @@ class ReportController extends Controller
 
         // Build frequencies — filter out empty ones
         $frequencies = array_values(array_filter([
-            $residenceFreq  ? ['id' => 'residence',     'title' => 'बसोबास अवस्था',              'title_en' => 'Residence Status',            'data' => $residenceFreq]  : null,
+            $residenceFreq  ? ['id' => 'residence',     'title' => 'बसोबास अवस्था',              'title_en' => 'Residence Status',            'data' => $residenceFreq,    'comparison' => $this->compFreq($lgMq, 'addrslocation', $addrLabels, $lgCk . '_residence')] : null,
             $districtFreq   ? ['id' => 'district',      'title' => 'स्वदेश बसाइँसरीको जिल्ला',   'title_en' => 'Internal Migration District', 'data' => $districtFreq]   : null,
             $countryFreq    ? ['id' => 'country',       'title' => 'विदेशमा बसेको देश',           'title_en' => 'Country of Residence Abroad', 'data' => $countryFreq]    : null,
             $abroadJobFreq  ? ['id' => 'abroad_job',    'title' => 'विदेशी रोजगारको प्रकार',     'title_en' => 'Type of Abroad Job',          'data' => $abroadJobFreq]  : null,
@@ -1503,6 +1589,9 @@ class ReportController extends Controller
         $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
         $mq      = $this->memberQuery($wardIds, $request);
         $ck      = CrossTabService::cacheKey('women', $lg->id, $request->only(['ward_id', 'settlement_id']));
+        $hasWard = $request->filled('ward_id');
+        $lgMq    = $hasWard ? $this->lgMemberQuery($lg, $request) : null;
+        $lgCk    = CrossTabService::cacheKey('women_lg', $lg->id, $request->only(['age_min','age_max','gender']));
 
         $litExpr = "CASE WHEN LOWER(education_level) NOT IN ('illitrate','illiterate') AND education_level IS NOT NULL AND education_level != '' THEN 'साक्षर' ELSE 'निरक्षर' END";
 
@@ -1561,11 +1650,11 @@ class ReportController extends Controller
         );
 
         $frequencies = array_values(array_filter([
-            ['id' => 'female_occupation',   'title' => 'महिला — पेसाको प्रकार',         'title_en' => 'Women by Occupation',     'data' => $femaleOccupation],
-            ['id' => 'female_employment',   'title' => 'महिला — रोजगारी अवस्था',         'title_en' => 'Women Employment Status', 'data' => $femaleEmployment],
-            ['id' => 'marital_female',      'title' => 'महिला (१५+) — वैवाहिक अवस्था',  'title_en' => 'Marital Status of Women', 'data' => $maritalFemale],
+            ['id' => 'female_occupation',   'title' => 'महिला — पेसाको प्रकार',         'title_en' => 'Women by Occupation',     'data' => $femaleOccupation,   'comparison' => $this->compFreq($lgMq ? (clone $lgMq)->where('gender', 'female') : null, 'occupation_type', CrossTabService::optionLabels('occupation'), $lgCk . '_f_occ')],
+            ['id' => 'female_employment',   'title' => 'महिला — रोजगारी अवस्था',         'title_en' => 'Women Employment Status', 'data' => $femaleEmployment,   'comparison' => $this->compFreq($lgMq ? (clone $lgMq)->where('gender', 'female') : null, 'employment_status', CrossTabService::optionLabels('employment_status'), $lgCk . '_f_emp')],
+            ['id' => 'marital_female',      'title' => 'महिला (१५+) — वैवाहिक अवस्था',  'title_en' => 'Marital Status of Women', 'data' => $maritalFemale,      'comparison' => $this->compFreq($lgMq ? (clone $lgMq)->where('gender', 'female')->where('age', '>=', 15) : null, 'marital_status', CrossTabService::optionLabels('marital_status'), $lgCk . '_marital_f')],
             ['id' => 'ss_allowance_female', 'title' => 'महिला — सामाजिक सुरक्षा भत्ता', 'title_en' => 'Women Social Security',  'data' => $ssAllowanceFemale],
-            ['id' => 'female_disability',   'title' => 'महिला — अपाङ्गताको प्रकार',     'title_en' => 'Female Disability Types', 'data' => $femaleDisability],
+            ['id' => 'female_disability',   'title' => 'महिला — अपाङ्गताको प्रकार',     'title_en' => 'Female Disability Types', 'data' => $femaleDisability,   'comparison' => $this->compFreq($lgMq ? (clone $lgMq)->where('gender', 'female')->where('disability_status', true) : null, 'disability_type', CrossTabService::optionLabels('disability_type'), $lgCk . '_f_dis')],
         ], fn($f) => !empty($f['data'])));
 
         return Inertia::render('Public/Reports/Show', [
@@ -1975,6 +2064,627 @@ class ReportController extends Controller
             ], fn($t) => !empty($t['data']['grand_total']))),
             'frequencies' => [],
         ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 11. Crop Production
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function cropProduction(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
+        $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
+        $ck      = CrossTabService::cacheKey('crop_prod', $lg->id, $request->only(['ward_id']));
+
+        $categories = [
+            'food_crops'  => 'अन्न बाली',
+            'pulses'      => 'दलहन बाली',
+            'oil_seeds'   => 'तेलहन बाली',
+            'vegetables'  => 'तरकारी बाली',
+            'cash_crops'  => 'नगदे बाली',
+            'fruits'      => 'फलफूल',
+            'other_crops' => 'अन्य बाली',
+        ];
+
+        $categoryFreq = \Illuminate\Support\Facades\Cache::remember($ck . '_cat_freq', 3600, function () use ($wardIds, $categories) {
+            $rows = Household::whereIn('ward_id', $wardIds)
+                ->where('status', 'published')
+                ->selectRaw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.cropProduction')) as cp_json")
+                ->pluck('cp_json');
+
+            $counts = array_fill_keys(array_keys($categories), 0);
+
+            foreach ($rows as $cpRaw) {
+                $cp = $cpRaw ? json_decode($cpRaw, true) : null;
+                if (!is_array($cp)) continue;
+                foreach (array_keys($categories) as $catKey) {
+                    $catRows = $cp[$catKey] ?? [];
+                    if (!is_array($catRows)) continue;
+                    foreach ($catRows as $row) {
+                        if (!empty($row['crop']) || !empty($row['land_area'])) {
+                            $counts[$catKey]++;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            $result = [];
+            foreach ($categories as $catKey => $catLabel) {
+                if ($counts[$catKey] > 0) {
+                    $result[] = ['key' => $catKey, 'label' => $catLabel, 'count' => $counts[$catKey]];
+                }
+            }
+            usort($result, fn($a, $b) => $b['count'] - $a['count']);
+            return $result;
+        });
+
+        return Inertia::render('Public/Reports/Show', [
+            'lg'          => $this->lgProps($lg),
+            'category'    => 'crop-production',
+            'title'       => 'बाली उत्पादन विवरण',
+            'title_en'    => 'Crop Production',
+            ...$this->filterProps($lg, $request),
+            'tables'      => [],
+            'frequencies' => [
+                ['id' => 'crop_cat', 'title' => 'बाली उत्पादन गर्ने घरधुरी (श्रेणी अनुसार)', 'title_en' => 'Households by Crop Category', 'data' => $categoryFreq],
+            ],
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 12. Health Awareness
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function healthAwareness(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
+        $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
+        $ck      = CrossTabService::cacheKey('health_aw', $lg->id, $request->only(['ward_id']));
+
+        $yn = ['yes' => 'छ', 'no' => 'छैन'];
+
+        $treatmentFreq = $this->surveyDataFreq($wardIds, '$.health.treatment_place', [
+            'govt_hospital'    => 'सरकारी अस्पताल',
+            'health_post'      => 'स्वास्थ्य चौकी / प्रा.स्वा.के.',
+            'community_health' => 'सामुदायिक स्वास्थ्य कक्ष',
+            'private_clinic'   => 'निजी क्लिनिक / नर्सिङ होम',
+            'pharmacy'         => 'दवाई पसल / फार्मेसी',
+            'traditional'      => 'वैद्य / झारफुक',
+            'home_remedy'      => 'घरेलु उपचार',
+            'other'            => 'अन्य',
+        ], $ck . '_treatment');
+
+        $illnessFreq = $this->surveyDataFreq($wardIds, '$.health.illness_frequency', [
+            'rarely' => 'विरलै (वर्षमा १ पटक भन्दा कम)',
+            '1_2'    => '१–२ पटक',
+            '3_5'    => '३–५ पटक',
+            '6_plus' => '६ पटक वा बढी',
+        ], $ck . '_illness');
+
+        $handwashFreq   = $this->surveyDataFreq($wardIds, '$.health.aware_handwashing',        $yn, $ck . '_handwash');
+        $nutritionFreq  = $this->surveyDataFreq($wardIds, '$.health.aware_nutrition',           $yn, $ck . '_nutrition');
+        $pregNutrFreq   = $this->surveyDataFreq($wardIds, '$.health.aware_pregnant_nutrition',  $yn, $ck . '_preg_nutr');
+        $ironFreq       = $this->surveyDataFreq($wardIds, '$.health.aware_iron_capsule',        $yn, $ck . '_iron');
+        $insuranceFreq  = $this->surveyDataFreq($wardIds, '$.health.has_health_insurance',      $yn, $ck . '_insurance');
+        $pregnantFreq   = $this->surveyDataFreq($wardIds, '$.health.has_pregnant_woman',        $yn, $ck . '_pregnant');
+
+        return Inertia::render('Public/Reports/Show', [
+            'lg'          => $this->lgProps($lg),
+            'category'    => 'health-awareness',
+            'title'       => 'स्वास्थ्य चेतना तथा सेवा',
+            'title_en'    => 'Health Awareness & Services',
+            ...$this->filterProps($lg, $request),
+            'tables'      => [],
+            'frequencies' => [
+                ['id' => 'treatment',   'title' => 'उपचार स्थान',                    'title_en' => 'Treatment Place',             'data' => $treatmentFreq],
+                ['id' => 'illness',     'title' => 'वार्षिक बिमारी दर',              'title_en' => 'Annual Illness Frequency',    'data' => $illnessFreq],
+                ['id' => 'handwash',    'title' => 'हात धुने चेतना',                 'title_en' => 'Handwashing Awareness',       'data' => $handwashFreq],
+                ['id' => 'nutrition',   'title' => 'पोषण चेतना',                     'title_en' => 'Nutrition Awareness',         'data' => $nutritionFreq],
+                ['id' => 'preg_nutr',   'title' => 'गर्भवती पोषण चेतना',             'title_en' => 'Pregnant Woman Nutrition',    'data' => $pregNutrFreq],
+                ['id' => 'iron',        'title' => 'आइरन क्याप्सुल चेतना',           'title_en' => 'Iron Capsule Awareness',      'data' => $ironFreq],
+                ['id' => 'insurance',   'title' => 'स्वास्थ्य बीमा',                 'title_en' => 'Health Insurance',            'data' => $insuranceFreq],
+                ['id' => 'pregnant',    'title' => 'हाल गर्भवती महिला भएका घरधुरी', 'title_en' => 'Households with Pregnant Woman','data'=> $pregnantFreq],
+            ],
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 13. Wellbeing
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function wellbeing(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
+        $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
+        $ck      = CrossTabService::cacheKey('wellbeing', $lg->id, $request->only(['ward_id']));
+
+        $yn = ['yes' => 'खुसी छौं', 'no' => 'खुसी छैनौं'];
+
+        $happyFreq = $this->surveyDataFreq($wardIds, '$.wellbeing.happy_with_location', $yn, $ck . '_happy');
+
+        $perceptionFreq = $this->surveyDataFreq($wardIds, '$.wellbeing.residence_perception', [
+            'very_good' => 'धेरै राम्रो',
+            'good'      => 'राम्रो',
+            'normal'    => 'सामान्य',
+            'not_good'  => 'राम्रो छैन',
+        ], $ck . '_perception');
+
+        $gatherFreq = $this->surveyDataFreq($wardIds, '$.wellbeing.family_gathering_freq', [
+            'once'        => 'एक पटक',
+            'twice'       => 'दुई पटक',
+            'three_times' => 'तीन पटक',
+            'four_plus'   => 'चार पटक भन्दा बढी',
+            'never'       => 'बैठक गर्ने अवसर छैन',
+        ], $ck . '_gather');
+
+        $neighborsFreq = $this->surveyDataFreq($wardIds, '$.wellbeing.neighbors_nice', [
+            'yes'     => 'हुन्',
+            'no'      => 'होइनन्',
+            'neutral' => 'त्यस्तो केही लाग्दैन',
+        ], $ck . '_neighbors');
+
+        $cooperationFreq = $this->surveyDataFreq($wardIds, '$.wellbeing.neighbor_cooperation', [
+            'often'       => 'प्रायः गर्छन्',
+            'sometimes'   => 'कहिलेकाहीं गर्छन्',
+            'when_needed' => 'आवश्यक पर्दा मात्र',
+            'never'       => 'कहिले पनि गर्दैनन्',
+        ], $ck . '_cooperation');
+
+        $activitiesFreq = \Illuminate\Support\Facades\Cache::remember($ck . '_activities', 3600, function () use ($wardIds) {
+            $actLabels = [
+                'mobile_tv' => 'मोबाइल तथा टेलिभिजन हेर्ने',
+                'outing'    => 'बाहिर भ्रमण गर्ने',
+                'festivals' => 'चाडपर्व मनाउने',
+                'yoga'      => 'योग-व्यायाम गर्ने',
+                'nothing'   => 'केही गर्ने अवसर छैन',
+            ];
+            $raw = DB::table('households')
+                ->whereIn('ward_id', $wardIds)->where('status', 'published')
+                ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.wellbeing.happiness_activities')) IS NOT NULL")
+                ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.wellbeing.happiness_activities')) NOT IN ('null', '', '[]')")
+                ->pluck(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.wellbeing.happiness_activities'))"));
+            $counts = [];
+            foreach ($raw as $json) {
+                $vals = is_string($json) ? json_decode($json, true) : (is_array($json) ? $json : []);
+                if (!is_array($vals)) continue;
+                foreach ($vals as $v) {
+                    $v = trim((string)$v);
+                    if ($v !== '') $counts[$v] = ($counts[$v] ?? 0) + 1;
+                }
+            }
+            arsort($counts);
+            return array_map(fn($v, $c) => ['key' => $v, 'label' => $actLabels[$v] ?? $v, 'count' => $c], array_keys($counts), $counts);
+        });
+
+        return Inertia::render('Public/Reports/Show', [
+            'lg'          => $this->lgProps($lg),
+            'category'    => 'wellbeing',
+            'title'       => 'जीवन सन्तुष्टि तथा सामाजिक सम्बन्ध',
+            'title_en'    => 'Wellbeing & Social Relations',
+            ...$this->filterProps($lg, $request),
+            'tables'      => [],
+            'frequencies' => [
+                ['id' => 'happy',       'title' => 'बसोबास स्थानसँग खुसी',      'title_en' => 'Happy with Location',           'data' => $happyFreq],
+                ['id' => 'perception',  'title' => 'बसोबास प्रति दृष्टिकोण',    'title_en' => 'Residence Perception',          'data' => $perceptionFreq],
+                ['id' => 'gather',      'title' => 'पारिवारिक भेटघाट (मासिक)',   'title_en' => 'Family Gathering Frequency',    'data' => $gatherFreq],
+                ['id' => 'activities',  'title' => 'खुसीका क्रियाकलाप',          'title_en' => 'Happiness Activities',          'data' => $activitiesFreq],
+                ['id' => 'neighbors',   'title' => 'छिमेकी सम्बन्ध',             'title_en' => 'Neighbour Relations',           'data' => $neighborsFreq],
+                ['id' => 'cooperation', 'title' => 'छिमेकी सहकार्य',             'title_en' => 'Neighbour Cooperation',         'data' => $cooperationFreq],
+            ],
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 14. Income Breakdown
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function incomeBreakdown(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
+        $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
+        $ck      = CrossTabService::cacheKey('income_bk', $lg->id, $request->only(['ward_id']));
+
+        $eq = fn () => HouseholdEconomic::whereHas('household', fn ($q) =>
+            $q->whereIn('ward_id', $wardIds)->whereNotNull('ward_id')->where('status', 'published')
+        );
+
+        $incomeRangeFreq = CrossTabService::freq($eq(), 'annual_income_range',      CrossTabService::optionLabels('annual_income_range'),      $ck . '_range');
+        $expendFreq      = CrossTabService::freq($eq(), 'annual_expenditure_range', CrossTabService::optionLabels('annual_expenditure_range'), $ck . '_expend');
+        $srcFreq         = CrossTabService::freq($eq(), 'primary_income_source',    CrossTabService::optionLabels('primary_income_source'),    $ck . '_src');
+
+        $sums = \Illuminate\Support\Facades\Cache::remember($ck . '_sums', 3600, function () use ($eq) {
+            return $eq()->selectRaw('
+                SUM(COALESCE(agri_livestock_income, 0))       as agri,
+                SUM(COALESCE(business_industry_income, 0))    as business,
+                SUM(COALESCE(employment_service_income, 0))   as employment,
+                SUM(COALESCE(abroad_job_income, 0))           as abroad,
+                SUM(COALESCE(food_expense, 0))                as food,
+                SUM(COALESCE(clothes_expense, 0))             as clothes,
+                SUM(COALESCE(education_expense, 0))           as education,
+                SUM(COALESCE(treatment_expense, 0))           as treatment,
+                SUM(COALESCE(other_expense, 0))               as other_exp,
+                SUM(COALESCE(remittance_amount, 0))           as remittance,
+                COUNT(*)                                       as total
+            ')->first();
+        });
+
+        $incomeAmounts = array_filter([
+            ['key' => 'agri_livestock',  'label' => 'कृषि / पशुपालन',   'count' => (int)($sums->agri ?? 0)],
+            ['key' => 'business',        'label' => 'व्यापार / उद्योग', 'count' => (int)($sums->business ?? 0)],
+            ['key' => 'employment',      'label' => 'नोकरी / सेवा',     'count' => (int)($sums->employment ?? 0)],
+            ['key' => 'abroad_job',      'label' => 'वैदेशिक रोजगार',   'count' => (int)($sums->abroad ?? 0)],
+        ], fn($r) => $r['count'] > 0);
+
+        $expenseAmounts = array_filter([
+            ['key' => 'food',       'label' => 'खाद्य सामग्री',    'count' => (int)($sums->food ?? 0)],
+            ['key' => 'education',  'label' => 'शिक्षा',           'count' => (int)($sums->education ?? 0)],
+            ['key' => 'treatment',  'label' => 'स्वास्थ्य उपचार',  'count' => (int)($sums->treatment ?? 0)],
+            ['key' => 'clothes',    'label' => 'लुगाफाटा',         'count' => (int)($sums->clothes ?? 0)],
+            ['key' => 'other_exp',  'label' => 'अन्य खर्च',        'count' => (int)($sums->other_exp ?? 0)],
+        ], fn($r) => $r['count'] > 0);
+
+        return Inertia::render('Public/Reports/Show', [
+            'lg'          => $this->lgProps($lg),
+            'category'    => 'income-breakdown',
+            'title'       => 'आय तथा खर्च विवरण',
+            'title_en'    => 'Income & Expenditure Breakdown',
+            ...$this->filterProps($lg, $request),
+            'tables'      => [],
+            'frequencies' => array_values(array_filter([
+                ['id' => 'income_src',    'title' => 'मुख्य आय स्रोत',              'title_en' => 'Primary Income Source',       'data' => $srcFreq],
+                ['id' => 'income_range',  'title' => 'वार्षिक आय दायरा',            'title_en' => 'Annual Income Range',         'data' => $incomeRangeFreq],
+                ['id' => 'expend_range',  'title' => 'वार्षिक खर्च दायरा',          'title_en' => 'Annual Expenditure Range',    'data' => $expendFreq],
+                count($incomeAmounts) ? ['id' => 'income_amounts',  'title' => 'आय स्रोत अनुसार कुल रकम (रु)', 'title_en' => 'Total Income by Source (NPR)', 'data' => array_values($incomeAmounts)] : null,
+                count($expenseAmounts) ? ['id' => 'expense_amounts', 'title' => 'खर्च प्रकार अनुसार कुल रकम (रु)', 'title_en' => 'Total Expense by Category (NPR)', 'data' => array_values($expenseAmounts)] : null,
+            ])),
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 15. Social Empowerment (Decision-Making + Org Participation)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function socialEmpowerment(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
+        $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
+        $ck      = CrossTabService::cacheKey('soc_emp', $lg->id, $request->only(['ward_id']));
+
+        $ownerLabels = [
+            'male'   => 'पुरुष',   'Male'   => 'पुरुष',
+            'female' => 'महिला',   'Female' => 'महिला',
+            'both'   => 'दुबै',    'Both'   => 'दुबै',
+            'none'   => 'कोही छैन','None'   => 'कोही छैन',
+            'other'  => 'अन्य',
+        ];
+
+        $decisionKeys = [
+            'decisioninHHWork'     => ['path' => '$.decisions.decisioninHHWork',     'label' => 'घरेलु काम',         'id' => 'dec_hhwork'],
+            'decisioninProperty'   => ['path' => '$.decisions.decisioninProperty',   'label' => 'सम्पत्ति',          'id' => 'dec_property'],
+            'decisioninBusiness'   => ['path' => '$.decisions.decisioninBusiness',   'label' => 'व्यवसाय',           'id' => 'dec_business'],
+            'decisioninCCommittee' => ['path' => '$.decisions.decisioninCCommittee', 'label' => 'उपभोक्ता समिति',   'id' => 'dec_committee'],
+            'decisioninSMC'        => ['path' => '$.decisions.decisioninSMC',        'label' => 'विद्यालय समिति',    'id' => 'dec_smc'],
+            'bank_account_owner'   => ['path' => '$.decisions.bank_account_owner',   'label' => 'बैंक खाता धारक',   'id' => 'dec_bank'],
+        ];
+
+        $frequencies = [];
+        foreach ($decisionKeys as $key => $meta) {
+            $data = $this->surveyDataFreqRaw($wardIds, $meta['path'], $ownerLabels, $ck . '_' . $key);
+            if (!empty($data)) {
+                $frequencies[] = ['id' => $meta['id'], 'title' => $meta['label'] . ' — निर्णयकर्ता', 'title_en' => 'Decision Maker: ' . $meta['label'], 'data' => $data];
+            }
+        }
+
+        $yn = ['yes' => 'सहभागी छ', 'no' => 'सहभागी छैन'];
+        $orgFreq  = $this->surveyDataFreq($wardIds, '$.decisions.org_participation', $yn, $ck . '_org');
+        $orgTypes = $this->surveyDataJsonArrayFreq($wardIds, '$.decisions.org_participation_types', [
+            'WomenGroup'     => 'महिला समूह',
+            'YouthClub'      => 'युवा क्लब',
+            'Cooperative'    => 'सहकारी',
+            'PoliticalParty' => 'राजनीतिक दल',
+            'MotherGroup'    => 'आमा समूह',
+            'FarmerGroup'    => 'कृषक समूह',
+            'NGO'            => 'गैसस',
+            'Other'          => 'अन्य',
+        ], $ck . '_org_types');
+
+        if (!empty($orgFreq))  $frequencies[] = ['id' => 'org_part',  'title' => 'संगठन सहभागिता',          'title_en' => 'Organisation Participation',  'data' => $orgFreq];
+        if (!empty($orgTypes)) $frequencies[] = ['id' => 'org_types', 'title' => 'संगठनका प्रकार',          'title_en' => 'Organisation Types',          'data' => $orgTypes];
+
+        return Inertia::render('Public/Reports/Show', [
+            'lg'          => $this->lgProps($lg),
+            'category'    => 'social-empowerment',
+            'title'       => 'सामाजिक सशक्तीकरण तथा निर्णय',
+            'title_en'    => 'Social Empowerment & Decision-Making',
+            ...$this->filterProps($lg, $request),
+            'tables'      => [],
+            'frequencies' => $frequencies,
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 16. Family Profile (Family Type, Settlement, Local Migration)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function familyProfile(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
+        $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
+        $ck      = CrossTabService::cacheKey('fam_prof', $lg->id, $request->only(['ward_id']));
+
+        // family_type: normalize duplicates (single=nuclear)
+        $familyTypeFreq = \Illuminate\Support\Facades\Cache::remember($ck . '_fam_type', 3600, function () use ($wardIds) {
+            $rows = DB::table('households')
+                ->whereIn('ward_id', $wardIds)->where('status', 'published')
+                ->selectRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.social.family_type'))) as val, COUNT(*) as cnt")
+                ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.social.family_type')) IS NOT NULL")
+                ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.social.family_type')) NOT IN ('null', '')")
+                ->groupBy(DB::raw('val'))->orderByDesc('cnt')->get();
+            $labels = ['single' => 'एकल (Nuclear)', 'nuclear' => 'एकल (Nuclear)', 'joint' => 'संयुक्त (Joint)'];
+            $merged = [];
+            foreach ($rows as $r) {
+                $label = $labels[$r->val] ?? $r->val;
+                $merged[$label] = ($merged[$label] ?? 0) + $r->cnt;
+            }
+            arsort($merged);
+            return array_map(fn($l, $c) => ['key' => $l, 'label' => $l, 'count' => $c], array_keys($merged), $merged);
+        });
+
+        // settlement_type: normalize duplicates (Permanent_resident=permanent, Temporary_resident=temporary)
+        $settlementFreq = \Illuminate\Support\Facades\Cache::remember($ck . '_settlement', 3600, function () use ($wardIds) {
+            $rows = DB::table('households')
+                ->whereIn('ward_id', $wardIds)->where('status', 'published')
+                ->selectRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.social.settlement_type'))) as val, COUNT(*) as cnt")
+                ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.social.settlement_type')) IS NOT NULL")
+                ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.social.settlement_type')) NOT IN ('null', '')")
+                ->groupBy(DB::raw('val'))->orderByDesc('cnt')->get();
+            $normalise = [
+                'permanent_resident' => 'स्थायी',
+                'permanent'          => 'स्थायी',
+                'temporary_resident' => 'अस्थायी',
+                'temporary'          => 'अस्थायी',
+                'squatter'           => 'सुकुम्बासी',
+            ];
+            $merged = [];
+            foreach ($rows as $r) {
+                $label = $normalise[$r->val] ?? $r->val;
+                $merged[$label] = ($merged[$label] ?? 0) + $r->cnt;
+            }
+            arsort($merged);
+            return array_map(fn($l, $c) => ['key' => $l, 'label' => $l, 'count' => $c], array_keys($merged), $merged);
+        });
+
+        $yn = ['yes' => 'छ', 'no' => 'छैन'];
+        $migrationFreq = $this->surveyDataFreq($wardIds, '$.social.migration_last_5years', $yn,       $ck . '_migr5');
+        $migPurpFreq   = $this->surveyDataFreq($wardIds, '$.social.migration_purpose', [
+            'employment' => 'रोजगार',
+            'education'  => 'शिक्षा',
+            'marriage'   => 'विवाह',
+            'disaster'   => 'प्रकोप',
+            'health'     => 'स्वास्थ्य',
+            'other'      => 'अन्य',
+        ], $ck . '_migr_purpose');
+        $migProvFreq   = $this->surveyDataFreq($wardIds, '$.social.migration_from_province', [], $ck . '_migr_prov');
+
+        $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
+        $wardColDef = CrossTabService::wardColDef($wards);
+
+        // Family type × Ward cross-tab (DB-side)
+        $familyByWard = \Illuminate\Support\Facades\Cache::remember($ck . '_fam_ward', 3600, function () use ($wardIds, $wardColDef) {
+            $normalise = [
+                'single'  => 'एकल', 'nuclear'             => 'एकल',
+                'joint'   => 'संयुक्त',
+                'permanent_resident' => 'स्थायी', 'permanent' => 'स्थायी',
+            ];
+            $rawRows = DB::table('households')
+                ->whereIn('households.ward_id', $wardIds)->where('status', 'published')
+                ->join('wards', 'households.ward_id', '=', 'wards.id')
+                ->selectRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.social.family_type'))) as ftype, wards.ward_number, COUNT(*) as cnt")
+                ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.social.family_type')) IS NOT NULL")
+                ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.social.family_type')) NOT IN ('null', '')")
+                ->groupBy('ftype', 'wards.ward_number')->get();
+
+            $rowDef = ['एकल (Nuclear)' => 'एकल (Nuclear)', 'संयुक्त (Joint)' => 'संयुक्त (Joint)'];
+            $matrix = []; $rowTotals = []; $colTotals = []; $grand = 0;
+            foreach ($rawRows as $r) {
+                $norm = ['single'=>'एकल (Nuclear)','nuclear'=>'एकल (Nuclear)','joint'=>'संयुक्त (Joint)'][$r->ftype] ?? $r->ftype;
+                $w = (string)$r->ward_number;
+                $matrix[$norm][$w] = ($matrix[$norm][$w] ?? 0) + $r->cnt;
+                $rowTotals[$norm] = ($rowTotals[$norm] ?? 0) + $r->cnt;
+                $colTotals[$w]    = ($colTotals[$w]    ?? 0) + $r->cnt;
+                $grand += $r->cnt;
+            }
+            return [
+                'rows' => array_keys($rowDef), 'row_labels' => $rowDef,
+                'cols' => array_keys($wardColDef), 'col_labels' => $wardColDef,
+                'matrix' => $matrix, 'row_totals' => $rowTotals,
+                'col_totals' => $colTotals, 'grand_total' => $grand,
+            ];
+        });
+
+        return Inertia::render('Public/Reports/Show', [
+            'lg'          => $this->lgProps($lg),
+            'category'    => 'family-profile',
+            'title'       => 'पारिवारिक प्रोफाइल तथा बसोबास',
+            'title_en'    => 'Family Profile & Settlement',
+            ...$this->filterProps($lg, $request),
+            'tables'      => [
+                ['id' => 'fam_by_ward', 'title' => 'परिवार प्रकार — वडाअनुसार', 'title_en' => 'Family Type by Ward', 'data' => $familyByWard],
+            ],
+            'frequencies' => array_values(array_filter([
+                !empty($familyTypeFreq) ? ['id' => 'fam_type',     'title' => 'परिवार प्रकार',                    'title_en' => 'Family Type',              'data' => $familyTypeFreq]  : null,
+                !empty($settlementFreq) ? ['id' => 'settlement',    'title' => 'बसोबास स्थिति',                    'title_en' => 'Settlement Status',        'data' => $settlementFreq]  : null,
+                !empty($migrationFreq)  ? ['id' => 'migr_5yr',      'title' => '५ वर्षमा यहाँ आएका घरधुरी',       'title_en' => 'In-Migration (5 yrs)',      'data' => $migrationFreq]   : null,
+                !empty($migPurpFreq)    ? ['id' => 'migr_purpose',  'title' => 'यहाँ आउनुको कारण',                'title_en' => 'Reason for Migration',     'data' => $migPurpFreq]     : null,
+                !empty($migProvFreq)    ? ['id' => 'migr_province', 'title' => 'आउनुपूर्वको प्रदेश',              'title_en' => 'Previous Province',        'data' => $migProvFreq]     : null,
+            ])),
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 17. Agri Enterprises (Bee/Fish/Silk)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function agriEnterprises(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) abort(404);
+        $wardIds = $this->wardIds($lg, $request->integer('ward_id') ?: null);
+        $ck      = CrossTabService::cacheKey('agri_ent', $lg->id, $request->only(['ward_id']));
+
+        $yn = ['yes' => 'छ', 'no' => 'छैन'];
+        $hasFreq  = $this->surveyDataFreq($wardIds, '$.beeFishSilk.has_bee_fish_silk', $yn, $ck . '_has');
+        $typeFreq = $this->surveyDataJsonArrayFreq($wardIds, '$.beeFishSilk.bee_fish_silk_select', [
+            'bee'  => '🐝 मौरीपालन',
+            'fish' => '🐟 माछापालन',
+            'silk' => '🪱 रेशम',
+        ], $ck . '_types');
+
+        $sums = \Illuminate\Support\Facades\Cache::remember($ck . '_sums', 3600, function () use ($wardIds) {
+            $rows = DB::table('households')
+                ->whereIn('ward_id', $wardIds)->where('status', 'published')
+                ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.beeFishSilk.has_bee_fish_silk')) = 'yes'")
+                ->selectRaw("
+                    COUNT(*) as total,
+                    SUM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.beeFishSilk.Mudhe_Hive'))+0, 0))  as mudhe_hive,
+                    SUM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.beeFishSilk.Modern_Hive'))+0, 0)) as modern_hive,
+                    SUM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.beeFishSilk.Honey_Production_Mudhe_Hive'))+0, 0)) as honey_mudhe,
+                    SUM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.beeFishSilk.Honey_Production_Modern_Hive'))+0, 0)) as honey_modern,
+                    SUM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.beeFishSilk.honey_sales'))+0, 0)) as honey_sales,
+                    SUM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.beeFishSilk.Pond_area'))+0, 0))  as pond_area,
+                    SUM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.beeFishSilk.fish_prod'))+0, 0))  as fish_prod,
+                    SUM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.beeFishSilk.fish_sales'))+0, 0)) as fish_sales,
+                    SUM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.beeFishSilk.silk_prod'))+0, 0))  as silk_prod,
+                    SUM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(survey_data, '$.beeFishSilk.silk_sales'))+0, 0)) as silk_sales
+                ")->first();
+            return $rows;
+        });
+
+        $beeAmounts = array_values(array_filter([
+            ($sums->mudhe_hive  > 0) ? ['key' => 'mudhe_hive',   'label' => 'मुढे घार (संख्या)',         'count' => (int)$sums->mudhe_hive]   : null,
+            ($sums->modern_hive > 0) ? ['key' => 'modern_hive',  'label' => 'आधुनिक घार (संख्या)',       'count' => (int)$sums->modern_hive]  : null,
+            ($sums->honey_mudhe > 0) ? ['key' => 'honey_mudhe',  'label' => 'मुढे मह उत्पादन (के.जी.)', 'count' => (int)round($sums->honey_mudhe)]  : null,
+            ($sums->honey_modern> 0) ? ['key' => 'honey_modern', 'label' => 'आधुनिक मह उत्पादन (के.जी.)','count'=> (int)round($sums->honey_modern)] : null,
+            ($sums->honey_sales > 0) ? ['key' => 'honey_sales',  'label' => 'मह बिक्री (के.जी.)',        'count' => (int)round($sums->honey_sales)]  : null,
+        ]));
+
+        $fishAmounts = array_values(array_filter([
+            ($sums->fish_prod  > 0) ? ['key' => 'fish_prod',  'label' => 'माछा उत्पादन (के.जी.)', 'count' => (int)round($sums->fish_prod)]  : null,
+            ($sums->fish_sales > 0) ? ['key' => 'fish_sales', 'label' => 'माछा बिक्री (के.जी.)',  'count' => (int)round($sums->fish_sales)] : null,
+            ($sums->pond_area  > 0) ? ['key' => 'pond_area',  'label' => 'पोखरी क्षेत्रफल (वर्गमिटर)', 'count' => (int)round($sums->pond_area)] : null,
+        ]));
+
+        $silkAmounts = array_values(array_filter([
+            ($sums->silk_prod  > 0) ? ['key' => 'silk_prod',  'label' => 'रेशम उत्पादन (के.जी.)', 'count' => (int)round($sums->silk_prod)]  : null,
+            ($sums->silk_sales > 0) ? ['key' => 'silk_sales', 'label' => 'रेशम बिक्री (के.जी.)',  'count' => (int)round($sums->silk_sales)] : null,
+        ]));
+
+        return Inertia::render('Public/Reports/Show', [
+            'lg'          => $this->lgProps($lg),
+            'category'    => 'agri-enterprises',
+            'title'       => 'कृषि उद्यम (मौरी, माछा, रेशम)',
+            'title_en'    => 'Agri Enterprises (Bee, Fish, Silk)',
+            ...$this->filterProps($lg, $request),
+            'tables'      => [],
+            'frequencies' => array_values(array_filter([
+                !empty($hasFreq)    ? ['id' => 'has_ent',     'title' => 'मौरी/माछा/रेशम गर्ने घरधुरी',  'title_en' => 'Households with Enterprises', 'data' => $hasFreq]    : null,
+                !empty($typeFreq)   ? ['id' => 'ent_types',   'title' => 'उद्यमका प्रकार',                'title_en' => 'Enterprise Types',            'data' => $typeFreq]   : null,
+                !empty($beeAmounts) ? ['id' => 'bee_qty',     'title' => 'मौरीपालन — कुल मात्रा',        'title_en' => 'Beekeeping Totals',           'data' => $beeAmounts] : null,
+                !empty($fishAmounts)? ['id' => 'fish_qty',    'title' => 'माछापालन — कुल मात्रा',        'title_en' => 'Fish Farming Totals',         'data' => $fishAmounts]: null,
+                !empty($silkAmounts)? ['id' => 'silk_qty',    'title' => 'रेशम — कुल मात्रा',            'title_en' => 'Silk Farming Totals',         'data' => $silkAmounts]: null,
+            ])),
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helper: frequency from a scalar JSON path in survey_data (households)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private function surveyDataFreq(array $wardIds, string $jsonPath, array $labelMap, string $cacheKey): array
+    {
+        try {
+            return \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($wardIds, $jsonPath, $labelMap) {
+                $rows = DB::table('households')
+                    ->whereIn('ward_id', $wardIds)
+                    ->where('status', 'published')
+                    ->selectRaw("LOWER(JSON_UNQUOTE(JSON_EXTRACT(survey_data, ?))) as val, COUNT(*) as cnt", [$jsonPath])
+                    ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, ?)) IS NOT NULL", [$jsonPath])
+                    ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, ?)) NOT IN ('null', '', 'false')", [$jsonPath])
+                    ->groupBy(DB::raw('val'))
+                    ->orderByDesc('cnt')
+                    ->get();
+
+                return $rows->map(fn($r) => [
+                    'key'   => $r->val,
+                    'label' => $labelMap[$r->val] ?? $r->val,
+                    'count' => $r->cnt,
+                ])->values()->toArray();
+            });
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    // Like surveyDataFreq but does NOT lowercase the value (for mixed-case labels like Male/Female)
+    private function surveyDataFreqRaw(array $wardIds, string $jsonPath, array $labelMap, string $cacheKey): array
+    {
+        try {
+            return \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($wardIds, $jsonPath, $labelMap) {
+                $rows = DB::table('households')
+                    ->whereIn('ward_id', $wardIds)
+                    ->where('status', 'published')
+                    ->selectRaw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, ?)) as val, COUNT(*) as cnt", [$jsonPath])
+                    ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, ?)) IS NOT NULL", [$jsonPath])
+                    ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, ?)) NOT IN ('null', '', 'false')", [$jsonPath])
+                    ->groupBy(DB::raw('val'))
+                    ->orderByDesc('cnt')
+                    ->get();
+
+                $merged = [];
+                foreach ($rows as $r) {
+                    $label = $labelMap[$r->val] ?? $labelMap[strtolower($r->val)] ?? $r->val;
+                    $merged[$label] = ($merged[$label] ?? 0) + $r->cnt;
+                }
+                arsort($merged);
+                return array_map(fn($l, $c) => ['key' => $l, 'label' => $l, 'count' => $c], array_keys($merged), $merged);
+            });
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    // JSON array field in survey_data (PHP-side expansion)
+    private function surveyDataJsonArrayFreq(array $wardIds, string $jsonPath, array $labelMap, string $cacheKey): array
+    {
+        try {
+            return \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($wardIds, $jsonPath, $labelMap) {
+                $raw = DB::table('households')
+                    ->whereIn('ward_id', $wardIds)->where('status', 'published')
+                    ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, ?)) IS NOT NULL", [$jsonPath])
+                    ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, ?)) NOT IN ('null', '', '[]')", [$jsonPath])
+                    ->pluck(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(survey_data, " . DB::connection()->getPdo()->quote($jsonPath) . "))"));
+                $counts = [];
+                foreach ($raw as $json) {
+                    $vals = is_string($json) ? json_decode($json, true) : (is_array($json) ? $json : []);
+                    if (!is_array($vals)) continue;
+                    foreach ($vals as $v) {
+                        $v = trim((string)$v);
+                        if ($v !== '') $counts[$v] = ($counts[$v] ?? 0) + 1;
+                    }
+                }
+                arsort($counts);
+                return array_map(fn($v, $c) => ['key' => $v, 'label' => $labelMap[$v] ?? $v, 'count' => $c], array_keys($counts), $counts);
+            });
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────

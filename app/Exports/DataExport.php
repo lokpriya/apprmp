@@ -388,12 +388,20 @@ class InstitutionsDataSheet implements FromQuery, WithMapping, WithHeadings, Wit
 
     public function title(): string { return 'संस्थाहरू'; }
 
+    /** Memoised — map() runs per exported row, so this would otherwise be one query each. */
+    private ?array $typeLabelCache = null;
+
+    private function typeLabels(): array
+    {
+        return $this->typeLabelCache ??= \App\Models\SurveyOption::where('category', 'institution_type')
+            ->pluck('label_ne', 'value')->toArray();
+    }
+
     public function query()
     {
         return Institution::with([
             'ward:id,ward_number',
             'settlement:id,name_np',
-            'institutionType:id,name_np',
             'enumerator:id,name',
         ])
             ->whereIn('ward_id', $this->wardIds)
@@ -426,7 +434,7 @@ class InstitutionsDataSheet implements FromQuery, WithMapping, WithHeadings, Wit
             $i->settlement->name_np              ?? '—',
             $i->name_np                          ?? '—',
             $i->name_en                          ?? '—',
-            $i->institutionType->name_np         ?? '—',
+            $this->typeLabels()[$i->institution_type] ?? $i->institution_type ?? '—',
             $i->ownership_type                   ?? '—',
             $i->registration_number              ?? '—',
             $this->statusLabel($i->status),

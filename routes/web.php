@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\RolePermissionsController;
 use App\Http\Controllers\Admin\ProgressController;
 use App\Http\Controllers\Admin\DataExportController;
 use App\Http\Controllers\Admin\GoogleSyncController;
+use App\Http\Controllers\Admin\SurveyRoundController;
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\ImpersonateController;
 use App\Http\Controllers\Admin\LicenseController;
@@ -27,9 +28,27 @@ use App\Http\Controllers\Public\BusinessReportController;
 use App\Http\Controllers\Public\InstitutionReportController;
 use App\Http\Controllers\Public\ReportController;
 use App\Http\Controllers\Public\ReportExportController;
+use App\Http\Controllers\Public\OpenDataController;
 use App\Http\Controllers\Public\FeedbackController as PublicFeedbackController;
 use App\Http\Controllers\Admin\FeedbackController as AdminFeedbackController;
+use App\Http\Controllers\Api\PublicDataController;
 use Illuminate\Support\Facades\Route;
+
+// ── Operational health probe ─────────────────────────────────────────────────
+// Intentionally outside the maintenance/license/public-access gates so an uptime
+// monitor can tell a dead server apart from a deliberately gated one.
+Route::get('/healthz', \App\Http\Controllers\HealthController::class)
+    ->middleware('throttle:60,1')
+    ->name('healthz');
+
+// ── Public REST API (aggregate published data, no auth) ──────────────────────
+Route::prefix('api/v1')->middleware(['throttle:60,1'])->group(function () {
+    Route::get('/summary',      [PublicDataController::class, 'summary'])     ->name('api.v1.summary');
+    Route::get('/population',   [PublicDataController::class, 'population'])  ->name('api.v1.population');
+    Route::get('/wards',        [PublicDataController::class, 'wards'])       ->name('api.v1.wards');
+    Route::get('/institutions', [PublicDataController::class, 'institutions'])->name('api.v1.institutions');
+    Route::get('/economics',    [PublicDataController::class, 'economics'])   ->name('api.v1.economics');
+});
 
 // ── Public access captcha gate ───────────────────────────────────────────────
 Route::middleware('maintenance')->group(function () {
@@ -56,7 +75,11 @@ Route::middleware('maintenance')->group(function () {
 });
 
 // Public analytics portal (no auth required)
-Route::prefix('public')->name('public.')->middleware(['maintenance', 'public.access'])->group(function () {
+// Throttled: every report below runs several aggregations over the full member
+// table with no authentication. On shared hosting the entry-process cap is the
+// binding constraint, so an unthrottled crawler can exhaust the account and take
+// down every site on it. 120/min is far above real browsing.
+Route::prefix('public')->name('public.')->middleware(['maintenance', 'public.access', 'throttle:120,1'])->group(function () {
     Route::get('/', [AnalyticsController::class, 'index'])->name('dashboard');
     Route::get('/profile',         [AnalyticsController::class, 'profile'])->name('profile');
     Route::get('/representatives', [AnalyticsController::class, 'representatives'])->name('representatives');
@@ -94,11 +117,20 @@ Route::prefix('public')->name('public.')->middleware(['maintenance', 'public.acc
         Route::get('/livestock-detail',    [ReportController::class,    'livestockDetail'])   ->name('livestock-detail');
         Route::get('/land-agriculture',    [ReportController::class,    'landAgriculture'])   ->name('land-agriculture');
         Route::get('/development-index',   [ReportController::class,    'developmentIndex'])  ->name('development-index');
+        Route::get('/crop-production',     [ReportController::class,    'cropProduction'])     ->name('crop-production');
+        Route::get('/health-awareness',    [ReportController::class,    'healthAwareness'])    ->name('health-awareness');
+        Route::get('/wellbeing',           [ReportController::class,    'wellbeing'])          ->name('wellbeing');
+        Route::get('/income-breakdown',    [ReportController::class,    'incomeBreakdown'])    ->name('income-breakdown');
+        Route::get('/social-empowerment',  [ReportController::class,    'socialEmpowerment'])  ->name('social-empowerment');
+        Route::get('/family-profile',      [ReportController::class,    'familyProfile'])      ->name('family-profile');
+        Route::get('/agri-enterprises',    [ReportController::class,    'agriEnterprises'])    ->name('agri-enterprises');
         Route::get('/export/{category}',   [ReportExportController::class, 'download'])       ->name('export');
         Route::get('/population-pyramid',  [AnalyticsController::class, 'populationPyramid'])->name('population-pyramid');
         Route::get('/ward-summary',        [AnalyticsController::class, 'wardSummaryPage'])     ->name('ward-summary');
         Route::get('/ward-profile',        [AnalyticsController::class, 'wardProfileDefault']) ->name('ward-profile');
         Route::get('/ward/{wardId}',       [AnalyticsController::class, 'wardProfile'])        ->name('ward-profile.ward');
+        Route::get('/round-comparison',    [ReportController::class,    'roundComparison'])    ->name('round-comparison');
+        Route::get('/ward-comparison',     [AnalyticsController::class, 'wardComparisonPage']) ->name('ward-comparison');
     });
 
     // ── Public Business Reports ──────────────────────────────────────────────
@@ -121,6 +153,14 @@ Route::prefix('public')->name('public.')->middleware(['maintenance', 'public.acc
         Route::get('/education',     fn() => redirect('/public/institution-reports/school', 301));
         Route::get('/health',        [InstitutionReportController::class, 'health'])        ->name('health');
         Route::get('/school',        [InstitutionReportController::class, 'school'])        ->name('school');
+    });
+
+    // ── Open Data CSV Downloads ──────────────────────────────────────────────
+    Route::prefix('opendata')->name('opendata.')->group(function () {
+        Route::get('/',             [OpenDataController::class, 'index'])        ->name('index');
+        Route::get('/wards',        [OpenDataController::class, 'wards'])       ->name('wards');
+        Route::get('/institutions', [OpenDataController::class, 'institutions'])->name('institutions');
+        Route::get('/businesses',   [OpenDataController::class, 'businesses'])  ->name('businesses');
     });
 });
 
@@ -318,6 +358,9 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
             Route::post('/google-sync/preview', [GoogleSyncController::class, 'preview'])->name('google-sync.preview');
             Route::post('/google-sync/apply',   [GoogleSyncController::class, 'apply'])  ->name('google-sync.apply');
 
+            // User Manual
+            Route::get('/user-manual', fn () => view('admin.user-manual'))->name('user-manual');
+
             // Bulk Import
             Route::get('/bulk-import', function () {
                 return view('admin.bulk-import');
@@ -383,10 +426,13 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
             Route::post('/settings/download-links/{downloadLink}',     [SettingsController::class, 'updateDownloadLink']) ->name('settings.download-links.update');
             Route::delete('/settings/download-links/{downloadLink}',   [SettingsController::class, 'destroyDownloadLink'])->name('settings.download-links.destroy');
             Route::patch('/settings/survey-period', [SettingsController::class, 'saveSurveyPeriod'])->name('settings.survey-period.save');
+            Route::post('/settings/rounds',              [SurveyRoundController::class, 'store'])  ->name('settings.rounds.store');
+            Route::delete('/settings/rounds/{number}',   [SurveyRoundController::class, 'destroy'])->name('settings.rounds.destroy');
             Route::get('/settings/export',  [SettingsController::class, 'exportSettings']) ->name('settings.export');
             Route::post('/settings/import', [SettingsController::class, 'importSettings']) ->name('settings.import');
             Route::patch('/settings/google-sheets',      [SettingsController::class, 'saveGoogleSheets'])  ->name('settings.google-sheets.save');
             Route::post('/settings/test-google-sheet',   [SettingsController::class, 'testGoogleSheet'])   ->name('settings.google-sheets.test');
+            Route::patch('/settings/user-manual',        [SettingsController::class, 'updateUserManual'])  ->name('settings.user-manual');
 
             // License
             Route::post('/settings/license/generate',  [LicenseController::class, 'generate']) ->name('settings.license.generate');

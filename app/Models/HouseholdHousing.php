@@ -13,6 +13,7 @@ class HouseholdHousing extends Model
         'rent_amount','distance_to_mainroad','distance_to_school',
         'total_rooms','total_floors','has_building_permit',
         'construction_year','house_condition','is_at_risk','risk_types',
+        'has_land_in_municipality',
     ];
     protected $casts = [
         'risk_types'=>'array','has_building_permit'=>'boolean','is_at_risk'=>'boolean',

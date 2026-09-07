@@ -394,13 +394,100 @@ class CrossTabService
         $category = $categoryMap[$field] ?? $field;
 
         return Cache::remember("opt_labels.{$category}", 3600, function () use ($category) {
-            return SurveyOption::where('category', $category)
+            $labels = SurveyOption::where('category', $category)
                 ->where('is_active', true)
                 ->orderBy('sort_order')
                 ->pluck('label_ne', 'value')
                 ->toArray();
+
+            // Augment with Kobo-format aliases (Google Sync stored raw Kobo choice names
+            // before normalization was added). Maps alias → same label as system key.
+            foreach ((CrossTabService::KOBO_LABEL_ALIASES[$category] ?? []) as $koboVal => $sysKey) {
+                if (!isset($labels[$koboVal]) && isset($labels[$sysKey])) {
+                    $labels[$koboVal] = $labels[$sysKey];
+                }
+            }
+
+            return $labels;
         });
     }
+
+    /** Kobo choice names → canonical survey_option key (for display fallback only). */
+    private const KOBO_LABEL_ALIASES = [
+        'water_source' => [
+            'Tap_house'     => 'tap_inside',  'Tap_public'    => 'tap_outside',
+            'covered_well'  => 'well',         'open_well'     => 'well',
+            'Jaruwa'        => 'tube_well',    'Tube_well'     => 'tube_well',
+            'River'         => 'river',        'नदी/खोला'     => 'river',
+            'Spring'        => 'spring',       'मूल/झरना'     => 'spring',
+            'Rain_water'    => 'rain',         'वर्षाको पानी' => 'rain',
+            'Jar_water'     => 'jar_water',    'इनार/कुवा'    => 'well',
+        ],
+        'toilet_type' => [
+            'Flush'       => 'flush',    'Water_seal'  => 'flush',
+            'Simple_pit'  => 'pit',      'no_toilet'   => 'none',
+            'No_toilet'   => 'none',
+        ],
+        'sanitation_type' => [
+            'Standard_septictank'     => 'flush_septic',
+            'Standard_publicdrainage' => 'flush_piped',
+            'normal'                  => 'simple_pit',
+            'no_toilet'               => 'open',       'No_toilet'    => 'open',
+            'Simple_pit'              => 'simple_pit', 'Improved_pit' => 'improved_pit',
+        ],
+        'roof_type' => [
+            'CGI_sheet'   => 'tin',    'Tin'         => 'tin',   'Metal_sheet' => 'tin',
+            'RCC'         => 'rcc',    'Concrete'    => 'rcc',
+            'Tile'        => 'tile',   'Clay_tile'   => 'tile',
+            'Thatch'      => 'thatch', 'Straw'       => 'thatch',
+            'Slate'       => 'slate',  'Stone_slate' => 'slate',
+        ],
+        'wall_type' => [
+            'Brick_cement'  => 'brick_cement', 'Brick_mud'    => 'brick_mud',
+            'Stone_cement'  => 'stone_cement', 'Stone_mud'    => 'stone_mud',
+            'RCC'           => 'rcc',          'Bamboo'       => 'bamboo',
+            'Wood'          => 'wood',         'Timber'       => 'wood',
+        ],
+        'electricity_source' => [
+            'National_grid' => 'national_grid', 'Grid'    => 'national_grid',
+            'Solar'         => 'solar',         'Generator' => 'generator',
+            'Micro_hydro'   => 'micro_hydro',
+        ],
+        'cooking_fuel' => [
+            'LPG'      => 'lpg',      'Firewood'      => 'firewood', 'Wood'   => 'firewood',
+            'Biogas'   => 'biogas',   'Kerosene'      => 'kerosene',
+            'Electricity' => 'electricity', 'Improved_cook' => 'improved_cook',
+        ],
+        'waste_management' => [
+            'Organized_disposal' => 'govt_collection', 'Organized' => 'govt_collection',
+            'Burned'   => 'burning', 'Composting' => 'composting', 'Compost' => 'composting',
+            'Open_dumping' => 'dumping',
+        ],
+        'house_condition' => [
+            'Good' => 'good', 'Average' => 'average', 'Poor' => 'poor', 'Damaged' => 'damaged',
+        ],
+        'child_vaccine' => [
+            'दादुरा' => 'measles',
+            'BCG'    => 'bcg',
+            'DPT-1'  => 'dpt1',  'DPT1' => 'dpt1',
+            'DPT-2'  => 'dpt2',  'DPT2' => 'dpt2',
+            'DPT-3'  => 'dpt3',  'DPT3' => 'dpt3',
+        ],
+        'ethnicity' => [
+            'माझी'   => 'majhi',   'जोगी'  => 'jogi',
+            'मधेसी'  => 'madhesi', 'चौधरी' => 'chaudhary',
+        ],
+        'irrigation_source' => [
+            'लिफ्ट/ पम्प सेट' => 'lift_pump',
+            'लिफ्ट/पम्प सेट'  => 'lift_pump',
+            'नहर'              => 'Canal',
+            'ट्यूबवेल'         => 'Borewell',
+            'नदी/खोला'         => 'River',
+            'पोखरी'            => 'Pond',
+            'वर्षा'            => 'Rainfall',
+            'मूल'              => 'Spring',
+        ],
+    ];
 
     // ── Cache key helper ─────────────────────────────────────────────────────
     /**

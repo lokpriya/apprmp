@@ -7,7 +7,7 @@ use Inertia\Inertia;
 use App\Models\Household;
 use App\Models\HouseholdMember;
 use App\Models\Institution;
-use App\Models\InstitutionType;
+use App\Models\SurveyOption;
 use App\Models\MemberBusiness;
 use App\Models\User;
 use App\Models\Ward;
@@ -75,12 +75,16 @@ class DashboardController extends Controller
             ->pluck('cnt', 'status');
 
         // ── Institution Types Count ─────────────────────────────────────
-        $institutionTypes = InstitutionType::withCount([
-            'institutions' => fn ($q) => $q->whereIn('ward_id', $wardIds),
-        ])
-        ->having('institutions_count', '>', 0)
-        ->orderByDesc('institutions_count')
-        ->get();
+        $typeLabels = SurveyOption::where('category', 'institution_type')->pluck('label_ne', 'value');
+        $typeCounts = Institution::whereIn('ward_id', $wardIds)
+            ->selectRaw('institution_type, count(*) as institutions_count')
+            ->groupBy('institution_type')
+            ->orderByDesc('institutions_count')
+            ->get();
+        $institutionTypes = $typeCounts->map(fn($r) => (object)[
+            'name_np'            => $typeLabels[$r->institution_type] ?? $r->institution_type,
+            'institutions_count' => $r->institutions_count,
+        ]);
 
         // ── Enumerator Leaderboard (top 5) ──────────────────────────────
         $enumeratorLeaderboard = User::where('local_government_id', $lgId)
@@ -157,6 +161,65 @@ class DashboardController extends Controller
             ->orderBy('ward_number')
             ->get();
 
+        // ── Weekly Digest (last 7 days vs previous 7 days) ─────────────
+        $weekStart = now()->subDays(7)->startOfDay();
+        $prevStart = now()->subDays(14)->startOfDay();
+
+        $hhSubmittedWeek = Household::whereIn('ward_id', $wardIds)
+            ->whereNotNull('submitted_at')
+            ->where('submitted_at', '>=', $weekStart)->count();
+        $hhSubmittedPrev = Household::whereIn('ward_id', $wardIds)
+            ->whereNotNull('submitted_at')
+            ->whereBetween('submitted_at', [$prevStart, $weekStart])->count();
+
+        $hhApprovedWeek = Household::whereIn('ward_id', $wardIds)
+            ->whereNotNull('ward_reviewed_at')
+            ->where('ward_reviewed_at', '>=', $weekStart)
+            ->whereIn('status', ['ward_approved', 'escalated', 'published'])->count();
+        $hhApprovedPrev = Household::whereIn('ward_id', $wardIds)
+            ->whereNotNull('ward_reviewed_at')
+            ->whereBetween('ward_reviewed_at', [$prevStart, $weekStart])
+            ->whereIn('status', ['ward_approved', 'escalated', 'published'])->count();
+
+        $hhPublishedWeek = Household::whereIn('ward_id', $wardIds)
+            ->whereNotNull('published_at')
+            ->where('published_at', '>=', $weekStart)->count();
+        $hhPublishedPrev = Household::whereIn('ward_id', $wardIds)
+            ->whereNotNull('published_at')
+            ->whereBetween('published_at', [$prevStart, $weekStart])->count();
+
+        $topEnumRow = Household::whereIn('ward_id', $wardIds)
+            ->whereNotNull('submitted_at')
+            ->where('submitted_at', '>=', $weekStart)
+            ->whereNotNull('enumerator_id')
+            ->select('enumerator_id', DB::raw('count(*) as cnt'))
+            ->groupBy('enumerator_id')
+            ->orderByDesc('cnt')
+            ->first();
+        $topEnumUser = $topEnumRow ? User::find($topEnumRow->enumerator_id) : null;
+
+        $topWardRow = Household::whereIn('ward_id', $wardIds)
+            ->whereNotNull('submitted_at')
+            ->where('submitted_at', '>=', $weekStart)
+            ->select('ward_id', DB::raw('count(*) as cnt'))
+            ->groupBy('ward_id')
+            ->orderByDesc('cnt')
+            ->first();
+        $topWardObj = $topWardRow ? Ward::find($topWardRow->ward_id) : null;
+
+        $digest = [
+            'hh_submitted_week'  => $hhSubmittedWeek,
+            'hh_submitted_delta' => $hhSubmittedWeek - $hhSubmittedPrev,
+            'hh_approved_week'   => $hhApprovedWeek,
+            'hh_approved_delta'  => $hhApprovedWeek - $hhApprovedPrev,
+            'hh_published_week'  => $hhPublishedWeek,
+            'hh_published_delta' => $hhPublishedWeek - $hhPublishedPrev,
+            'top_enumerator'     => $topEnumUser?->name,
+            'top_enumerator_count' => (int) ($topEnumRow?->cnt ?? 0),
+            'top_ward_number'    => $topWardObj?->ward_number,
+            'top_ward_count'     => (int) ($topWardRow?->cnt ?? 0),
+        ];
+
         // ── Recent Activity (households + institutions, combined) ────────
         $recentHouseholds = Household::with(['ward', 'enumerator'])
             ->whereIn('ward_id', $wardIds)
@@ -211,6 +274,7 @@ class DashboardController extends Controller
             'trendData'            => $trendData,
             'wardSummary'          => $wardSummary,
             'recentActivity'       => $recentActivity,
+            'digest'               => $digest,
         ]);
     }
 }

@@ -3,8 +3,8 @@
 namespace App\Imports\Sheets;
 
 use App\Models\Institution;
-use App\Models\InstitutionType;
 use App\Models\Settlement;
+use App\Models\SurveyOption;
 use App\Models\Ward;
 use App\Services\DuplicateDetectionService;
 use App\Services\UniqueCodeService;
@@ -30,7 +30,7 @@ class InstitutionsSheet implements ToCollection, WithChunkReading, WithHeadingRo
     private array $wardMap       = [];   // ward_number => Ward
     private array $wardById      = [];   // ward_id     => Ward
     private array $settlementMap = [];   // "ward_id:name_lower" => Settlement
-    private array $typeMap       = [];   // slug_lower => InstitutionType
+    private array $typeMap       = [];   // slug_lower => canonical slug
     private array $existingCodes = [];   // unique_code => true
     private bool  $preloaded    = false;
     private DuplicateDetectionService $dupService;
@@ -61,10 +61,10 @@ class InstitutionsSheet implements ToCollection, WithChunkReading, WithHeadingRo
                 $this->settlementMap[$s->ward_id . ':' . mb_strtolower(trim($s->name_np))] = $s;
             }
 
-            // Pre-load institution types
-            foreach (InstitutionType::all() as $t) {
-                $this->typeMap[strtolower($t->slug)]    = $t;
-                $this->typeMap[strtolower($t->name_en)] = $t;
+            // Pre-load institution types from survey_options
+            foreach (SurveyOption::where('category', 'institution_type')->get() as $t) {
+                $this->typeMap[strtolower($t->value)]    = $t->value;
+                $this->typeMap[strtolower($t->label_en)] = $t->value;
             }
 
             // Pre-load existing codes
@@ -115,8 +115,8 @@ class InstitutionsSheet implements ToCollection, WithChunkReading, WithHeadingRo
             $this->errors[] = "Row {$rowNum}: institution_type is required.";
             return;
         }
-        $type = $this->typeMap[$typeSlug] ?? null;
-        if (!$type) {
+        $resolvedType = $this->typeMap[$typeSlug] ?? null;
+        if (!$resolvedType) {
             $this->errors[] = "Row {$rowNum}: Institution type '{$typeSlug}' not found. See Valid Values sheet.";
             return;
         }
@@ -168,7 +168,7 @@ class InstitutionsSheet implements ToCollection, WithChunkReading, WithHeadingRo
             'unique_code'          => $code,
             'ward_id'              => $wardId,
             'settlement_id'        => $settlementId,
-            'institution_type_id'  => $type->id,
+            'institution_type'     => $resolvedType,
             'name_np'              => $nameNp ?: $nameEn,
             'name_en'              => $nameEn ?: $nameNp,
             'ownership_type'       => trim($row['ownership_type'] ?? '') ?: null,

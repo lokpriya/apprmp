@@ -5,6 +5,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Institution extends Model
@@ -12,7 +13,7 @@ class Institution extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'unique_code','ward_id','settlement_id','institution_type_id','name_np','name_en',
+        'unique_code','ward_id','settlement_id','institution_type','name_np','name_en',
         'established_date','ownership_type','registration_number','enumerator_id',
         'gps_lat','gps_lng','gps_altitude','gps_accuracy','photo_number','status','survey_date','submitted_at','ward_reviewed_at',
         'ward_reviewer_id','ward_review_comment','published_at','published_by',
@@ -28,7 +29,6 @@ class Institution extends Model
 
     public function ward(): BelongsTo          { return $this->belongsTo(Ward::class); }
     public function settlement(): BelongsTo    { return $this->belongsTo(Settlement::class); }
-    public function institutionType(): BelongsTo { return $this->belongsTo(InstitutionType::class); }
     public function enumerator(): BelongsTo    { return $this->belongsTo(User::class, 'enumerator_id'); }
     public function wardReviewer(): BelongsTo  { return $this->belongsTo(User::class, 'ward_reviewer_id'); }
     public function publisher(): BelongsTo     { return $this->belongsTo(User::class, 'published_by'); }
@@ -45,6 +45,6 @@ class Institution extends Model
     public function isDraft(): bool     { return $this->status === 'draft'; }
     public function isFrozen(): bool    { return $this->data_frozen_at !== null; }
 
-    public function isSchool(): bool    { return $this->institutionType?->has_education ?? false; }
-    public function isHealth(): bool    { return $this->institutionType?->has_health ?? false; }
+    public function isSchool(): bool    { return $this->institution_type === 'school'; }
+    public function isHealth(): bool    { return $this->institution_type === 'health_post'; }
 }

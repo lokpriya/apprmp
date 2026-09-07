@@ -10,7 +10,6 @@ use App\Models\Household;
 use App\Models\HouseholdLivestock;
 use App\Models\HouseholdMember;
 use App\Models\Institution;
-use App\Models\InstitutionType;
 use App\Models\Settlement;
 use App\Models\SurveyOption;
 use App\Models\Ward;
@@ -27,13 +26,138 @@ class GoogleSheetsSyncService
     private array $unmappedValues = [];
 
     /**
+     * Kobo choice-name → system survey_option value.
+     * KoboToTemplate.gs copies raw Kobo choice codes; normalize them before DB storage.
+     */
+    private const KOBO_NORM = [
+        'water_source' => [
+            'Tap_house'      => 'tap_inside',   'Tap_public'   => 'tap_outside',
+            'covered_well'   => 'well',          'open_well'    => 'well',
+            'Jaruwa'         => 'tube_well',     'Tube_well'    => 'tube_well',
+            'River'          => 'river',         'नदी/खोला'    => 'river',
+            'Spring'         => 'spring',        'मूल/झरना'    => 'spring',
+            'Rain_water'     => 'rain',          'Rainwater'    => 'rain',
+            'वर्षाको पानी'  => 'rain',
+            'Jar_water'      => 'jar_water',     'जार पानी'    => 'jar_water',
+            'Well'           => 'well',          'इनार/कुवा'   => 'well',
+        ],
+        'toilet_type' => [
+            'Flush'        => 'flush',           'Water_seal'   => 'flush',
+            'Simple_pit'   => 'pit',             'Pit'          => 'pit',
+            'Eco_san'      => 'eco_san',
+            'no_toilet'    => 'none',            'No_toilet'    => 'none',
+        ],
+        'sanitation_type' => [
+            'Standard_septictank'     => 'flush_septic',
+            'Standard_publicdrainage' => 'flush_piped',
+            'normal'                  => 'simple_pit',   'Normal'      => 'simple_pit',
+            'no_toilet'               => 'open',         'No_toilet'   => 'open',
+            'Open_field'              => 'open',
+            'Simple_pit'              => 'simple_pit',
+            'Improved_pit'            => 'improved_pit', 'VIP'         => 'improved_pit',
+        ],
+        'electricity_source' => [
+            'National_grid' => 'national_grid',  'Grid'         => 'national_grid',
+            'Solar'         => 'solar',          'Generator'    => 'generator',
+            'Micro_hydro'   => 'micro_hydro',    'Biogas'       => 'biogas',
+        ],
+        'cooking_fuel' => [
+            'LPG'           => 'lpg',            'Biogas'       => 'biogas',
+            'Firewood'      => 'firewood',       'Wood'         => 'firewood',
+            'Kerosene'      => 'kerosene',       'Electricity'  => 'electricity',
+            'Improved_cook' => 'improved_cook',  'Dung'         => 'other',
+        ],
+        'waste_management' => [
+            'Organized_disposal' => 'govt_collection',
+            'Organized'          => 'govt_collection',
+            'Burned'             => 'burning',   'Burning'      => 'burning',
+            'Compost'            => 'composting','Composting'   => 'composting',
+            'Open_dumping'       => 'dumping',   'Open_dump'    => 'dumping',
+            'Pit_disposal'       => 'pit',
+        ],
+        'internet_type' => [
+            'Broadband'   => 'broadband',        'Mobile_data'  => 'mobile_data',
+            'Wifi'        => 'wifi',             'WiFi'         => 'wifi',
+            'Dish'        => 'dish',             'VSAT'         => 'dish',
+        ],
+        'roof_type' => [
+            'CGI_sheet'     => 'tin',    'Tin'          => 'tin',
+            'Metal_sheet'   => 'tin',    'Iron_sheet'   => 'tin',
+            'RCC'           => 'rcc',    'Concrete'     => 'rcc',  'rcc_concrete' => 'rcc',
+            'Tile'          => 'tile',   'Clay_tile'    => 'tile', 'Wood_tile'    => 'tile',
+            'Thatch'        => 'thatch', 'Straw'        => 'thatch','Grass'       => 'thatch',
+            'Slate'         => 'slate',  'Stone_slate'  => 'slate',
+        ],
+        'wall_type' => [
+            'Brick_cement'        => 'brick_cement',
+            'Burnt_brick_cement'  => 'brick_cement',
+            'Brick_mud'           => 'brick_mud',
+            'Burnt_brick_mud'     => 'brick_mud',    'Adobe'      => 'brick_mud',
+            'Stone_cement'        => 'stone_cement',
+            'Stone_mud'           => 'stone_mud',    'Mud_stone'  => 'stone_mud',
+            'RCC'                 => 'rcc',          'Concrete'   => 'rcc',
+            'Bamboo'              => 'bamboo',       'Bamboo_mud' => 'bamboo',
+            'Wood'                => 'wood',         'Timber'     => 'wood',
+        ],
+        'foundation_type' => [
+            'RCC'          => 'rcc',    'Concrete'     => 'rcc',
+            'Brick_cement' => 'brick_cement',
+            'Stone_cement' => 'stone_cement',
+            'Stone_mud'    => 'stone_mud',   'Mud'     => 'stone_mud',
+        ],
+        'house_condition' => [
+            'Good'        => 'good',    'Average'  => 'average',  'Fair'       => 'average',
+            'Poor'        => 'poor',    'Damaged'  => 'damaged',  'Dilapidated'=> 'damaged',
+        ],
+        'ownership_type' => [
+            'Owned'         => 'owned',   'Rented'       => 'rented',
+            'Institutional' => 'institutional',           'Squatter' => 'squatter',
+        ],
+        'ethnicity' => [
+            'माझी'    => 'majhi',   'जोगी'   => 'jogi',
+            'मधेसी'   => 'madhesi', 'चौधरी'  => 'chaudhary',
+            // Common Nepali label → code mappings (Kobo forms that output labels)
+            'ब्राह्मण (पहाड)'  => 'brahmin_hill',
+            'ब्राह्मण (तराई)'  => 'brahmin_tarai',
+            'क्षेत्री'         => 'chhetri',
+            'मगर'              => 'magar',
+            'तामाङ'            => 'tamang',
+            'नेवार'            => 'newar',
+            'राई'              => 'rai',
+            'लिम्बू'           => 'limbu',
+            'थारू'             => 'tharu',
+            'यादव'             => 'yadav',
+            'कामी'             => 'kami',
+            'दमाई'             => 'damai',
+            'सार्की'           => 'sarki',
+        ],
+        'irrigation_source' => [
+            'लिफ्ट/ पम्प सेट' => 'lift_pump',
+            'लिफ्ट/पम्प सेट'  => 'lift_pump',
+            'Lift'             => 'lift_pump',
+            'Lift_pump'        => 'lift_pump',
+            'नहर'              => 'Canal',
+            'ट्यूबवेल'         => 'Borewell',
+            'नदी/खोला'         => 'River',
+            'पोखरी'            => 'Pond',
+            'वर्षा'            => 'Rainfall',
+            'मूल'              => 'Spring',
+        ],
+    ];
+
+    /**
      * Canonicalize an enum field value via SurveyOption lookup.
+     * Applies Kobo normalization first, then survey_options registry.
      * Tracks values that are not found in the registry so they can be surfaced in preview/apply results.
      */
     private function opt(string $category, mixed $raw): ?string
     {
         $value = trim((string)($raw ?? ''));
         if ($value === '') return null;
+
+        // Normalize raw Kobo choice names to system survey_option values
+        $value = self::KOBO_NORM[$category][$value] ?? $value;
+
         $lgId = $this->syncLgId ?: null;
         if (!SurveyOption::isKnown($category, $value, $lgId)) {
             $this->unmappedValues[$category][$value] = ($this->unmappedValues[$category][$value] ?? 0) + 1;
@@ -1100,6 +1224,7 @@ class GoogleSheetsSyncService
             'house_condition'       => $this->opt('house_condition',       $row['house_condition']       ?? null),
             'is_at_risk'            => $this->parseBool($row['is_at_risk'] ?? null) ?? false,
             'risk_types'            => $this->parseJsonArray($row['disaster_type'] ?? null),
+            'has_land_in_municipality' => $this->parseBoolYesNo($row['has_land_in_municipality'] ?? null),
         ];
     }
 
@@ -1121,17 +1246,24 @@ class GoogleSheetsSyncService
         return [
             'water_source'              => $this->opt('water_source',      $row['water_source']           ?? null),
             'water_distance_minutes'    => is_numeric($row['water_distance_minutes'] ?? '') ? (int)$row['water_distance_minutes'] : null,
+            'uses_firewood'             => $this->parseBoolYesNo($row['uses_firewood'] ?? null),
+            'firewood_source'           => $this->parseJsonArray($row['firewood_source'] ?? null),
+            'cooking_stove'             => $this->opt('cooking_stove',     $row['cooking_stove']          ?? null),
+            'cooking_fuel_arr'          => $this->parseJsonArray($row['cooking_fuel_arr'] ?? null),
+            'cooking_fuel'              => $this->opt('cooking_fuel',      $row['cooking_fuel']           ?? null),
+            'has_biogas'                => $this->parseBool($row['has_biogas']    ?? null) ?? false,
+            'has_alt_electricity'       => $this->parseBoolYesNo($row['has_alt_electricity'] ?? null),
+            'alt_electricity_sources'   => $this->parseJsonArray($row['alt_electricity_source'] ?? null),
+            'electricity_source'        => $this->opt('electricity_source',$row['electricity_source']     ?? null),
+            'monthly_electricity_units' => is_numeric($row['monthly_electricity_units'] ?? '') ? (int)$row['monthly_electricity_units'] : null,
+            'solid_waste_management'    => $this->opt('waste_management',  $row['waste_management'] ?? null),
             'has_toilet'                => $this->parseBool($row['has_toilet']    ?? null) ?? false,
             'toilet_type'               => $this->opt('toilet_type',       $row['toilet_type']            ?? null),
             'sanitation_type'           => $this->opt('sanitation_type',   $row['sanitation_type']        ?? null),
-            'electricity_source'        => $this->opt('electricity_source',$row['electricity_source']     ?? null),
-            'monthly_electricity_units' => is_numeric($row['monthly_electricity_units'] ?? '') ? (int)$row['monthly_electricity_units'] : null,
-            'cooking_fuel'              => $this->opt('cooking_fuel',      $row['cooking_fuel']           ?? null),
-            'has_biogas'                => $this->parseBool($row['has_biogas']    ?? null) ?? false,
-            'solid_waste_management'    => $this->opt('waste_management',  $row['waste_management'] ?? null),
+            'handwashing'               => $this->opt('handwashing',       $row['handwashing']            ?? null),
+            'access_to_facilities'      => $this->parseJsonArray($row['facilities'] ?? null),
             'has_internet'              => $this->parseBool($row['has_internet']  ?? null) ?? false,
             'internet_type'             => $this->opt('internet_type',     $row['internet_type']          ?? null),
-            'handwashing'               => $this->opt('handwashing',       $row['handwashing']            ?? null),
             // vehicles_bike/car/tempo/tractor/other → vehicles array; has_own_vehicle → vehicle (varchar Yes/No)
             'vehicle'                   => $this->parseBoolYesNo($row['has_own_vehicle'] ?? null),
             'vehicles'                  => $this->parseVehiclesArray($row),
@@ -1150,6 +1282,11 @@ class GoogleSheetsSyncService
             'has_bank_account'          => $this->parseBool($row['has_bank_account']          ?? null) ?? false,
             'has_insurance'             => $this->parseBool($row['has_insurance']             ?? null) ?? false,
             'poverty_card'              => $this->parseBool($row['poverty_card']              ?? null) ?? false,
+            'food_expense'              => is_numeric($row['food_expense']        ?? '') ? (int)$row['food_expense']        : null,
+            'clothes_expense'           => is_numeric($row['clothes_expense']     ?? '') ? (int)$row['clothes_expense']     : null,
+            'education_expense'         => is_numeric($row['education_expense']   ?? '') ? (int)$row['education_expense']   : null,
+            'treatment_expense'         => is_numeric($row['treatment_expense']   ?? '') ? (int)$row['treatment_expense']   : null,
+            'other_expense'             => is_numeric($row['other_expense']       ?? '') ? (int)$row['other_expense']       : null,
             // social_security_allowance is per-person — synced via Members sheet (ss_allowance)
             // decision_* and has_foreign_employment → synced to survey_data in syncRelated()
         ];
@@ -1163,10 +1300,16 @@ class GoogleSheetsSyncService
             'agri_categories'          => $this->parseJsonArray($row['agri_category'] ?? null),
             'use_of_chem_fertilizer'   => trim($row['use_of_chem_fertilizer'] ?? '') ?: null,
             'uses_chemical_fertilizer' => $yn($row['uses_chemical_fertilizer'] ?? $row['use_of_chem_fertilizer'] ?? null),
+            'chem_fertilizer_types'    => $this->parseJsonArray($row['chem_fertilizer'] ?? null),
+            'chem_fertilizer_kg'       => is_numeric($row['chem_fertilizer_kg'] ?? '') ? (int)$row['chem_fertilizer_kg'] : null,
+            'fertilizer_sources'       => $this->parseJsonArray($row['fertilizer_source'] ?? null),
+            'use_of_chem_pesticide'    => trim($row['use_of_chem_pesticide'] ?? '') ?: null,
+            'chem_pesticide_types'     => $this->parseJsonArray($row['chem_pesticide'] ?? null),
+            'chem_pesticide_cost'      => is_numeric($row['chem_pesticide_cost'] ?? '') ? (int)$row['chem_pesticide_cost'] : null,
             'uses_organic_fertilizer'  => $yn($row['uses_organic_fertilizer']  ?? null),
             'sells_produce'            => $yn($row['sells_produce']             ?? null),
             'has_agri_loan'            => $yn($row['has_agri_loan']             ?? null),
-            'irrigation_source'        => trim($row['irrigation_source']       ?? '') ?: null,
+            'irrigation_source'        => $this->opt('irrigation_source',      $row['irrigation_source']       ?? null),
             'Farm_Challenges'          => $this->parseJsonArray($row['farm_challenge'] ?? null),
             'owns_land'                => $yn($row['owns_land']   ?? null),
             'land_area_ropani'         => is_numeric($row['land_area_ropani']      ?? '') ? (float)$row['land_area_ropani']      : null,
@@ -1197,6 +1340,7 @@ class GoogleSheetsSyncService
     {
         return [
             'full_name'         => trim($row['full_name']         ?? '') ?: null,
+            'father_name'       => trim($row['father_name']       ?? '') ?: null,
             'gender'            => trim($row['gender']            ?? '') ?: null,
             'age'               => is_numeric($row['age']         ?? '') ? (int)$row['age'] : null,
             'date_of_birth'     => $this->parseDate($row['date_of_birth'] ?? null),
@@ -1205,25 +1349,15 @@ class GoogleSheetsSyncService
             'religion'          => $this->opt('religion',          $row['religion']          ?? null),
             'mother_tongue'     => $this->opt('language',          $row['language']          ?? null),
             'marital_status'    => $this->opt('marital_status',    $row['marital_status']    ?? null),
+            'ageofmarriage'     => is_numeric($row['ageofmarriage'] ?? '') ? (int)$row['ageofmarriage'] : null,
             'education_level'   => $this->opt('education_level',   $row['education_level']   ?? null),
+            'education_status'  => $this->opt('education_status',  $row['education_status']  ?? null),
             'is_literate'       => $this->parseBool($row['is_literate']       ?? null) ?? false,
+            'school_type'       => $this->opt('school_type',       $row['school_type']       ?? null),
+            'cause_not_school'  => $this->parseJsonArray($row['cause_not_school'] ?? null),
+            'current_class'     => trim($row['current_class']     ?? '') ?: null,
+            'school_name'       => trim($row['school_name']       ?? '') ?: null,
             'occupation_type'   => $this->opt('occupation_type',   $row['occupation_type']   ?? null),
-            'employment_status' => $this->opt('employment_status', $row['employment_status'] ?? null),
-            'disability_status'       => $this->parseBool($row['disability_status']       ?? null) ?? false,
-            'disability_type'         => $this->opt('disability_type', $row['disability_type'] ?? null),
-            'disability_card'         => trim($row['disability_card']       ?? '') ?: null,
-            'disability_card_color'   => trim($row['disability_card_color'] ?? '') ?: null,
-            'chronic_illness'         => $this->parseBool($row['chronic_illness']         ?? null) ?? false,
-            'chronic_illness_types'   => $this->parseJsonArray($row['chronic_illness_types'] ?? null),
-            'smoking_drinking'        => $this->parseBool($row['smoking_drinking']        ?? null) ?? false,
-            'child_labor'             => $this->parseBool($row['child_labor']             ?? null) ?? false,
-            'blood_group'             => trim($row['blood_group']       ?? '') ?: null,
-            'blood_group_tested'      => trim($row['blood_group_tested'] ?? '') ?: null,
-            'has_phone'               => $this->parseBool($row['has_phone']               ?? null),
-            'residence_status'        => $this->opt('residence_status', $row['residence_status'] ?? null),
-            'addrslocation'           => trim($row['addrslocation']       ?? '') ?: null,
-            'residing_district'       => trim($row['residing_district']   ?? '') ?: null,
-            'ageofmarriage'           => is_numeric($row['ageofmarriage'] ?? '') ? (int)$row['ageofmarriage'] : null,
             'vocational_training'     => $this->parseBool($row['vocational_training']     ?? null) ?? false,
             'vt_subject'              => trim($row['vt_subject']           ?? '') ?: null,
             'vt_duration_min'         => is_numeric($row['vt_duration_min'] ?? '') ? (int)$row['vt_duration_min'] : null,
@@ -1232,16 +1366,45 @@ class GoogleSheetsSyncService
             'techtraining_subject'    => trim($row['techtraining_subject']  ?? '') ?: null,
             'sa_training'             => $this->parseBool($row['sa_training']             ?? null) ?? false,
             'sa_training_subject'     => trim($row['sa_training_subject']   ?? '') ?: null,
-            'contact_phone'           => trim($row['contact_phone']        ?? '') ?: null,
-            'is_household_head'       => $this->parseBool($row['is_household_head']       ?? null) ?? false,
+            'employment_status' => $this->opt('employment_status', $row['employment_status'] ?? null),
+            'disability_status'       => $this->parseBool($row['disability_status']       ?? null) ?? false,
+            'disability_type'         => $this->opt('disability_type', $row['disability_type'] ?? null),
+            'disability_card'         => trim($row['disability_card']       ?? '') ?: null,
+            'disability_card_color'   => trim($row['disability_card_color'] ?? '') ?: null,
+            'chronic_illness'         => $this->parseBool($row['chronic_illness']         ?? null) ?? false,
+            'chronic_illness_types'   => $this->parseJsonArray($row['chronic_illness_types'] ?? null),
+            'child_labor'             => $this->parseBool($row['child_labor']             ?? null) ?? false,
+            'workplace_child_labor'   => trim($row['workplace_child_labor'] ?? '') ?: null,
+            'blood_group'             => trim($row['blood_group']       ?? '') ?: null,
+            'blood_group_tested'      => trim($row['blood_group_tested'] ?? '') ?: null,
+            'has_birth_certificate'      => $this->parseBool($row['has_birth_certificate']      ?? null) ?? false,
             'has_citizenship'         => $this->parseBool($row['has_citizenship']         ?? null) ?? false,
+            'no_citizenship_reason'   => trim($row['no_citizenship_reason'] ?? '') ?: null,
             'has_voters_card'         => $this->parseBool($row['has_voters_card']         ?? null) ?? false,
             'has_national_id_card'    => $this->parseBool($row['has_national_id_card']    ?? null) ?? false,
             'has_passport'            => $this->parseBool($row['has_passport']            ?? null) ?? false,
             'has_pan'                 => $this->parseBool($row['has_pan']                 ?? null) ?? false,
             'has_drivers_license'     => $this->parseBool($row['has_drivers_license']     ?? null) ?? false,
             'drivers_license_category'=> trim($row['drivers_license_category'] ?? '') ?: null,
-            'has_birth_certificate'      => $this->parseBool($row['has_birth_certificate']      ?? null) ?? false,
+            'residence_status'        => $this->opt('residence_status', $row['residence_status'] ?? null),
+            'residing_country'        => trim($row['residing_country']         ?? '') ?: null,
+            'purpose_living_outside'  => trim($row['purpose_living_outside']   ?? '') ?: null,
+            'typeofabroadjob'         => $this->opt('typeofabroadjob',  $row['typeofabroadjob']  ?? null),
+            'abroadjobstatus'         => $this->opt('abroadjobstatus',  $row['abroadjobstatus']  ?? null),
+            'addrslocation'           => trim($row['addrslocation']       ?? '') ?: null,
+            'residing_district'       => trim($row['residing_district']   ?? '') ?: null,
+            'contact_phone'           => trim($row['contact_phone']        ?? '') ?: null,
+            'national_id'             => trim($row['national_id']          ?? '') ?: null,
+            'ss_allowance'               => $this->parseBool($row['social_security_allowance']  ?? null) ?? false,
+            'smoking_drinking'        => $this->parseBool($row['smoking_drinking']        ?? null) ?? false,
+            'smoking_drinking_items'  => $this->parseJsonArray($row['smoking_drinking_items'] ?? null),
+            'frequency_smoking_drinking' => trim($row['frequency_smoking_drinking'] ?? '') ?: null,
+            'is_deceased'             => $this->parseBool($row['is_deceased']             ?? null) ?? false,
+            'death_cause'             => trim($row['death_cause']          ?? '') ?: null,
+            'death_date'              => $this->parseDate($row['death_date'] ?? null),
+            'remarks'                 => trim($row['remarks'] ?? '') ?: null,
+            'has_phone'               => $this->parseBool($row['has_phone']               ?? null),
+            'is_household_head'       => $this->parseBool($row['is_household_head']       ?? null) ?? false,
             // Child health (0–3 yrs)
             'colostrum'                  => $this->parseBool($row['colostrum']                  ?? null),
             'vit_a_dewormin'             => $this->parseBool($row['vit_a_dewormin']             ?? null),
@@ -1257,8 +1420,6 @@ class GoogleSheetsSyncService
             'allergy_infection_6_15'     => $this->parseBool($row['allergy_infection_6_15']     ?? null),
             'watch_mobile_tv_6_15'       => $this->parseBool($row['watch_mobile_tv_6_15']       ?? null),
             'school_interest_6_15'       => trim($row['school_interest_6_15']   ?? '') ?: null,
-            'ss_allowance'               => $this->parseBool($row['social_security_allowance']  ?? null) ?? false,
-            'remarks'                 => trim($row['remarks'] ?? '') ?: null,
         ];
     }
 
@@ -1281,7 +1442,7 @@ class GoogleSheetsSyncService
             'name_np'             => trim($row['name_np']             ?? '') ?: null,
             'ownership_type'      => $this->opt('inst_ownership_type', $row['ownership_type'] ?? null),
             'registration_number' => trim($row['registration_number'] ?? '') ?: null,
-            'institution_type_id' => $this->resolveInstitutionTypeId($row['institution_type'] ?? null),
+            'institution_type'    => $this->opt('institution_type', $row['institution_type'] ?? null),
             'settlement_id'       => $this->resolveSettlementId(trim($row['settlement_name'] ?? ''), $wardId),
             'gps_lat'             => $gpsLat,
             'gps_lng'             => $gpsLng,
@@ -1648,18 +1809,6 @@ class GoogleSheetsSyncService
         return $this->settlementCache[$cacheKey];
     }
 
-    private array $institutionTypeCache = [];
-
-    private function resolveInstitutionTypeId(?string $slug): ?int
-    {
-        if (!$slug) return null;
-        $slug = trim($slug);
-        if (!$slug) return null;
-        if (!array_key_exists($slug, $this->institutionTypeCache)) {
-            $this->institutionTypeCache[$slug] = InstitutionType::where('slug', $slug)->value('id');
-        }
-        return $this->institutionTypeCache[$slug];
-    }
 
     private function logSyncAudit(string $type, int $wardId, int $imported, int $updated, int $skipped): void
     {

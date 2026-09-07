@@ -9,7 +9,6 @@ use App\Models\HouseholdHousing;
 use App\Models\HouseholdMember;
 use App\Models\MemberBusiness;
 use App\Models\Institution;
-use App\Models\InstitutionType;
 use App\Models\LocalGovernment;
 use App\Models\Settlement;
 use App\Models\SurveyOption;
@@ -44,6 +43,7 @@ class AnalyticsController extends Controller
             'district'         => $lg->district?->name_en,
             'established_year' => $lg->established_date?->format('Y'),
             'map_config'       => $lg->map_config ?? [],
+            'type'             => $lg->type ?? 'municipality',
         ];
     }
 
@@ -217,15 +217,16 @@ class AnalyticsController extends Controller
             ->pluck('count', 'mother_tongue')
             ->toArray();
 
+        $instTypeMap = \App\Models\SurveyOption::where('category', 'institution_type')
+            ->pluck('label_ne', 'value');
         $institutionData = Institution::whereIn('ward_id', $activeWardIds)
             ->where('status', 'published')
             ->when($selectedSettlementId, fn($q) => $q->where('settlement_id', $selectedSettlementId))
-            ->join('institution_types', 'institutions.institution_type_id', '=', 'institution_types.id')
-            ->select('institution_types.name_np as label_ne', 'institution_types.name_en as label_en', DB::raw('count(*) as count'))
-            ->groupBy('institution_types.name_np', 'institution_types.name_en')
+            ->select('institution_type', DB::raw('count(*) as count'))
+            ->groupBy('institution_type')
             ->orderByDesc('count')
             ->get()
-            ->map(fn($r) => ['label_ne' => $r->label_ne, 'label_en' => $r->label_en, 'count' => (int)$r->count])
+            ->map(fn($r) => ['label_ne' => $instTypeMap[$r->institution_type] ?? $r->institution_type, 'label_en' => $r->institution_type, 'count' => (int)$r->count])
             ->values()->toArray();
 
         $wardHouseholds = DB::table('households')
@@ -567,12 +568,9 @@ class AnalyticsController extends Controller
         ]);
     }
 
-    // ── Ward Summary page ─────────────────────────────────────────────────
-    public function wardSummaryPage(Request $request)
+    // ── Shared ward summary builder (used by wardSummaryPage + wardComparisonPage) ──
+    private function buildWardSummaries(LocalGovernment $lg): \Illuminate\Support\Collection
     {
-        $lg = $this->defaultLg();
-        if (!$lg) return redirect()->route('public.dashboard');
-
         $allWardIds = Ward::where('local_government_id', $lg->id)->pluck('id')->toArray();
         $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
 
@@ -605,10 +603,33 @@ class AnalyticsController extends Controller
                 DB::raw('count(*) as total'))
             ->groupBy('households.ward_id')->get()->keyBy('ward_id');
 
-        $wardSummary = $wards->map(function ($ward) use (
-            $wardHouseholds, $wardGender, $wardInstitutions, $wardBusinesses, $wardLiteracy
+        $wardUtils = DB::table('household_utilities')
+            ->join('households', 'household_utilities.household_id', '=', 'households.id')
+            ->whereIn('households.ward_id', $allWardIds)->where('households.status', 'published')
+            ->select('households.ward_id',
+                DB::raw("SUM(CASE WHEN water_source IN ('Tap_public','Tap_house','covered_well') THEN 1 ELSE 0 END) as safe_water"),
+                DB::raw('SUM(CAST(has_internet AS UNSIGNED)) as has_internet'),
+                DB::raw("SUM(CASE WHEN toilet_type IS NOT NULL AND toilet_type NOT IN ('no_toilet','open_field','openfield','') THEN 1 ELSE 0 END) as has_toilet"),
+                DB::raw('COUNT(*) as total')
+            )
+            ->groupBy('households.ward_id')->get()->keyBy('ward_id');
+
+        $wardEcon = DB::table('household_economic')
+            ->join('households', 'household_economic.household_id', '=', 'households.id')
+            ->whereIn('households.ward_id', $allWardIds)->where('households.status', 'published')
+            ->select('households.ward_id',
+                DB::raw('SUM(CAST(has_bank_account AS UNSIGNED)) as has_bank'),
+                DB::raw('COUNT(*) as total')
+            )
+            ->groupBy('households.ward_id')->get()->keyBy('ward_id');
+
+        return $wards->map(function ($ward) use (
+            $wardHouseholds, $wardGender, $wardInstitutions, $wardBusinesses,
+            $wardLiteracy, $wardUtils, $wardEcon
         ) {
             $lit = $wardLiteracy->get($ward->id);
+            $u   = $wardUtils->get($ward->id);
+            $e   = $wardEcon->get($ward->id);
             return [
                 'ward_id'        => $ward->id,
                 'ward_number'    => $ward->ward_number,
@@ -621,10 +642,44 @@ class AnalyticsController extends Controller
                 'businesses'     => (int) ($wardBusinesses->get($ward->id, 0)),
                 'literate'       => (int) ($lit?->literate ?? 0),
                 'literate_total' => (int) ($lit?->total    ?? 0),
+                'safe_water'     => (int) ($u?->safe_water  ?? 0),
+                'internet'       => (int) ($u?->has_internet ?? 0),
+                'toilet'         => (int) ($u?->has_toilet   ?? 0),
+                'bank'           => (int) ($e?->has_bank     ?? 0),
+                'utils_total'    => (int) ($u?->total        ?? 0),
+                'econ_total'     => (int) ($e?->total        ?? 0),
             ];
         })->values();
+    }
+
+    // ── Ward Summary page ─────────────────────────────────────────────────
+    public function wardSummaryPage(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) return redirect()->route('public.dashboard');
+
+        $wardSummary = $this->buildWardSummaries($lg);
+        $wards       = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
 
         return Inertia::render('Public/Reports/WardSummary', [
+            'lg'          => $this->lgProps($lg),
+            'wardSummary' => $wardSummary,
+            'wards'       => $wards->map(fn($w) => ['id' => $w->id, 'ward_number' => $w->ward_number])->values(),
+            'settlements' => [],
+            'filters'     => [],
+        ]);
+    }
+
+    // ── Ward Comparison page ──────────────────────────────────────────────
+    public function wardComparisonPage(Request $request)
+    {
+        $lg = $this->defaultLg();
+        if (!$lg) return redirect()->route('public.dashboard');
+
+        $wardSummary = $this->buildWardSummaries($lg);
+        $wards       = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
+
+        return Inertia::render('Public/Reports/WardComparison', [
             'lg'          => $this->lgProps($lg),
             'wardSummary' => $wardSummary,
             'wards'       => $wards->map(fn($w) => ['id' => $w->id, 'ward_number' => $w->ward_number])->values(),
@@ -709,6 +764,8 @@ class AnalyticsController extends Controller
                 'bhujel'    => 'भुजेल',              'hayu'      => 'हायू',
                 'gaaine'    => 'गाइने',              'dom'       => 'डोम',
                 'kumaal'    => 'कुमाल',              'other'     => 'अन्य',
+                'majhi'     => 'माझी',               'jogi'      => 'जोगी',
+                'madhesi'   => 'मधेसी',              'chaudhary' => 'चौधरी',
             ],
             // ── Religion: values absent from survey_options ─────────────────────
             'religion' => [
@@ -824,6 +881,13 @@ class AnalyticsController extends Controller
             'income_source' => [
                 'selfemployment' => 'स्वरोजगार',
                 'other_income'   => 'अन्य',
+            ],
+            // ── Irrigation source: Aathrai lift_pump + Nepali fallbacks ────────
+            'irrigation_source' => [
+                'canal'     => 'नहर',           'borewell'  => 'ट्यूबवेल',
+                'river'     => 'नदी/खोला',      'pond'      => 'पोखरी',
+                'rainfall'  => 'वर्षा',          'spring'    => 'मूल',
+                'lift_pump' => 'लिफ्ट/पम्प सेट',
             ],
         ];
         foreach ($koboFallback as $cat => $fallback) {
@@ -1082,12 +1146,15 @@ class AnalyticsController extends Controller
             ->select('addrslocation', DB::raw('count(*) as cnt'))
             ->groupBy('addrslocation')->pluck('cnt', 'addrslocation');
 
-        // residing_country not yet captured; placeholder for when it is
+        // residing_country is stored as JSON — an array from the form, a scalar from
+        // bulk import/Google Sync. Unwrap both so they group as the same country
+        // instead of appearing as separate quoted entries.
+        $countryExpr = 'COALESCE(JSON_UNQUOTE(JSON_EXTRACT(residing_country, \'$[0]\')), JSON_UNQUOTE(residing_country))';
         $destCountries = $memberBase()
             ->where('addrslocation', 'विदेशमा बसेको (६ महिना भन्दा बढी समय देखि)')
             ->whereNotNull('residing_country')->where('residing_country', '!=', '')
-            ->select('residing_country as country', DB::raw('count(*) as cnt'))
-            ->groupBy('residing_country')->orderByDesc('cnt')->limit(8)->get()
+            ->select(DB::raw("$countryExpr as country"), DB::raw('count(*) as cnt'))
+            ->groupBy(DB::raw($countryExpr))->orderByDesc('cnt')->limit(8)->get()
             ->map(fn($r) => ['country' => $r->country, 'cnt' => (int)$r->cnt])->toArray();
 
         $migration = [
@@ -1287,12 +1354,11 @@ class AnalyticsController extends Controller
 
         $institutions = Institution::where('ward_id', $ward->id)
             ->where('status', 'published')
-            ->with('institutionType')
-            ->get()
+            ->get(['id', 'name_en', 'institution_type'])
             ->map(fn($i) => [
                 'id'      => $i->id,
                 'name_en' => $i->name_en,
-                'type'    => $i->institutionType?->name_en,
+                'type'    => $i->institution_type,
             ]);
 
         $lg = LocalGovernment::with(['district.province'])->where('is_active', true)->first()
@@ -1330,9 +1396,8 @@ class AnalyticsController extends Controller
 
         $data = Institution::whereIn('ward_id', $wardIds)
             ->where('status', 'published')
-            ->join('institution_types', 'institutions.institution_type_id', '=', 'institution_types.id')
-            ->select('institution_types.name_en as label', DB::raw('count(*) as count'))
-            ->groupBy('institution_types.name_en')
+            ->select('institution_type as label', DB::raw('count(*) as count'))
+            ->groupBy('institution_type')
             ->get();
 
         return response()->json($data);
@@ -1411,7 +1476,7 @@ class AnalyticsController extends Controller
         $wardIds = $wards->pluck('id')->toArray();
 
         $selectedWardId = $request->integer('ward_id') ?: null;
-        $selectedTypeId = $request->integer('type_id') ?: null;
+        $selectedType   = $request->input('type') ?: null;
 
         $filterWardIds = $selectedWardId ? [$selectedWardId] : $wardIds;
 
@@ -1421,12 +1486,14 @@ class AnalyticsController extends Controller
             ->whereNotNull('institutions.gps_lng')
             ->where('institutions.gps_lat', '!=', 0)
             ->where('institutions.gps_lng', '!=', 0)
-            ->join('institution_types', 'institutions.institution_type_id', '=', 'institution_types.id')
             ->join('wards', 'institutions.ward_id', '=', 'wards.id');
 
-        if ($selectedTypeId) {
-            $baseQ->where('institutions.institution_type_id', $selectedTypeId);
+        if ($selectedType) {
+            $baseQ->where('institutions.institution_type', $selectedType);
         }
+
+        $typeLabels = \App\Models\SurveyOption::where('category', 'institution_type')
+            ->get(['value', 'label_ne', 'label_en'])->keyBy('value');
 
         $points = (clone $baseQ)
             ->select(
@@ -1437,24 +1504,22 @@ class AnalyticsController extends Controller
                 'institutions.gps_lat',
                 'institutions.gps_lng',
                 'institutions.gps_altitude',
-                'institutions.institution_type_id',
-                'institution_types.name_np as type_np',
-                'institution_types.name_en as type_en',
+                'institutions.institution_type',
                 'wards.ward_number'
             )
             ->get()
             ->map(fn ($i) => [
-                'id'      => $i->id,
-                'code'    => $i->unique_code,
-                'name_np' => $i->name_np,
-                'name_en' => $i->name_en,
-                'lat'     => (float) $i->gps_lat,
-                'lng'     => (float) $i->gps_lng,
-                'alt'     => $i->gps_altitude ? (float) $i->gps_altitude : null,
-                'ward'    => $i->ward_number,
-                'type_id' => $i->institution_type_id,
-                'type_np' => $i->type_np,
-                'type_en' => $i->type_en,
+                'id'               => $i->id,
+                'code'             => $i->unique_code,
+                'name_np'          => $i->name_np,
+                'name_en'          => $i->name_en,
+                'lat'              => (float) $i->gps_lat,
+                'lng'              => (float) $i->gps_lng,
+                'alt'              => $i->gps_altitude ? (float) $i->gps_altitude : null,
+                'ward'             => $i->ward_number,
+                'institution_type' => $i->institution_type,
+                'type_np'          => $typeLabels[$i->institution_type]?->label_ne ?? $i->institution_type,
+                'type_en'          => $typeLabels[$i->institution_type]?->label_en ?? $i->institution_type,
             ]);
 
         // Ward counts (no type filter for sidebar counts)
@@ -1467,11 +1532,14 @@ class AnalyticsController extends Controller
             ->pluck('cnt', 'ward_id');
 
         // All institution types that have GPS data in this LG
-        $types = InstitutionType::whereHas('institutions', fn ($q) =>
-            $q->whereIn('ward_id', $wardIds)
-              ->where('status', 'published')
-              ->whereNotNull('gps_lat')->where('gps_lat', '!=', 0)
-        )->orderBy('name_en')->get(['id', 'name_np', 'name_en']);
+        $typeSlugsWithData = Institution::whereIn('ward_id', $wardIds)
+            ->where('status', 'published')
+            ->whereNotNull('gps_lat')->where('gps_lat', '!=', 0)
+            ->distinct()->pluck('institution_type');
+        $types = \App\Models\SurveyOption::where('category', 'institution_type')
+            ->whereIn('value', $typeSlugsWithData)
+            ->orderBy('sort_order')
+            ->get(['value', 'label_ne', 'label_en']);
 
         return Inertia::render('Public/InstitutionMap', [
             'lg'          => $this->lgProps($lg),
@@ -1479,7 +1547,7 @@ class AnalyticsController extends Controller
             'types'       => $types,
             'points'      => $points,
             'wardCounts'  => $wardCounts,
-            'filters'     => ['ward_id' => $selectedWardId, 'type_id' => $selectedTypeId],
+            'filters'     => ['ward_id' => $selectedWardId, 'type' => $selectedType],
             'totalPoints' => $points->count(),
         ]);
     }

@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\EditRequest;
 use App\Models\Institution;
-use App\Models\InstitutionType;
 use App\Models\Settlement;
 use App\Models\SurveyOption;
 use App\Models\Ward;
@@ -14,18 +13,38 @@ use App\Services\DuplicateDetectionService;
 use App\Services\InstitutionService;
 use App\Services\WorkflowService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class InstitutionController extends Controller
 {
     public function __construct(private WorkflowService $workflow) {}
 
+    /**
+     * Valid institution_type slugs — global options plus any LG-specific ones.
+     * The InstitutionType foreign key was dropped in favour of survey_options
+     * slugs, so this is now the only thing keeping arbitrary strings out of the
+     * column and, in turn, out of the report groupings.
+     */
+    private function institutionTypeRule(?int $lgId): array
+    {
+        $allowed = SurveyOption::query()
+            ->where('category', 'institution_type')
+            ->where('is_active', true)
+            ->where(fn ($q) => $q->whereNull('local_government_id')->orWhere('local_government_id', $lgId))
+            ->pluck('value')
+            ->all();
+
+        return ['nullable', 'string', 'max:100', Rule::in($allowed)];
+    }
+
     public function index(Request $request)
     {
         $user = auth()->user();
         $lgId = $user->local_government_id;
 
-        $query = Institution::with(['ward', 'settlement', 'institutionType', 'enumerator', 'infrastructure'])->latest();
+        $typeLabels = SurveyOption::where('category', 'institution_type')->pluck('label_ne', 'value');
+        $query = Institution::with(['ward', 'settlement', 'enumerator', 'infrastructure'])->latest();
 
         if ($user->isEnumerator()) {
             $wardIds = $user->assignedWards()->pluck('wards.id')->toArray();
@@ -50,7 +69,7 @@ class InstitutionController extends Controller
                 'name_np'          => $i->name_np,
                 'name_en'          => $i->name_en,
                 'ward'             => $i->ward ? ['ward_number' => $i->ward->ward_number] : null,
-                'institutionType'  => $i->institutionType ? ['name_np' => $i->institutionType->name_np] : null,
+                'institutionType'  => $i->institution_type ? ['name_np' => $typeLabels[$i->institution_type] ?? $i->institution_type] : null,
                 'ownership_type'   => $i->ownership_type,
                 'status'           => $i->status,
                 'enumerator'       => $i->enumerator ? ['name' => $i->enumerator->name] : null,
@@ -80,9 +99,10 @@ class InstitutionController extends Controller
             'settlements'      => Settlement::whereIn('ward_id', $wardIds)
                                             ->orderBy('name_np')
                                             ->get(['id', 'ward_id', 'name_np']),
-            'institutionTypes' => InstitutionType::where('is_active', true)
+            'institutionTypes' => SurveyOption::where('category', 'institution_type')
+                                                 ->where('is_active', true)
                                                  ->orderBy('sort_order')
-                                                 ->get(['id', 'name_np', 'name_en', 'slug', 'has_education', 'has_health']),
+                                                 ->get(['value', 'label_ne', 'label_en']),
             'buildingTypes'    => SurveyOption::where('category', 'inst_building_type')
                                                 ->orderBy('sort_order')->orderBy('label_ne')
                                                 ->get(['value', 'label_ne', 'label_en']),
@@ -107,7 +127,7 @@ class InstitutionController extends Controller
         $this->authorize('view', $institution);
 
         $institution->load([
-            'ward', 'settlement', 'institutionType', 'enumerator',
+            'ward', 'settlement', 'enumerator',
             'infrastructure', 'healthDetail', 'services', 'staff', 'education',
             'submissionLogs.actor', 'fieldVerification.verifier',
         ]);
@@ -123,9 +143,11 @@ class InstitutionController extends Controller
                                     ->get(['category', 'value', 'label_ne'])
                                     ->groupBy('category');
 
-        // Laravel serializes relations as snake_case; add camelCase aliases for Vue
+        // Build institutionType alias for Vue (slug→label lookup)
+        $typeLabels = SurveyOption::where('category', 'institution_type')->get()->keyBy('value');
         $institutionData = $institution->toArray();
-        $institutionData['institutionType']  = $institutionData['institution_type']  ?? null;
+        $t = $typeLabels[$institution->institution_type] ?? null;
+        $institutionData['institutionType'] = $t ? ['name_np' => $t->label_ne, 'name_en' => $t->label_en, 'slug' => $institution->institution_type] : null;
         $institutionData['healthDetail']     = $institutionData['health_detail']     ?? null;
         $institutionData['submissionLogs']   = $institutionData['submission_logs']   ?? [];
 
@@ -190,9 +212,10 @@ class InstitutionController extends Controller
             'settlements'      => Settlement::whereIn('ward_id', $wardIds)
                                             ->orderBy('name_np')
                                             ->get(['id', 'ward_id', 'name_np']),
-            'institutionTypes' => InstitutionType::where('is_active', true)
+            'institutionTypes' => SurveyOption::where('category', 'institution_type')
+                                                 ->where('is_active', true)
                                                  ->orderBy('sort_order')
-                                                 ->get(['id', 'name_np', 'name_en', 'slug', 'has_education', 'has_health']),
+                                                 ->get(['value', 'label_ne', 'label_en']),
             'buildingTypes'    => SurveyOption::where('category', 'inst_building_type')
                                                 ->orderBy('sort_order')->orderBy('label_ne')
                                                 ->get(['value', 'label_ne', 'label_en']),
@@ -212,12 +235,14 @@ class InstitutionController extends Controller
 
     public function store(Request $request)
     {
+        $user = auth()->user();
+
         $request->validate([
-            'ward_id' => 'required|exists:wards,id',
-            'name_en' => 'required|string|max:200',
+            'ward_id'          => 'required|exists:wards,id',
+            'name_en'          => 'required|string|max:200',
+            'institution_type' => $this->institutionTypeRule($user->local_government_id),
         ]);
 
-        $user = auth()->user();
         if (!$user->isAdmin()) {
             $lg = \App\Models\LocalGovernment::getCached($user->local_government_id);
             if ($lg?->isSurveyFrozen()) {
@@ -252,6 +277,11 @@ class InstitutionController extends Controller
         $this->authorize('update', $institution);
 
         $user = auth()->user();
+
+        $request->validate([
+            'institution_type' => $this->institutionTypeRule($user->local_government_id),
+        ]);
+
         if (!$user->isAdmin()) {
             $lg = \App\Models\LocalGovernment::getCached($user->local_government_id);
             if ($lg?->isSurveyFrozen()) {
@@ -319,7 +349,7 @@ class InstitutionController extends Controller
     {
         $errors = [];
 
-        if (!$institution->institution_type_id)                       $errors[] = 'संस्थाको प्रकार';
+        if (!$institution->institution_type)                           $errors[] = 'संस्थाको प्रकार';
         if (!$institution->name_np && !$institution->name_en)         $errors[] = 'संस्थाको नाम';
         if (!$institution->ward_id)                                   $errors[] = 'वडा नं.';
         if (!$institution->respondent_name)                           $errors[] = 'उत्तरदाताको नाम';

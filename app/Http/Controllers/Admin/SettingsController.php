@@ -1356,6 +1356,19 @@ class SettingsController extends Controller
         }
     }
 
+    // ── User Manual Visibility (super_admin only) ─────────────────────────────
+
+    public function updateUserManual(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()?->isSuperAdmin(), 403);
+        $lg      = $this->lg();
+        $config  = $lg->welcome_config ?? [];
+        $config['show_user_manual'] = $request->boolean('show_user_manual');
+        $lg->update(['welcome_config' => $config]);
+        Cache::forget('show_user_manual_' . $lg->id);
+        return back()->with('success', 'प्रयोगकर्ता निर्देशिका सेटिङ अपडेट भयो।');
+    }
+
     // ── Settings Export / Import ──────────────────────────────────────────────
 
     public function exportSettings(): \Symfony\Component\HttpFoundation\StreamedResponse

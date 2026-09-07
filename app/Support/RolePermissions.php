@@ -206,8 +206,8 @@ class RolePermissions
                 'reports.view','reports.export',
                 // Import (ward-scoped)
                 'import.households','import.institutions','import.businesses',
-                // Feedback (view only by default — manage/delete off)
-                'feedback.view',
+                // Feedback
+                'feedback.view','feedback.manage',
             ],
 
             'ward_reviewer' => [

@@ -161,7 +161,10 @@ class SurveyOption extends Model
     /** Institution-specific categories (keys starting with 'inst_'). */
     public static function institutionCategories(): array
     {
-        return array_filter(static::categories(), fn($k) => str_starts_with($k, 'inst_'), ARRAY_FILTER_USE_KEY);
+        return array_filter(static::categories(), fn($k) =>
+            str_starts_with($k, 'inst_') || $k === 'institution_type',
+            ARRAY_FILTER_USE_KEY
+        );
     }
 
     /** Business-specific categories (keys starting with 'business_' or 'sub_'). */
@@ -178,6 +181,7 @@ class SurveyOption extends Model
     {
         return array_filter(static::categories(), fn($k) =>
             !str_starts_with($k, 'inst_') &&
+            $k !== 'institution_type' &&
             !str_starts_with($k, 'business_') &&
             !str_starts_with($k, 'sub_'),
             ARRAY_FILTER_USE_KEY
@@ -195,7 +199,7 @@ class SurveyOption extends Model
                 'step'     => 1,
                 'title_ne' => 'सामान्य विवरण',
                 'title_en' => 'General Details',
-                'keys'     => ['inst_ownership_type', 'inst_building_type', 'inst_building_condition'],
+                'keys'     => ['institution_type', 'inst_ownership_type', 'inst_building_type', 'inst_building_condition'],
             ],
             [
                 'step'     => 2,
@@ -328,7 +332,7 @@ class SurveyOption extends Model
                 'title_en' => 'Utilities & Sanitation',
                 'keys'     => [
                     'water_source', 'toilet_type', 'sanitation_type', 'handwashing',
-                    'nutrition_diet', 'treatment_place',
+                    'nutrition_diet', 'illness_frequency', 'treatment_place',
                     'electricity_source', 'alt_electricity_source',
                     'cooking_fuel', 'firewood_source', 'cooking_stove',
                     'waste_management', 'internet_type', 'facilities',
@@ -479,6 +483,7 @@ class SurveyOption extends Model
             'sanitation_type'         => 'घरधुरी: सरसफाइको प्रकार (Sanitation Type)',
             'handwashing'             => 'घरधुरी: हात धुने सुविधा (Handwashing Facility)',
             'nutrition_diet'          => 'घरधुरी: पोषण तथा सन्तुलित आहार (Nutrition & Diet)',
+            'illness_frequency'       => 'घरधुरी: बर्षमा बिरामी हुने आवृत्ति (Illness Frequency)',
             'treatment_place'         => 'घरधुरी: उपचारको लागि जाने ठाउँ (Treatment Place)',
             'electricity_source'      => 'घरधुरी: विद्युतको स्रोत (Electricity Source)',
             'alt_electricity_source'  => 'घरधुरी: बत्तिको बैकल्पिक स्रोत (Alternative Electricity Source)',
@@ -590,6 +595,8 @@ class SurveyOption extends Model
             'sub_OtherShopBusiness'           => 'व्यवसाय उप-वर्ग: अन्य पसल व्यवसाय (Other Shop Business)',
             // ── Business — Registration
             'business_registration_place'     => 'व्यवसाय: दर्ता स्थान (Registration Place)',
+            // ── Institution — General
+            'institution_type'        => 'संस्था: संस्थाको प्रकार (Institution Type)',
             // ── Institution — Building
             'inst_building_type'      => 'संस्था: भवनको किसिम (Building Type)',
             'inst_building_condition' => 'संस्था: भवनको अवस्था (Building Condition)',

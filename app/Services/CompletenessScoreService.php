@@ -78,7 +78,7 @@ class CompletenessScoreService
             filled($inst->gps_lat) && filled($inst->gps_lng),
             filled($inst->photo_number),
             filled($inst->name_np) || filled($inst->name_en),
-            filled($inst->institution_type_id),
+            filled($inst->institution_type),
             filled($inst->ward_id),
             filled($inst->settlement_id),
             filled($inst->survey_date),

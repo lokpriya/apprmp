@@ -9,7 +9,6 @@ use App\Models\InstitutionHealth;
 use App\Models\InstitutionInfrastructure;
 use App\Models\InstitutionService;
 use App\Models\InstitutionStaff;
-use App\Models\InstitutionType;
 use App\Models\LocalGovernment;
 use App\Models\SurveyOption;
 use App\Models\Ward;
@@ -81,18 +80,18 @@ class InstitutionReportController extends Controller
         $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
 
         $total      = (clone $base)->count();
-        $totalTypes = InstitutionType::count();
+        $instTypeLabels = SurveyOption::where('category', 'institution_type')->pluck('label_ne', 'value');
+        $totalTypes = $instTypeLabels->count();
 
         // Count by type
         $byType = (clone $base)
-            ->join('institution_types', 'institutions.institution_type_id', '=', 'institution_types.id')
-            ->select('institution_types.name_en', 'institution_types.name_np', DB::raw('count(*) as count'))
-            ->groupBy('institution_types.name_en', 'institution_types.name_np')
+            ->select('institution_type', DB::raw('count(*) as count'))
+            ->groupBy('institution_type')
             ->orderByDesc('count')
             ->get()
             ->map(fn($r) => [
-                'name_en' => $r->name_en,
-                'name_np' => $r->name_np,
+                'name_en' => $r->institution_type,
+                'name_np' => $instTypeLabels[$r->institution_type] ?? $r->institution_type,
                 'count'   => $r->count,
             ]);
 
@@ -140,17 +139,15 @@ class InstitutionReportController extends Controller
         $wards      = Ward::where('local_government_id', $lg->id)->orderBy('ward_number')->get();
         $wardColDef = CrossTabService::wardColDef($wards);
 
-        // Type labels from DB — key=name_en (used in SQL), value=Nepali label
-        $typeLabels = InstitutionType::all()
-            ->mapWithKeys(fn($t) => [$t->name_en => $t->name_np ?: $t->name_en])
-            ->toArray();
+        // Type labels — slug → Nepali label
+        $typeLabels = SurveyOption::where('category', 'institution_type')
+            ->pluck('label_ne', 'value')->toArray();
 
         $typeByWard = CrossTabService::tab(
             Institution::whereIn('institutions.ward_id', $wardIds)
                 ->where('institutions.status', 'published')
-                ->join('institution_types', 'institutions.institution_type_id', '=', 'institution_types.id')
                 ->join('wards', 'institutions.ward_id', '=', 'wards.id'),
-            'institution_types.name_en',
+            'institutions.institution_type',
             'wards.ward_number',
             $typeLabels,
             $wardColDef,
@@ -159,9 +156,8 @@ class InstitutionReportController extends Controller
 
         $typeFreq = CrossTabService::freq(
             Institution::whereIn('institutions.ward_id', $wardIds)
-                ->where('institutions.status', 'published')
-                ->join('institution_types', 'institutions.institution_type_id', '=', 'institution_types.id'),
-            'institution_types.name_en',
+                ->where('institutions.status', 'published'),
+            'institutions.institution_type',
             $typeLabels,
             $ck . '_type'
         );
@@ -232,12 +228,11 @@ class InstitutionReportController extends Controller
 
         $ownerByType = CrossTabService::tab(
             Institution::whereIn('institutions.ward_id', $wardIds)
-                ->where('institutions.status', 'published')
-                ->join('institution_types', 'institutions.institution_type_id', '=', 'institution_types.id'),
+                ->where('institutions.status', 'published'),
             'institutions.ownership_type',
-            'institution_types.name_en',
+            'institutions.institution_type',
             $ownershipLabels,
-            InstitutionType::pluck('name_en', 'name_en')->toArray(),
+            SurveyOption::where('category', 'institution_type')->pluck('label_ne', 'value')->toArray(),
             $ck . '_ownxtype'
         );
 
@@ -651,16 +646,21 @@ class InstitutionReportController extends Controller
         $mediumLabels = $grouped['inst_medium']           ?? [];
         $gradeLabels  = $grouped['inst_grade']            ?? [];
 
-        // Base query: only school types (has_education = true)
+        // Base query: only school type.
+        // This was previously driven by InstitutionType::has_education, but that table
+        // was replaced by survey_options slugs, which carry no capability flag — so the
+        // slug is matched directly. If another education-bearing type is ever added to
+        // the institution_type options, it must be added here too or it will silently
+        // drop out of this report.
         $schoolBase = fn () => Institution::whereIn('ward_id', $wardIds)
             ->where('status', 'published')
-            ->whereHas('institutionType', fn($q) => $q->where('has_education', true));
+            ->where('institution_type', 'school');
 
         $totalSchools = $schoolBase()->count();
 
         // School list with ward + education aggregates
         $schools = $schoolBase()
-            ->with(['ward:id,ward_number', 'institutionType:id,name_np,name_en', 'education'])
+            ->with(['ward:id,ward_number', 'education'])
             ->orderBy('name_np')
             ->get()
             ->map(function ($inst) use ($levelLabels, $mgmtLabels, $mediumLabels) {
@@ -743,7 +743,7 @@ class InstitutionReportController extends Controller
         $gradeEnrollment = InstitutionEducation::whereHas('institution', fn($q) =>
             $q->whereIn('ward_id', $wardIds)
               ->where('status', 'published')
-              ->whereHas('institutionType', fn($qt) => $qt->where('has_education', true))
+              ->where('institution_type', 'school')
         )
         ->select(
             'grade',

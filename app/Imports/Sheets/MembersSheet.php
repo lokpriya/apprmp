@@ -121,7 +121,7 @@ class MembersSheet implements ToCollection, WithChunkReading, WithHeadingRow, Wi
                         'drivers_license_category' => $this->parseArray($row['drivers_license_category'] ?? null) ?: null,
                         // ── Location & Contact ────────────────────────────────
                         'residence_status'           => trim($row['residence_status']           ?? '') ?: null,
-                        'residing_country'           => $this->parseArray($row['residing_country']  ?? null) ?: null,
+                        'residing_country'           => trim($row['residing_country'] ?? '') ?: null,
                         'purpose_living_outside'     => trim($row['purpose_living_outside']     ?? '') ?: null,
                         'typeofabroadjob'            => trim($row['typeofabroadjob']            ?? '') ?: null,
                         'abroadjobstatus'            => trim($row['abroadjobstatus']            ?? '') ?: null,
