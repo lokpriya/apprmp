@@ -5,10 +5,13 @@ namespace App\Services;
 use App\Models\MemberBusiness;
 use App\Models\HouseholdMember;
 use App\Models\Ward;
+use App\Support\RetriesUniqueCode;
 use Illuminate\Support\Facades\DB;
 
 class BusinessService
 {
+    use RetriesUniqueCode;
+
     /** Generate next unique code for a ward, e.g. BIZ-001-0001 */
     public function generateUniqueCode(int $wardId): string
     {
@@ -37,7 +40,9 @@ class BusinessService
         $wardId      = $member->household->ward_id;
         $settlementId = $member->household->settlement_id;
 
-        return DB::transaction(function () use ($data, $member, $wardId, $settlementId, $enumeratorId) {
+        // See RetriesUniqueCode: concurrent saves in one ward derive the same
+        // unique_code from an unlocked read.
+        return $this->retryOnDuplicateCode(fn () => DB::transaction(function () use ($data, $member, $wardId, $settlementId, $enumeratorId) {
             return MemberBusiness::create([
                 'household_member_id'       => $member->id,
                 'household_id'              => $member->household_id,
@@ -75,7 +80,7 @@ class BusinessService
                 'tax_amount'                => $data['tax_amount'] ?? null,
                 'contact_number'            => $data['contact_number'] ?? null,
             ]);
-        });
+        }));
     }
 
     /** Update an existing business record */

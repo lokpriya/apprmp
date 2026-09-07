@@ -17,8 +17,10 @@ class BusinessReportController extends Controller
 {
     private function defaultLg(): ?LocalGovernment
     {
-        return LocalGovernment::with(['district.province'])->where('is_active', true)->first()
-            ?? LocalGovernment::with(['district.province'])->first();
+        // Canonical, cached and deterministic. Resolving this per controller meant
+        // an uncached joined query on every public request, and copies that could
+        // disagree with one another after a settings change.
+        return LocalGovernment::getActiveFull();
     }
 
     private function lgProps(LocalGovernment $lg): array

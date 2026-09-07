@@ -52,9 +52,41 @@ class LocalGovernment extends Model
         return Cache::rememberForever("lg_{$id}", fn () => static::find($id));
     }
 
+    /**
+     * The active local government, without relations.
+     *
+     * Both queries order by id explicitly. `first()` on an unordered query
+     * returns whatever row the storage engine happens to yield, so without this
+     * the identity of the *entire public site* — every report, every export —
+     * depends on physical row order. The fallback matters in practice: the
+     * local_governments table carries all 753 Nepal municipalities as master
+     * data, and on a freshly imported database none of them is flagged active.
+     */
     public static function getFirstCached(): ?self
     {
-        return Cache::rememberForever('lg_first', fn () => static::where('is_active', true)->first() ?? static::first());
+        return Cache::rememberForever('lg_first', fn () => static::activeQuery()->first());
+    }
+
+    /**
+     * The active local government with district and province eager-loaded.
+     *
+     * Five public controllers used to resolve this themselves, four of them
+     * uncached — a database hit with a join on every public request, which is
+     * the last thing the CloudLinux entry-process budget needs. Worse, the
+     * uncached copies could disagree with the cached ones after a change.
+     * Cached under the key SettingsController already busts.
+     */
+    public static function getActiveFull(): ?self
+    {
+        return Cache::remember('active_lg_full', 600, fn () => static::activeQuery()->with(['district.province'])->first());
+    }
+
+    /** Shared, deterministic definition of "the active LG". */
+    private static function activeQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return static::query()
+            ->orderByRaw('is_active DESC')
+            ->orderBy('id');
     }
 
     public static function bustCache(int $id): void

@@ -17,10 +17,7 @@ class OpenDataController extends Controller
 {
     private function defaultLg(): ?LocalGovernment
     {
-        return Cache::remember('active_lg_full', 600, fn () =>
-            LocalGovernment::with(['district.province'])->where('is_active', true)->first()
-                ?? LocalGovernment::with(['district.province'])->first()
-        );
+        return LocalGovernment::getActiveFull();
     }
 
     private function csvStream(string $filename, callable $writer): Response

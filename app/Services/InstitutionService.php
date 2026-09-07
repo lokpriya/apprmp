@@ -5,15 +5,20 @@ namespace App\Services;
 use App\Models\Institution;
 use App\Models\Ward;
 use App\Models\User;
+use App\Support\RetriesUniqueCode;
 use Illuminate\Support\Facades\DB;
 
 class InstitutionService
 {
+    use RetriesUniqueCode;
+
     public function __construct(private UniqueCodeService $codeService) {}
 
     public function create(array $data, User $enumerator): Institution
     {
-        return DB::transaction(function () use ($data, $enumerator) {
+        // See RetriesUniqueCode: concurrent saves in one ward derive the same
+        // unique_code from an unlocked read.
+        return $this->retryOnDuplicateCode(fn () => DB::transaction(function () use ($data, $enumerator) {
             $ward = Ward::findOrFail($data['ward_id']);
 
             $institution = Institution::create([
@@ -43,7 +48,7 @@ class InstitutionService
             $this->syncSubTables($institution, $data);
 
             return $institution;
-        });
+        }));
     }
 
     public function update(Institution $institution, array $data): Institution

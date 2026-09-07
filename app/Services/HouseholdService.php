@@ -5,16 +5,23 @@ namespace App\Services;
 use App\Models\Household;
 use App\Models\Ward;
 use App\Models\User;
+use App\Support\RetriesUniqueCode;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 class HouseholdService
 {
+    use RetriesUniqueCode;
+
     public function __construct(private UniqueCodeService $codeService) {}
 
     public function create(array $data, User $enumerator): Household
     {
-        return DB::transaction(function () use ($data, $enumerator) {
+        // The unique_code is derived from an unlocked read of the highest
+        // existing code, so two enumerators saving in the same ward at the same
+        // moment generate the same one. Retrying regenerates it from a fresh
+        // read instead of failing the request and losing the enumerator's form.
+        return $this->retryOnDuplicateCode(fn () => DB::transaction(function () use ($data, $enumerator) {
             $ward = Ward::findOrFail($data['ward_id']);
 
             $household = Household::create([
@@ -39,7 +46,7 @@ class HouseholdService
             $this->syncSubTables($household, $data);
 
             return $household;
-        });
+        }));
     }
 
     public function update(Household $household, array $data): Household
