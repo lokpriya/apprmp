@@ -39,3 +39,4 @@ database/sql/
 *.sql.gz
 deploy/*.sql
 deploy/*.sql.gz
+deploy/run.php
