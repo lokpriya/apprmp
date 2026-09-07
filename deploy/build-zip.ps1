@@ -8,10 +8,10 @@
 # =============================================================
 
 param(
-    [string]$Target = 'apprmp'   # 'apprmp' | 'ajirkot' | 'aamchowk'
+    [string]$Target = 'apprmp'   # 'apprmp' | 'ajirkot' | 'aamchowk' | 'aathrai' | 'rongdata'
 )
 
-# ── Per-target config ────────────────────────────────────────────────────────
+# -- Per-target config --------------------------------------------------------
 $Targets = @{
     'apprmp' = @{
         LaravelRoot = '/home2/prayasne/apprmp'
@@ -40,10 +40,28 @@ $Targets = @{
         ZipName     = 'aamchowk-deploy.zip'
         InstallUrl  = 'https://aamchowk.prayasprarambha.com.np/install.php'
     }
+    'aathrai' = @{
+        LaravelRoot = '/home2/prayaspr/aathrai'
+        WebRoot     = 'public_html/aathrai'
+        AppUrl      = 'https://aathrai.prayasprarambha.com.np'
+        DbName      = 'prayaspr_aathrai'
+        DbUser      = 'prayaspra_aamchowk'
+        ZipName     = 'aathrai-deploy.zip'
+        InstallUrl  = 'https://aathrai.prayasprarambha.com.np/install.php'
+    }
+    'rongdata' = @{
+        LaravelRoot = '/home2/prayaspr/rong'
+        WebRoot     = 'public_html/rong'
+        AppUrl      = 'https://rong.prayasprarambha.com.np'
+        DbName      = 'prayaspr_rongdata'
+        DbUser      = 'prayaspr_rongdata'
+        ZipName     = 'rongdata-deploy.zip'
+        InstallUrl  = 'https://rong.prayasprarambha.com.np/install.php'
+    }
 }
 
 if (-not $Targets.ContainsKey($Target)) {
-    Write-Host "  ERROR: Unknown target '$Target'. Use 'apprmp', 'ajirkot', or 'aamchowk'." -ForegroundColor Red
+    Write-Host "  ERROR: Unknown target '$Target'. Use 'apprmp', 'ajirkot', 'aamchowk', 'aathrai', or 'rongdata'." -ForegroundColor Red
     exit 1
 }
 
@@ -73,7 +91,7 @@ $SkipNames = @(
     '.env',
     'tests',
     'phpunit.xml', 'phpunit.xml.dist', '.phpunit.result.cache',
-    'apprmp-deploy.zip', 'ajirkot-deploy.zip', 'aamchowk-deploy.zip',
+    'apprmp-deploy.zip', 'ajirkot-deploy.zip', 'aamchowk-deploy.zip', 'aathrai-deploy.zip', 'rongdata-deploy.zip',
     '.install_lock',
     'Makefile',
     'vite.config.js', 'tailwind.config.js', 'postcss.config.js',
@@ -115,7 +133,7 @@ $storageClearDirs = @(
     'storage\framework\views',
     'storage\app\private\bulk-imports',        # Uploaded import files (~4.5 MB)
     'storage\app\private\livewire-tmp',        # Livewire temp uploads (~0.4 MB)
-    'storage\app\public'                       # Uploaded photos/logos — not deployed; re-upload on server
+    'storage\app\public'                       # Uploaded photos/logos - not deployed; re-upload on server
 )
 
 foreach ($rel in $storageClearDirs) {
@@ -207,7 +225,7 @@ if (Test-Path $installSrc) {
     Write-Host '    WARNING: public/install.php not found!' -ForegroundColor Red
 }
 
-# run.php — patch $root and copy to deploy/ as run-{target}.php (ready to upload manually)
+# run.php - patch $root and copy to deploy/ as run-{target}.php (ready to upload manually)
 $runSrc = Join-Path $ProjectRoot 'deploy\run.php'
 if (Test-Path $runSrc) {
     $runContent = Get-Content $runSrc -Raw -Encoding UTF8

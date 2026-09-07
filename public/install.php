@@ -138,7 +138,11 @@ function ins_writeEnv(string $root, array $d): bool {
     $env .= "APP_DEBUG={$debug}\n";
     $env .= "APP_URL={$d['app_url']}\n";
     $env .= "APP_TIMEZONE={$d['timezone']}\n\n";
-    $env .= "LOG_CHANNEL=stack\nLOG_LEVEL={$level}\n\n";
+    // 'stack' falls through to LOG_STACK, which defaults to 'single' — an unbounded
+    // laravel.log that becomes unreadable and slow on long-lived shared hosting.
+    // 'daily' rotates with LOG_DAILY_DAYS (14) retention.
+    $stack = $d['app_env'] === 'production' ? 'daily' : 'single';
+    $env .= "LOG_CHANNEL=stack\nLOG_STACK={$stack}\nLOG_LEVEL={$level}\n\n";
     $env .= "DB_CONNECTION=mysql\n";
     $env .= "DB_HOST={$d['db_host']}\n";
     $env .= "DB_PORT={$d['db_port']}\n";
@@ -151,6 +155,13 @@ function ins_writeEnv(string $root, array $d): bool {
     $env .= "MAIL_USERNAME=null\nMAIL_PASSWORD=null\nMAIL_ENCRYPTION=null\n";
     $env .= "MAIL_FROM_ADDRESS=\"noreply@example.com\"\nMAIL_FROM_NAME=\"\${APP_NAME}\"\n\n";
     $env .= "FILESYSTEM_DISK=local\n";
+    // Error monitoring. Left empty on purpose: the Sentry SDK is a no-op without
+    // a DSN, so a fresh install reports nothing until someone deliberately pastes
+    // one in. SENTRY_ENVIRONMENT is pre-filled from the site URL because the
+    // installations share a codebase and reports are useless without it.
+    $siteTag = preg_replace('/[^a-z0-9]+/', '-', strtolower(parse_url($d['app_url'], PHP_URL_HOST) ?: 'site'));
+    $env .= "\nSENTRY_LARAVEL_DSN=\n";
+    $env .= "SENTRY_ENVIRONMENT={$siteTag}\n\n";
     $webRoot = $d['webroot'] ?? '';
     if ($webRoot) {
         $env .= "PUBLIC_DISK_ROOT={$webRoot}/storage\n";

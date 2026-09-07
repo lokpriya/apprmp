@@ -34,3 +34,8 @@ survey_dictionary*.csv
 # Local working data files (not needed in git or deploy)
 Reference Files/
 database/sql/
+# Database dumps — real household/PII data, must never enter git history
+*.sql
+*.sql.gz
+deploy/*.sql
+deploy/*.sql.gz
