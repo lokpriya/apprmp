@@ -122,6 +122,45 @@ foreach ($item in $items) {
     Write-Host "    + $($item.Name)" -ForegroundColor DarkGray
 }
 
+# --- Prune sensitive / non-deployable content -------------------------------
+# $SkipNames above is matched against top-level Get-ChildItem names only, so a
+# path entry like 'database/sql' never matched anything and nested files were
+# copied wholesale by -Recurse. Database dumps of real household data were
+# reaching the servers inside the deploy ZIP as a result. Prune by pattern after
+# the copy instead, which is independent of nesting depth.
+Write-Host '  Pruning sensitive files...' -ForegroundColor Yellow
+
+$PrunePatterns = @(
+    '*.sql',        # raw schema/data dumps
+    '*.sql.gz',     # compressed production dumps - real household PII
+    '*.sqlite',     # local dev database
+    '*.sqlite-journal'
+)
+
+$pruned = 0
+foreach ($pattern in $PrunePatterns) {
+    Get-ChildItem -Path $TempDir -Recurse -File -Filter $pattern -Force -ErrorAction SilentlyContinue |
+        ForEach-Object {
+            Write-Host "    - $($_.FullName.Substring($TempDir.Length + 1))" -ForegroundColor DarkYellow
+            Remove-Item $_.FullName -Force
+            $script:pruned++
+        }
+}
+
+# database/sql holds hand-written migration SQL; never needed at runtime.
+$sqlDir = Join-Path $TempDir 'database\sql'
+if (Test-Path $sqlDir) { Remove-Item $sqlDir -Recurse -Force; $pruned++ }
+
+Write-Host "    OK $pruned sensitive item(s) removed" -ForegroundColor Green
+
+# Fail loudly rather than ship PII if anything slipped through.
+$leaked = Get-ChildItem -Path $TempDir -Recurse -File -Force -ErrorAction SilentlyContinue |
+          Where-Object { $_.Name -match '\.(sql|sqlite)(\.gz)?$' }
+if ($leaked) {
+    $leaked | ForEach-Object { Write-Host "    LEAK: $($_.FullName)" -ForegroundColor Red }
+    throw 'Refusing to build: database dumps would be shipped in the deploy ZIP.'
+}
+
 # --- Clear storage runtime content ---
 Write-Host '  Clearing storage runtime files...' -ForegroundColor Yellow
 
