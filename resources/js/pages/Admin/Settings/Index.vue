@@ -284,6 +284,30 @@
           </div>
         </div>
       </form>
+
+      <!-- Super Admin: User Manual link visibility toggle -->
+      <div v-if="isSuperAdmin" class="bg-white rounded-xl border border-purple-100 shadow-sm p-6">
+        <h2 class="section-heading">
+          <span class="section-heading-icon"><i class="fa-solid fa-book-open text-purple-600 text-sm"></i></span>
+          प्रयोगकर्ता निर्देशिका
+          <span class="ml-2 text-[10px] font-semibold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded">Super Admin</span>
+        </h2>
+        <div class="flex items-center justify-between gap-4 py-1">
+          <div>
+            <p class="text-[13px] font-medium text-[#1d273b]">Gear मेनुमा "प्रयोगकर्ता निर्देशिका" देखाउने</p>
+            <p class="text-[11px] text-[#9aa0ac] mt-0.5">बन्द गर्दा सबै Admin को Gear dropdown बाट User Manual लिंक हट्छ</p>
+          </div>
+          <button @click="toggleUserManual"
+            class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none"
+            :class="showUserManualSetting ? 'bg-purple-600' : 'bg-gray-200'">
+            <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
+              :class="showUserManualSetting ? 'translate-x-6' : 'translate-x-1'"></span>
+          </button>
+        </div>
+        <p v-if="userManualSaved" class="text-[11px] text-green-600 mt-2 flex items-center gap-1">
+          <i class="fa-solid fa-check text-[10px]"></i> सुरक्षित भयो
+        </p>
+      </div>
     </div>
 
     <!-- ── Wards Tab ────────────────────────────────────────────────── -->
@@ -1274,6 +1298,8 @@
               <input ref="landmarkInput" type="file" accept="image/jpeg,image/png,image/jpg,image/webp"
                 class="hidden" @change="onLandmarkPicked" />
 
+              <p v-if="landmarkError" class="field-error">{{ landmarkError }}</p>
+
               <div class="flex flex-wrap gap-2">
                 <button type="button" @click="landmarkInput?.click()" :disabled="locked"
                   class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-sm text-gray-700 font-medium transition disabled:opacity-50">
@@ -2195,6 +2221,105 @@
             </button>
           </div>
         </form>
+      </div>
+
+    </div>
+
+    <!-- ── Survey Rounds Tab ─────────────────────────────────────────── -->
+    <div v-if="activeTab === 'survey_rounds'" class="space-y-5">
+
+      <!-- Info banner -->
+      <div class="flex items-start gap-3 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-md">
+        <i class="fa-solid fa-circle-info text-indigo-500 mt-0.5 shrink-0"></i>
+        <div class="text-[13px] text-indigo-700 leading-relaxed">
+          <p class="font-semibold mb-0.5">सर्वेक्षण राउन्ड के हो?</p>
+          <p class="text-[12px]">
+            राउन्ड बन्द गर्दा हालको प्रकाशित (published) घरधुरीहरूको वडागत तथ्याङ्क snapshot गरी सुरक्षित गरिन्छ।
+            यो तुलनात्मक प्रतिवेदनमा वडा-वडाको प्रगति देखाउन प्रयोग हुन्छ।
+          </p>
+        </div>
+      </div>
+
+      <!-- Close a new round -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <h3 class="text-[14px] font-bold text-gray-800 mb-4">
+          <i class="fa-solid fa-flag-checkered text-indigo-500 mr-1.5"></i>
+          नयाँ राउन्ड बन्द गर्नुहोस्
+        </h3>
+        <form @submit.prevent="closeRound" class="space-y-3 max-w-md">
+          <div>
+            <label class="field-label">राउन्डको नाम (नेपाली) <span class="text-red-400">*</span></label>
+            <input v-model="roundForm.label_np" type="text" required class="field-input"
+              placeholder="जस्तै: पहिलो सर्वेक्षण, दोस्रो चरण..." />
+          </div>
+          <div>
+            <label class="field-label">राउन्डको नाम (English)</label>
+            <input v-model="roundForm.label_en" type="text" class="field-input"
+              placeholder="e.g. Round 1, Baseline..." />
+          </div>
+          <button type="submit" :disabled="roundSaving || !roundForm.label_np.trim()"
+            class="inline-flex items-center gap-2 h-9 px-5 bg-indigo-600 hover:bg-indigo-700 text-white text-[13px] font-medium rounded-md transition-colors disabled:opacity-50">
+            <i v-if="roundSaving" class="fa-solid fa-spinner fa-spin text-[11px]"></i>
+            <i v-else class="fa-solid fa-flag text-[11px]"></i>
+            {{ roundSaving ? 'सुरक्षित हुँदैछ...' : 'राउन्ड बन्द गरी सुरक्षित गर्नुहोस्' }}
+          </button>
+        </form>
+      </div>
+
+      <!-- Existing rounds list -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="px-5 py-3.5 border-b border-gray-100 bg-gray-50/70">
+          <p class="text-[13px] font-semibold text-gray-700">सुरक्षित राउन्डहरू ({{ surveyRounds.length }})</p>
+        </div>
+
+        <div v-if="!surveyRounds.length" class="px-5 py-10 text-center">
+          <i class="fa-solid fa-inbox text-2xl text-gray-200 mb-2"></i>
+          <p class="text-[13px] text-gray-400">कुनै राउन्ड छैन — माथि राउन्ड बन्द गर्नुहोस्।</p>
+        </div>
+
+        <div v-else class="divide-y divide-gray-100">
+          <div v-for="r in surveyRounds" :key="r.number" class="flex items-center gap-4 px-5 py-4">
+            <div class="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
+              <span class="text-[13px] font-bold text-indigo-700">{{ r.number }}</span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-[14px] font-semibold text-gray-800">{{ r.label_np }}</p>
+              <p class="text-[12px] text-gray-400">{{ r.label_en }} · {{ formatRoundDate(r.closed_at) }}</p>
+              <div class="flex gap-4 mt-1">
+                <span class="text-[12px] text-gray-600">
+                  <i class="fa-solid fa-house text-gray-400 mr-1"></i>
+                  {{ (r.total_households ?? 0).toLocaleString() }} घरधुरी
+                </span>
+                <span class="text-[12px] text-gray-600">
+                  <i class="fa-solid fa-users text-gray-400 mr-1"></i>
+                  {{ (r.total_population ?? 0).toLocaleString() }} जनसंख्या
+                </span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <a href="/public/reports/round-comparison" target="_blank"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors no-underline">
+                <i class="fa-solid fa-chart-bar text-[10px]"></i>
+                हेर्नुहोस्
+              </a>
+              <button @click="confirmDeleteRound(r.number)"
+                class="inline-flex items-center gap-1 px-3 py-1.5 text-[12px] font-medium text-red-500 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
+                <i class="fa-solid fa-trash text-[10px]"></i>
+                हटाउनुहोस्
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Public page link -->
+      <div v-if="surveyRounds.length" class="flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-md text-[13px]">
+        <i class="fa-solid fa-link text-emerald-500 shrink-0"></i>
+        <span class="text-emerald-700">
+          सार्वजनिक तुलना पृष्ठ:
+          <a href="/public/reports/round-comparison" target="_blank"
+            class="font-semibold underline ml-1">/public/reports/round-comparison</a>
+        </span>
       </div>
 
     </div>
@@ -3314,6 +3439,7 @@ const tabs = computed(() => {
     { key: 'downloads',       label: 'डाउनलोड लिंक',     icon: 'fa-solid fa-link' },
     { key: 'maintenance',     label: 'मर्मत अवस्था',      icon: 'fa-solid fa-triangle-exclamation' },
     { key: 'survey_period',  label: 'सर्वेक्षण अवधि',   icon: 'fa-solid fa-calendar-check' },
+    { key: 'survey_rounds',  label: 'सर्वेक्षण राउन्ड', icon: 'fa-solid fa-flag' },
     { key: 'google_sheets',  label: 'Google Sheets',      icon: 'fa-brands fa-google' },
     { key: 'sync',           label: 'आयात/निर्यात',      icon: 'fa-solid fa-arrows-rotate' },
   ]
@@ -3404,6 +3530,21 @@ onMounted(async () => {
     }
   }
 })
+
+// ── User Manual visibility (super_admin only) ──────────────────────────────
+const showUserManualSetting = ref(props.welcomeConfig?.show_user_manual ?? true)
+const userManualSaved       = ref(false)
+function toggleUserManual() {
+  const next = !showUserManualSetting.value
+  router.patch('/admin/settings/user-manual', { show_user_manual: next }, {
+    preserveScroll: true,
+    onSuccess: () => {
+      showUserManualSetting.value = next
+      userManualSaved.value = true
+      setTimeout(() => { userManualSaved.value = false }, 2000)
+    },
+  })
+}
 
 // ── General form ───────────────────────────────────────────────────────────
 const genForm = useForm({
@@ -3618,11 +3759,32 @@ const currentLandmark  = ref(lb.landmark ?? null)
 const landmarkInput    = ref(null)
 const landmarkFile     = ref(null)
 const landmarkUploading = ref(false)
+const landmarkError    = ref('')
+
+// Keep in step with the 'max:4096' rule on uploadLoginLandmark and with the
+// server's upload_max_filesize. An oversized file used to fail with no message
+// at all: PHP rejects it before Laravel sees it, so the request came back with
+// nothing to show and the card simply stopped spinning.
+const LANDMARK_MAX_MB = 4
+
 function onLandmarkPicked(e) {
-  landmarkFile.value = e.target.files[0] ?? null
+  landmarkError.value = ''
+  const file = e.target.files[0] ?? null
+
+  if (file && file.size > LANDMARK_MAX_MB * 1024 * 1024) {
+    const mb = (file.size / 1024 / 1024).toFixed(1)
+    landmarkError.value = `फाइल ${mb} MB छ — अधिकतम ${LANDMARK_MAX_MB} MB मात्र अपलोड गर्न मिल्छ। सानो फोटो छान्नुहोस्।`
+    landmarkFile.value = null
+    e.target.value = ''
+    return
+  }
+
+  landmarkFile.value = file
 }
+
 function uploadLandmark() {
   if (!landmarkFile.value || locked.value) return
+  landmarkError.value = ''
   landmarkUploading.value = true
   const fd = new FormData()
   fd.append('landmark', landmarkFile.value)
@@ -3633,7 +3795,10 @@ function uploadLandmark() {
       landmarkUploading.value = false
       landmarkFile.value = null
     },
-    onError: () => { landmarkUploading.value = false },
+    onError: (errors) => {
+      landmarkError.value = errors.landmark ?? 'फोटो अपलोड हुन सकेन। फेरि प्रयास गर्नुहोस्।'
+      landmarkUploading.value = false
+    },
   })
 }
 function deleteLandmark() {
@@ -4132,6 +4297,29 @@ function saveSurveyPeriod() {
   router.patch('/admin/settings/survey-period', { ...surveyForm }, {
     onFinish: () => { surveySaving.value = false },
   })
+}
+
+// ── Survey Rounds ──────────────────────────────────────────────────────────
+const surveyRounds = computed(() => props.surveyConfig.rounds ?? [])
+const roundForm    = reactive({ label_np: '', label_en: '' })
+const roundSaving  = ref(false)
+
+function closeRound() {
+  roundSaving.value = true
+  router.post('/admin/settings/rounds', { ...roundForm }, {
+    onSuccess: () => { roundForm.label_np = ''; roundForm.label_en = '' },
+    onFinish:  () => { roundSaving.value = false },
+  })
+}
+
+function formatRoundDate(iso) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleDateString('ne-NP', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+function confirmDeleteRound(number) {
+  if (!confirm(`राउन्ड #${number} हटाउने? यो कार्य पूर्ववत हुँदैन।`)) return
+  router.delete(`/admin/settings/rounds/${number}`)
 }
 
 // ── Download Links ─────────────────────────────────────────────────────────

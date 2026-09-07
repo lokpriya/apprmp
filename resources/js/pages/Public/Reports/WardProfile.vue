@@ -44,6 +44,13 @@
       </div>
     </div>
 
+    <!-- ── Data Story Narrative ─────────────────────────────────────────────── -->
+    <div v-if="narrative"
+      class="flex items-start gap-3 px-4 py-3.5 bg-blue-50/70 border border-blue-100 rounded-xl text-[13px] text-[#1d273b] leading-relaxed">
+      <i class="fa-solid fa-circle-info text-[#206bc4] mt-0.5 shrink-0 text-[14px]"></i>
+      <p>{{ narrative }}</p>
+    </div>
+
     <!-- ── 1. Overview ─────────────────────────────────────────────────────── -->
     <div>
       <div class="flex items-center gap-2.5 border-b border-[#e6e7e9] pb-2">
@@ -530,6 +537,7 @@
 import { computed, defineComponent, h } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import PublicLayout from '@/layouts/PublicLayout.vue'
+import { wardNarrative } from '@/composables/useWardNarrative.js'
 
 defineOptions({ layout: PublicLayout })
 
@@ -599,7 +607,8 @@ const mig = computed(() => props.migration)
 const hlt = computed(() => props.health)
 const dis = computed(() => props.disaster)
 
-const fmt = n => Number(n ?? 0).toLocaleString()
+const fmt       = n => Number(n ?? 0).toLocaleString()
+const narrative = computed(() => wardNarrative(props.ward.ward_number, o.value, eco.value))
 const printDate = new Date().toLocaleDateString('ne-NP', { year: 'numeric', month: 'long', day: 'numeric' })
 const litColor = pct => {
   if (pct >= 80) return 'text-green-600'

@@ -610,7 +610,7 @@
               <img :src="photoUrl" :alt="`Photo ${household.photo_number}`"
                 class="w-full object-cover"
                 style="max-height:320px;"
-                @error="e => { if (photoUrlFallback && e.target.src !== photoUrlFallback) { e.target.src = photoUrlFallback } else { e.target.closest('div').style.display='none' } }" />
+                @error="e => { const t = e.target; if (photoUrlFallback && t.src !== photoUrlFallback && t.src !== photoUrlFallback2) { t.src = photoUrlFallback } else if (photoUrlFallback2 && t.src !== photoUrlFallback2) { t.src = photoUrlFallback2 } else { t.closest('div').style.display='none' } }" />
             </div>
             <!-- Has number but no base URL -->
             <div v-else-if="household.photo_number" class="rounded-md border border-dashed border-amber-200 bg-amber-50 flex flex-col items-center justify-center py-5 gap-1.5">
@@ -656,6 +656,26 @@
               </p>
             </div>
           </div>
+        </div>
+
+        <!-- Data Quality Flags -->
+        <div v-if="activeFlagBadges.length" class="no-print bg-amber-50 border border-amber-200 rounded-md p-4">
+          <h3 class="text-[12px] font-semibold text-amber-800 flex items-center gap-2 mb-3">
+            <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
+            डेटा गुणस्तर चेतावनी
+            <span class="text-[10px] font-normal text-amber-600 ml-1">Data Quality Flags</span>
+          </h3>
+          <div class="flex flex-wrap gap-2">
+            <span v-for="b in activeFlagBadges" :key="b.key"
+              :class="['inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-full border', b.cls]">
+              <i :class="[b.icon, 'text-[11px]']"></i>
+              {{ b.label }}
+            </span>
+          </div>
+          <p class="text-[11px] text-amber-600 mt-2.5">
+            <i class="fa-solid fa-circle-info mr-1"></i>
+            यी समस्याहरू डेटा प्रविष्टिमा त्रुटि संकेत गर्न सक्छन् — समीक्षा गर्नुअघि जाँच गर्नुहोस्।
+          </p>
         </div>
 
         <!-- Field Verification -->
@@ -845,6 +865,15 @@ const props = defineProps({
   canMarkDeceased:        { type: Boolean, default: false },
   fieldVerification:      { type: Object,  default: null },
   surveyOptions:          { type: Object,  default: () => ({}) },
+  dataFlags:              { type: Object,  default: () => ({}) },
+  flagMeta:               { type: Object,  default: () => ({}) },
+})
+
+const activeFlagBadges = computed(() => {
+  const FLAG_COLORS = { warning: 'bg-amber-50 border-amber-200 text-amber-800', danger: 'bg-red-50 border-red-200 text-red-700' }
+  return Object.entries(props.flagMeta ?? {})
+    .filter(([key]) => props.dataFlags?.[key])
+    .map(([key, [label, icon, severity]]) => ({ key, label, icon, cls: FLAG_COLORS[severity] ?? FLAG_COLORS.warning }))
 })
 
 const photoUrl = computed(() => {
@@ -855,6 +884,13 @@ const photoUrl = computed(() => {
   return `${base}/${hasExt ? num : num + '.jpg'}?v=${encodeURIComponent(num)}`
 })
 const photoUrlFallback = computed(() => {
+  const base = usePage().props.auth?.lg?.photo_dir?.household_base_url
+  const num  = props.household.photo_number
+  if (!base || !num) return null
+  const hasExt = /\.[a-zA-Z]{3,4}$/.test(num)
+  return hasExt ? null : `${base}/${num}.jpeg?v=${encodeURIComponent(num)}`
+})
+const photoUrlFallback2 = computed(() => {
   const base = usePage().props.auth?.lg?.photo_dir?.household_base_url
   const num  = props.household.photo_number
   if (!base || !num) return null

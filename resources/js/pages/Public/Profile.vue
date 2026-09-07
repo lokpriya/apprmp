@@ -16,7 +16,7 @@
             {{ props.lg?.name_en?.charAt(0) ?? 'L' }}
           </div>
           <div class="min-w-0 flex-1">
-            <p class="text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-[0.12em] mb-0.5">{{ t('profile.label') }}</p>
+            <p class="text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-[0.12em] mb-0.5">{{ lgTypeLabel }}</p>
             <h1 class="text-[15px] font-semibold text-[#1d273b] leading-tight">{{ props.lg?.name_en }}</h1>
             <p class="text-[12px] text-[#9aa0ac] mt-0.5 flex items-center gap-1.5 flex-wrap">
               <template v-if="props.lg?.province">
@@ -115,6 +115,16 @@ const sectionIcons = {
   attractions:    '🌟', political:      '🏛️', tourism:        '✈️',
   regulations:    '📑', challenges:     '⚡', development:    '🚀',
 }
+
+const LG_TYPE_LABELS = {
+  municipality:      'नगरपालिका परिचय',
+  rural_municipality:'गाउँपालिका परिचय',
+  sub_metropolitan:  'उपमहानगरपालिका परिचय',
+  metropolitan:      'महानगरपालिका परिचय',
+}
+const lgTypeLabel = computed(() =>
+  LG_TYPE_LABELS[props.lg?.type] ?? t('profile.label')
+)
 
 const filledSections = computed(() =>
   Object.entries(props.profileSections)

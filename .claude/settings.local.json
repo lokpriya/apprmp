@@ -5,7 +5,11 @@
       "Bash(php --version)",
       "Bash(mysql --version)",
       "Bash(/d/xampp/php/php --version)",
-      "Bash(/d/xampp/php/php -r \"echo PHP_BINARY;\")"
+      "Bash(/d/xampp/php/php -r \"echo PHP_BINARY;\")",
+      "Bash(powershell -Command \"& 'D:\\\\XAMPP2\\\\mysql\\\\bin\\\\mysql.exe' -u root apprmp -e 'SHOW TABLES;'\")",
+      "Bash(Select-String -Pattern \"session\")",
+      "Bash(D:/XAMPP2/mysql/bin/mysql.exe -u root apprmp -e \"DESCRIBE household_members;\")",
+      "Bash(/d/xampp/php-8.2/php.exe artisan *)"
     ]
   }
 }

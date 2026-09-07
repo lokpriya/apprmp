@@ -29,7 +29,7 @@
       <td class="lbl">संस्थाको नाम (अंग्रेजी)</td><td class="val" colspan="3">{{ $institution->name_en ?? '—' }}</td>
     </tr>
     <tr>
-      <td class="lbl">संस्थाको प्रकार</td><td class="val">{{ $institution->institutionType?->name_np ?? '—' }}</td>
+      <td class="lbl">संस्थाको प्रकार</td><td class="val">{{ \App\Models\SurveyOption::where('category','institution_type')->where('value',$institution->institution_type)->value('label_ne') ?? $institution->institution_type ?? '—' }}</td>
       <td class="lbl">स्वामित्व</td><td class="val">{{ $ol('ownership_type', $institution->ownership_type) }}</td>
     </tr>
     <tr>

@@ -1,6 +1,18 @@
 <template>
   <div class="max-w-screen-xl mx-auto px-4 sm:px-6 py-5 space-y-6">
 
+    <!-- ── Page header ── -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h1 class="text-[18px] font-bold text-[#1d273b]">व्यवसाय प्रतिवेदन</h1>
+        <p class="text-[12px] text-[#9aa0ac] mt-0.5">Business Reports Overview</p>
+      </div>
+      <a href="/public/opendata/businesses"
+        class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] font-medium rounded-md transition-colors">
+        <i class="fa-solid fa-download text-[11px]"></i> CSV डाउनलोड
+      </a>
+    </div>
+
     <!-- ── Hero Stats Bar ── -->
     <div v-if="summary" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
       <div v-for="card in statCards" :key="card.key"

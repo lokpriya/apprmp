@@ -429,9 +429,11 @@ const GROUPS = [
     labelKey: 'reports.group.ward',
     color: '#4f8ef7',
     items: [
-      { href: '/public/reports/ward-summary',    icon: '🗂️', labelKey: 'reports.cat.wardSummary'    },
-      { href: '/public/reports/ward-profile',    icon: '📋', labelKey: 'reports.cat.wardProfile'    },
-      { href: '/public/reports/development-index', icon: '📈', labelKey: 'reports.cat.developmentIndex' },
+      { href: '/public/reports/ward-summary',      icon: '🗂️', labelKey: 'reports.cat.wardSummary',     noFilter: true },
+      { href: '/public/reports/ward-profile',      icon: '📋', labelKey: 'reports.cat.wardProfile'               },
+      { href: '/public/reports/ward-comparison',   icon: '⚖️', labelKey: 'reports.cat.wardComparison',  noFilter: true },
+      { href: '/public/reports/development-index', icon: '📈', labelKey: 'reports.cat.developmentIndex', noFilter: true },
+      { href: '/public/reports/round-comparison',  icon: '🔄', labelKey: 'reports.cat.roundComparison',  noFilter: true },
     ],
   },
   {
@@ -450,6 +452,10 @@ const GROUPS = [
     items: [
       { href: '/public/reports/education',          icon: '🎓', labelKey: 'reports.cat.education'         },
       { href: '/public/reports/health',             icon: '🏥', labelKey: 'reports.cat.health'            },
+      { href: '/public/reports/health-awareness',   icon: '💊', labelKey: 'reports.cat.healthAwareness'   },
+      { href: '/public/reports/wellbeing',          icon: '😊', labelKey: 'reports.cat.wellbeing'         },
+      { href: '/public/reports/social-empowerment', icon: '🤝', labelKey: 'reports.cat.socialEmpowerment' },
+      { href: '/public/reports/family-profile',     icon: '🏘️', labelKey: 'reports.cat.familyProfile'     },
       { href: '/public/reports/child-development',  icon: '👶', labelKey: 'reports.cat.childDevelopment'  },
       { href: '/public/reports/migration',          icon: '✈️',  labelKey: 'reports.cat.migration'         },
       { href: '/public/reports/documents',          icon: '🪪', labelKey: 'reports.cat.documents'         },
@@ -465,8 +471,11 @@ const GROUPS = [
       { href: '/public/reports/employment',      icon: '💼', labelKey: 'reports.cat.employment'      },
       { href: '/public/reports/economics',       icon: '💰', labelKey: 'reports.cat.economics'       },
       { href: '/public/reports/agriculture',     icon: '🌾', labelKey: 'reports.cat.agriculture'     },
-      { href: '/public/reports/livestock-detail', icon: '🐄', labelKey: 'reports.cat.livestockDetail' },
-      { href: '/public/reports/land-agriculture', icon: '🌱', labelKey: 'reports.cat.landAgriculture' },
+      { href: '/public/reports/livestock-detail',  icon: '🐄', labelKey: 'reports.cat.livestockDetail'  },
+      { href: '/public/reports/land-agriculture',  icon: '🌱', labelKey: 'reports.cat.landAgriculture'  },
+      { href: '/public/reports/crop-production',   icon: '🌽', labelKey: 'reports.cat.cropProduction'   },
+      { href: '/public/reports/agri-enterprises', icon: '🐝', labelKey: 'reports.cat.agriEnterprises'  },
+      { href: '/public/reports/income-breakdown', icon: '📊', labelKey: 'reports.cat.incomeBreakdown'  },
     ],
   },
   {
@@ -555,6 +564,7 @@ const footerLinks = [
   { href: '/public/profile',     icon: 'fa-solid fa-building-columns', label: t('nav.profile') ?? 'Profile' },
   { href: '/public/gallery',     icon: 'fa-solid fa-images',       label: t('nav.gallery') ?? 'Gallery' },
   { href: '/public/downloads',   icon: 'fa-solid fa-download',     label: t('nav.downloads') ?? 'Downloads' },
+  { href: '/public/opendata',    icon: 'fa-solid fa-database',     label: t('nav.openData') ?? 'खुला तथ्याङ्क' },
 ]
 
 function isCurrentSection(href) {

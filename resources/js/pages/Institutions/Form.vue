@@ -190,13 +190,13 @@
       <!-- Institution type -->
       <div class="flex flex-col gap-1">
         <label class="text-[13px] font-semibold text-[#626976] mb-1.5">संस्थाको प्रकार <span class="text-red-500">*</span></label>
-        <select v-model="form.institution_type_id" class="w-full rounded-md border border-[#e6e7e9] px-4 py-2.5 text-[14px] focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4]">
+        <select v-model="form.institution_type" class="w-full rounded-md border border-[#e6e7e9] px-4 py-2.5 text-[14px] focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4]">
           <option value="">-- प्रकार छान्नुहोस् --</option>
-          <option v-for="t in props.institutionTypes" :key="t.id" :value="t.id">
-            {{ t.name_np }} <template v-if="t.name_en">({{ t.name_en }})</template>
+          <option v-for="t in props.institutionTypes" :key="t.value" :value="t.value">
+            {{ t.label_ne }} <template v-if="t.label_en">({{ t.label_en }})</template>
           </option>
         </select>
-        <p v-if="form.errors.institution_type_id" class="text-[11px] text-red-500 mt-1">{{ form.errors.institution_type_id }}</p>
+        <p v-if="form.errors.institution_type" class="text-[11px] text-red-500 mt-1">{{ form.errors.institution_type }}</p>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
@@ -2412,7 +2412,7 @@ const stepValidationErrors = computed(() => {
 
   // Step 1 — संस्था विवरण
   const s1 = []
-  if (!f.institution_type_id)                      s1.push('संस्थाको प्रकार आवश्यक छ')
+  if (!f.institution_type)                         s1.push('संस्थाको प्रकार आवश्यक छ')
   if (!f.name_np?.trim() && !f.name_en?.trim())    s1.push('संस्थाको नाम आवश्यक छ')
   if (!f.ward_id)                                   s1.push('वडा नं. आवश्यक छ')
   if (s1.length) errs[1] = s1
@@ -2477,7 +2477,7 @@ const isBuildingLocked = computed(() =>
 const form = useForm({
   ward_id:             existing?.ward_id            ?? '',
   settlement_id:       existing?.settlement_id      ?? '',
-  institution_type_id: existing?.institution_type_id ?? '',
+  institution_type:    existing?.institution_type    ?? '',
   name_np:             existing?.name_np            ?? '',
   name_en:             existing?.name_en            ?? '',
   established_date:    existing?.established_date ? existing.established_date.split('T')[0] : '',
@@ -2648,10 +2648,10 @@ const filteredSettlements = computed(() =>
 )
 
 const selectedType = computed(() =>
-  props.institutionTypes.find(t => String(t.id) === String(form.institution_type_id))
+  props.institutionTypes.find(t => t.value === form.institution_type)
 )
-const selectedTypeName = computed(() => selectedType.value?.name_np ?? '')
-const institutionSlug  = computed(() => selectedType.value?.slug   ?? '')
+const selectedTypeName = computed(() => selectedType.value?.label_ne ?? '')
+const institutionSlug  = computed(() => form.institution_type ?? '')
 
 const selectedWardNumber = computed(() =>
   props.wards.find(w => String(w.id) === String(form.ward_id))?.ward_number ?? null
@@ -2780,7 +2780,7 @@ function getGPS() {
 
 // ── Local Draft (IndexedDB) ───────────────────────────────────────
 const INST_DRAFT_KEYS = [
-  'ward_id', 'settlement_id', 'institution_type_id', 'name_np', 'name_en',
+  'ward_id', 'settlement_id', 'institution_type', 'name_np', 'name_en',
   'established_date', 'ownership_type', 'registration_number',
   'respondent_name', 'respondent_contact', 'survey_date', 'remarks',
   'gps_lat', 'gps_lng', 'gps_accuracy', 'gps_altitude', 'photo_number',

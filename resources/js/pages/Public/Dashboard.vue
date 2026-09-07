@@ -490,7 +490,7 @@
       <div v-if="props.profileFilledCount > 0"
         class="relative overflow-hidden bg-[#206bc4] rounded-md p-4 flex items-center justify-between gap-4 mb-4">
         <div class="text-white min-w-0">
-          <p class="text-[14px] font-semibold leading-tight">{{ t('dashboard.profileCTA') }}</p>
+          <p class="text-[14px] font-semibold leading-tight">{{ lgTypeLabel }}</p>
           <p class="text-blue-200 text-[12px] mt-0.5">
             {{ t('dashboard.profileCTADesc') }} —
             <span class="font-semibold text-white">{{ props.profileFilledCount }} {{ t('dashboard.sectionsAvailable') }}</span>
@@ -587,6 +587,16 @@ const hasInstitutions = computed(() => props.institutionData.length > 0)
 const hasServices     = computed(() => props.waterData?.length || props.toiletData?.length || props.electricityData?.length || props.cookingData?.length)
 const hasSocialData   = computed(() => (props.migrationData?.abroad ?? 0) + (props.migrationData?.internal ?? 0) + (props.trainingData?.total ?? 0) > 0)
 
+const LG_TYPE_LABELS = {
+  municipality:      'नगरपालिका परिचय',
+  rural_municipality:'गाउँपालिका परिचय',
+  sub_metropolitan:  'उपमहानगरपालिका परिचय',
+  metropolitan:      'महानगरपालिका परिचय',
+}
+const lgTypeLabel = computed(() =>
+  LG_TYPE_LABELS[props.lg?.type] ?? t('dashboard.profileCTA')
+)
+
 const decisionPct = (n, row) => {
   const tot = (row.male ?? 0) + (row.female ?? 0) + (row.both ?? 0) + (row.other ?? 0)
   return tot > 0 ? Math.round(n / tot * 100) : 0
@@ -654,10 +664,10 @@ async function initMap() {
   }).addTo(leafletMap)
 
   // ── Choropleth layer ─────────────────────────────────────────────────
-  if (cfg.geojson_url && props.wardSummary?.length) {
+  if (cfg.geojson_url) {
     const wardProp = cfg.ward_number_property ?? 'WARD_NO'
-    const wardData = Object.fromEntries(props.wardSummary.map(w => [String(w.ward_number), w]))
-    const maxPop   = Math.max(...props.wardSummary.map(w => w.total), 1)
+    const wardData = Object.fromEntries((props.wardSummary ?? []).map(w => [String(w.ward_number), w]))
+    const maxPop   = Math.max(...(props.wardSummary ?? []).map(w => w.total), 1)
 
     const choroplethColor = pop => {
       const r = pop / maxPop

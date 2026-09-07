@@ -98,7 +98,8 @@
             </p>
             <div class="h-px bg-white/10 mb-2"></div>
           </div>
-          <NavItem href="/review" icon="fa-solid fa-magnifying-glass-chart" label="समीक्षा अवस्था" :collapsed="collapsed" />
+          <NavItem href="/review" icon="fa-solid fa-magnifying-glass-chart" label="समीक्षा अवस्था" :collapsed="collapsed"
+                   :badge="pendingReviewsCount || null" badge-color="bg-rose-500" />
           <template v-if="['ward_admin','municipal_admin','super_admin'].includes(userRole)">
             <NavItem href="/admin/publish-queue" icon="fa-solid fa-paper-plane" label="प्रकाशन अवस्था" :collapsed="collapsed" />
           </template>
@@ -141,6 +142,39 @@
         </a>
 
       </nav>
+
+      <!-- ── Gamification widget (enumerator only, sidebar expanded) ── -->
+      <div v-if="userRole === 'enumerator' && gamification && !collapsed"
+        class="mx-2 mb-2 rounded-xl bg-white/6 border border-white/10 px-3 py-3 shrink-0">
+        <!-- Level row -->
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-[18px] leading-none">{{ gamification.level_emoji }}</span>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between mb-0.5">
+              <span class="text-[11px] font-semibold text-white/80">{{ gamification.level_name }}</span>
+              <span class="text-[10px] text-white/40">{{ gamification.xp }} XP</span>
+            </div>
+            <div class="h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div class="h-full bg-indigo-400 rounded-full transition-all duration-700"
+                :style="`width:${gamification.level_pct}%`"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Stats row -->
+        <div class="flex items-center gap-2">
+          <div v-if="gamification.streak > 0" class="flex items-center gap-1 shrink-0">
+            <i class="fa-solid fa-fire text-[12px] text-amber-400"></i>
+            <span class="text-[12px] font-bold text-amber-300">{{ gamification.streak }}</span>
+            <span class="text-[9px] text-white/35">दिन</span>
+          </div>
+          <!-- Badges earned (last 5) -->
+          <div class="flex items-center gap-0.5 flex-1 overflow-hidden">
+            <span v-for="b in gamification.badges.slice(-5)" :key="b.count"
+              class="text-[14px] leading-none" :title="`${b.count} रेकर्ड`">{{ b.emoji }}</span>
+          </div>
+          <span class="text-[10px] text-white/40 shrink-0 tabular-nums">{{ gamification.total }} रेकर्ड</span>
+        </div>
+      </div>
 
       <!-- User section at bottom -->
       <div class="shrink-0 border-t border-[#0d1825]/60 p-2 space-y-1">
@@ -388,6 +422,14 @@
                 <i class="fa-solid fa-list-check w-4 text-[#9aa0ac] text-center text-xs"></i>
                 सर्वेक्षण विकल्प
               </a>
+              <template v-if="showUserManual">
+                <div class="border-t border-[#e6e7e9] my-1"></div>
+                <a href="/admin/user-manual" target="_blank"
+                  class="flex items-center gap-3 px-4 py-2.5 text-[13px] text-[#626976] hover:bg-gray-50 transition-colors">
+                  <i class="fa-solid fa-book-open w-4 text-[#9aa0ac] text-center text-xs"></i>
+                  प्रयोगकर्ता निर्देशिका
+                </a>
+              </template>
             </div>
           </Transition>
         </div>
@@ -586,6 +628,7 @@
                 :class="['flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-medium transition no-underline',
                   page.url.startsWith('/review') ? 'bg-white/12 text-white' : 'text-white/65 hover:bg-white/8 hover:text-white']">
                 <i class="fa-solid fa-magnifying-glass-chart w-4 text-center"></i> समीक्षा अवस्था
+                <span v-if="pendingReviewsCount" class="ml-auto inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-rose-500 text-white text-[10px] font-semibold">{{ pendingReviewsCount }}</span>
               </a>
               <a v-if="['ward_admin','municipal_admin','super_admin'].includes(userRole)" href="/admin/publish-queue" @click="mobileNavOpen = false"
                 :class="['flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-medium transition no-underline',
@@ -1035,7 +1078,8 @@ function toggleCollapse() {
 }
 
 // ── Feedback badge ─────────────────────────────────────────────────
-const feedbackNewCount = computed(() => page.props.feedbackNewCount ?? 0)
+const feedbackNewCount     = computed(() => page.props.feedbackNewCount     ?? 0)
+const pendingReviewsCount  = computed(() => page.props.pendingReviewsCount  ?? 0)
 
 // ── Impersonation ──────────────────────────────────────────────────
 const impersonating = computed(() => page.props.impersonating ?? null)
@@ -1045,7 +1089,9 @@ function stopImpersonating() {
 }
 
 // ── Role ───────────────────────────────────────────────────────────
-const userRole = computed(() => page.props.auth?.user?.role ?? '')
+const userRole       = computed(() => page.props.auth?.user?.role ?? '')
+const showUserManual = computed(() => page.props.showUserManual ?? true)
+const gamification   = computed(() => page.props.myGamification ?? null)
 
 // ── Edit Requests notification count (admin only) ──────────────────
 const editRequestsCount = computed(() => page.props.editRequestsCount ?? 0)

@@ -142,10 +142,21 @@
       प्रणाली पुनः सक्रिय गर्न Super Admin ले लगइन गरी Settings → लाइसेन्स मा नयाँ की प्रविष्ट गर्नुहोस्।
     </p>
 
-    <a href="/login" class="login-btn">
-      <i class="fa-solid fa-shield-halved"></i>
-      Admin लगइन गर्नुहोस्
-    </a>
+    @auth
+      {{-- Already logged in (e.g. reviewer via impersonation) — offer logout then login --}}
+      <form method="POST" action="/logout" style="display:inline;">
+        @csrf
+        <button type="submit" class="login-btn" style="border:none;cursor:pointer;">
+          <i class="fa-solid fa-right-from-bracket"></i>
+          लगआउट गरी Admin लगइन गर्नुहोस्
+        </button>
+      </form>
+    @else
+      <a href="/login" class="login-btn">
+        <i class="fa-solid fa-shield-halved"></i>
+        Admin लगइन गर्नुहोस्
+      </a>
+    @endauth
 
     <div class="footer">
       &copy; {{ date('Y') }} {{ $lg?->name_en ?? 'Local Government' }} — All Rights Reserved

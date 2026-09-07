@@ -23,6 +23,10 @@
         <p class="text-[12px] text-[#9aa0ac] mt-0.5">Ward-wise Population & Household Summary</p>
       </div>
       <div class="flex items-center gap-2">
+        <a href="/public/opendata/wards"
+          class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] font-medium rounded-md transition-colors">
+          <i class="fa-solid fa-download text-[11px]"></i> CSV डाउनलोड
+        </a>
         <button @click="printReport"
           class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#1d273b] hover:bg-[#2d3a4f] text-white text-[12px] font-medium rounded-md transition-colors">
           <i class="fa-solid fa-print text-[11px]"></i> PDF / प्रिन्ट
@@ -31,6 +35,13 @@
           <i class="fa-solid fa-arrow-left text-[10px]"></i> प्रतिवेदन सूची
         </a>
       </div>
+    </div>
+
+    <!-- ── Data Story Narrative ─────────────────────────────────────────────── -->
+    <div v-if="narrative && props.wardSummary.length"
+      class="no-print flex items-start gap-3 px-4 py-3.5 bg-blue-50/70 border border-blue-100 rounded-xl text-[13px] text-[#1d273b] leading-relaxed">
+      <i class="fa-solid fa-circle-info text-[#206bc4] mt-0.5 shrink-0 text-[14px]"></i>
+      <p>{{ narrative }}</p>
     </div>
 
     <!-- ── Summary stat strip ─────────────────────────────────────────────── -->
@@ -104,6 +115,22 @@
                 class="px-4 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-teal-500 cursor-pointer hover:text-teal-700 select-none whitespace-nowrap">
                 साक्षरता <SortIcon :col="'litpct'" :sortKey="sortKey" :sortDir="sortDir" />
               </th>
+              <th @click="setSort('waterpct')"
+                class="px-4 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-blue-400 cursor-pointer hover:text-blue-600 select-none whitespace-nowrap">
+                खानेपानी <SortIcon :col="'waterpct'" :sortKey="sortKey" :sortDir="sortDir" />
+              </th>
+              <th @click="setSort('toiletpct')"
+                class="px-4 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-amber-500 cursor-pointer hover:text-amber-700 select-none whitespace-nowrap">
+                शौचालय <SortIcon :col="'toiletpct'" :sortKey="sortKey" :sortDir="sortDir" />
+              </th>
+              <th @click="setSort('internetpct')"
+                class="px-4 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-violet-400 cursor-pointer hover:text-violet-600 select-none whitespace-nowrap">
+                इन्टरनेट <SortIcon :col="'internetpct'" :sortKey="sortKey" :sortDir="sortDir" />
+              </th>
+              <th @click="setSort('bankpct')"
+                class="px-4 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-emerald-500 cursor-pointer hover:text-emerald-700 select-none whitespace-nowrap">
+                बैंक खाता <SortIcon :col="'bankpct'" :sortKey="sortKey" :sortDir="sortDir" />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -151,6 +178,27 @@
                   {{ litPct(ws) }}%
                 </span>
               </td>
+              <!-- Development indicators -->
+              <td class="px-4 py-3 text-center">
+                <span class="inline-block px-2 py-0.5 rounded-full text-[12px] font-semibold" :class="indBadge(indPct(ws, 'safe_water', 'utils_total'))">
+                  {{ indPct(ws, 'safe_water', 'utils_total') }}%
+                </span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <span class="inline-block px-2 py-0.5 rounded-full text-[12px] font-semibold" :class="indBadge(indPct(ws, 'toilet', 'utils_total'))">
+                  {{ indPct(ws, 'toilet', 'utils_total') }}%
+                </span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <span class="inline-block px-2 py-0.5 rounded-full text-[12px] font-semibold" :class="indBadge(indPct(ws, 'internet', 'utils_total'))">
+                  {{ indPct(ws, 'internet', 'utils_total') }}%
+                </span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <span class="inline-block px-2 py-0.5 rounded-full text-[12px] font-semibold" :class="indBadge(indPct(ws, 'bank', 'econ_total'))">
+                  {{ indPct(ws, 'bank', 'econ_total') }}%
+                </span>
+              </td>
             </tr>
           </tbody>
 
@@ -169,6 +217,26 @@
                 <span class="inline-block px-2 py-0.5 rounded-full text-[12px] font-bold"
                   :class="litBadge({ literate: totalLiterate, literate_total: totalLiterateBase })">
                   {{ totalLiteracyPct }}%
+                </span>
+              </td>
+              <td class="px-4 py-2.5 text-center">
+                <span class="inline-block px-2 py-0.5 rounded-full text-[12px] font-bold" :class="indBadge(munIndPct('safe_water','utils_total'))">
+                  {{ munIndPct('safe_water', 'utils_total') }}%
+                </span>
+              </td>
+              <td class="px-4 py-2.5 text-center">
+                <span class="inline-block px-2 py-0.5 rounded-full text-[12px] font-bold" :class="indBadge(munIndPct('toilet','utils_total'))">
+                  {{ munIndPct('toilet', 'utils_total') }}%
+                </span>
+              </td>
+              <td class="px-4 py-2.5 text-center">
+                <span class="inline-block px-2 py-0.5 rounded-full text-[12px] font-bold" :class="indBadge(munIndPct('internet','utils_total'))">
+                  {{ munIndPct('internet', 'utils_total') }}%
+                </span>
+              </td>
+              <td class="px-4 py-2.5 text-center">
+                <span class="inline-block px-2 py-0.5 rounded-full text-[12px] font-bold" :class="indBadge(munIndPct('bank','econ_total'))">
+                  {{ munIndPct('bank', 'econ_total') }}%
                 </span>
               </td>
             </tr>
@@ -398,6 +466,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, defineComponent, h } from 'vue'
 import Chart from 'chart.js/auto'
 import PublicReportsLayout from '@/layouts/PublicReportsLayout.vue'
+import { municipalityNarrative } from '@/composables/useWardNarrative.js'
 
 defineOptions({ layout: PublicReportsLayout })
 
@@ -433,12 +502,38 @@ function setSort(key) {
   }
 }
 
-const litPct  = ws => ws.literate_total > 0 ? Math.round(ws.literate / ws.literate_total * 100) : 0
-const malePct = ws => ws.total > 0 ? Math.round(ws.male / ws.total * 100) : 0
+const litPct    = ws => ws.literate_total > 0 ? Math.round(ws.literate / ws.literate_total * 100) : 0
+const malePct   = ws => ws.total > 0 ? Math.round(ws.male / ws.total * 100) : 0
 const femalePct = ws => ws.total > 0 ? Math.round(ws.female / ws.total * 100) : 0
 
+// Generic indicator %: safe_water, toilet, internet use utils_total; bank uses econ_total
+const indPct = (ws, field, den) => ws[den] > 0 ? Math.round(ws[field] / ws[den] * 100) : 0
+
+// Municipal-level aggregate % for indicator footer
+const munIndPct = (field, den) => {
+  const totalNum = props.wardSummary.reduce((s, w) => s + (w[field] ?? 0), 0)
+  const totalDen = props.wardSummary.reduce((s, w) => s + (w[den]   ?? 0), 0)
+  return totalDen > 0 ? Math.round(totalNum / totalDen * 100) : 0
+}
+
+// Colour badge for % indicators (same thresholds as literacy)
+const indBadge = p => {
+  if (p >= 80) return 'bg-green-100 text-green-700'
+  if (p >= 60) return 'bg-teal-100 text-teal-700'
+  if (p >= 40) return 'bg-amber-100 text-amber-700'
+  if (p >  0)  return 'bg-red-100 text-red-600'
+  return 'bg-gray-100 text-gray-400'
+}
+
 const sortedWards = computed(() => {
-  const arr = [...props.wardSummary].map(w => ({ ...w, litpct: litPct(w) }))
+  const arr = [...props.wardSummary].map(w => ({
+    ...w,
+    litpct:     litPct(w),
+    waterpct:   indPct(w, 'safe_water', 'utils_total'),
+    toiletpct:  indPct(w, 'toilet',     'utils_total'),
+    internetpct:indPct(w, 'internet',   'utils_total'),
+    bankpct:    indPct(w, 'bank',       'econ_total'),
+  }))
   const dir = sortDir.value === 'asc' ? 1 : -1
   return arr.sort((a, b) => {
     const av = a[sortKey.value] ?? 0
@@ -446,6 +541,9 @@ const sortedWards = computed(() => {
     return (av - bv) * dir
   })
 })
+
+// ── Narrative ─────────────────────────────────────────────────────────────
+const narrative = computed(() => municipalityNarrative(props.lg?.name_np ?? '', props.wardSummary))
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 const fmt = n => Number(n ?? 0).toLocaleString()
@@ -531,6 +629,10 @@ const wardMax = computed(() => ({
   institutions: Math.max(...props.wardSummary.map(w => w.institutions), 1),
   businesses:   Math.max(...props.wardSummary.map(w => w.businesses), 1),
   litpct:       Math.max(...props.wardSummary.map(w => litPct(w)), 1),
+  waterpct:     Math.max(...props.wardSummary.map(w => indPct(w, 'safe_water', 'utils_total')), 1),
+  toiletpct:    Math.max(...props.wardSummary.map(w => indPct(w, 'toilet',     'utils_total')), 1),
+  internetpct:  Math.max(...props.wardSummary.map(w => indPct(w, 'internet',   'utils_total')), 1),
+  bankpct:      Math.max(...props.wardSummary.map(w => indPct(w, 'bank',       'econ_total')),  1),
 }))
 
 // Rank by metric (1 = best/highest)
@@ -543,12 +645,18 @@ const comparisonMetrics = computed(() => {
   const w = activeWard.value
   if (!w) return []
   const mx = wardMax.value
+  const wp  = indPct(w, 'safe_water', 'utils_total')
+  const tp  = indPct(w, 'toilet',     'utils_total')
+  const bp  = indPct(w, 'bank',       'econ_total')
   return [
-    { key: 'hh',    label: 'घरधुरी',      value: w.households,   pct: Math.round(w.households   / mx.households   * 100), barClass: 'bg-amber-400',   rank: rankOf(w, 'hh', x => x.households) },
-    { key: 'pop',   label: 'जनसंख्या',    value: w.total,        pct: Math.round(w.total        / mx.total        * 100), barClass: 'bg-blue-400',    rank: rankOf(w, 'pop', x => x.total) },
-    { key: 'lit',   label: 'साक्षरता %',  value: litPct(w),      pct: Math.round(litPct(w)      / mx.litpct       * 100), barClass: 'bg-teal-400',    rank: rankOf(w, 'lit', x => litPct(x)) },
-    { key: 'inst',  label: 'संस्था',      value: w.institutions, pct: Math.round(w.institutions / mx.institutions * 100), barClass: 'bg-violet-400',  rank: rankOf(w, 'inst', x => x.institutions) },
-    { key: 'biz',   label: 'व्यवसाय',    value: w.businesses,   pct: Math.round(w.businesses   / mx.businesses   * 100), barClass: 'bg-emerald-400', rank: rankOf(w, 'biz', x => x.businesses) },
+    { key: 'hh',    label: 'घरधुरी',          value: w.households,   pct: Math.round(w.households   / mx.households   * 100), barClass: 'bg-amber-400',   rank: rankOf(w, 'hh', x => x.households) },
+    { key: 'pop',   label: 'जनसंख्या',        value: w.total,        pct: Math.round(w.total        / mx.total        * 100), barClass: 'bg-blue-400',    rank: rankOf(w, 'pop', x => x.total) },
+    { key: 'lit',   label: 'साक्षरता %',      value: litPct(w), pct: Math.round(litPct(w) / mx.litpct    * 100), barClass: 'bg-teal-400',    rank: rankOf(w, 'lit',    x => litPct(x)) },
+    { key: 'water', label: 'सुरक्षित पानी %', value: wp,        pct: Math.round(wp        / mx.waterpct  * 100), barClass: 'bg-blue-300',    rank: rankOf(w, 'water',  x => indPct(x, 'safe_water', 'utils_total')) },
+    { key: 'toilet',label: 'शौचालय %',        value: tp,        pct: Math.round(tp        / mx.toiletpct * 100), barClass: 'bg-amber-300',   rank: rankOf(w, 'toilet', x => indPct(x, 'toilet',     'utils_total')) },
+    { key: 'bank',  label: 'बैंक खाता %',     value: bp,        pct: Math.round(bp        / mx.bankpct   * 100), barClass: 'bg-emerald-400', rank: rankOf(w, 'bank',   x => indPct(x, 'bank',       'econ_total')) },
+    { key: 'inst',  label: 'संस्था',          value: w.institutions, pct: Math.round(w.institutions / mx.institutions * 100), barClass: 'bg-violet-400',  rank: rankOf(w, 'inst', x => x.institutions) },
+    { key: 'biz',   label: 'व्यवसाय',        value: w.businesses,   pct: Math.round(w.businesses   / mx.businesses   * 100), barClass: 'bg-emerald-500', rank: rankOf(w, 'biz', x => x.businesses) },
   ]
 })
 

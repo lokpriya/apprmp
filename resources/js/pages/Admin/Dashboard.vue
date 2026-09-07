@@ -123,6 +123,89 @@
     </div>
 
     <!-- ══════════════════════════════════════════════════════════════
+         WEEKLY PULSE DIGEST
+    ══════════════════════════════════════════════════════════════ -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-chart-line text-indigo-500 text-[13px]"></i>
+          <span class="text-[13px] font-bold text-gray-800">साप्ताहिक पल्स</span>
+          <span class="text-[11px] text-gray-400 bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-full">पछिल्लो ७ दिन</span>
+        </div>
+        <a href="/admin/progress" class="text-[11px] text-indigo-600 hover:underline flex items-center gap-1">
+          विस्तृत हेर्नुस् <i class="fa-solid fa-arrow-right text-[9px]"></i>
+        </a>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 divide-x divide-gray-100">
+        <!-- Submitted this week -->
+        <div class="px-5 py-4">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">पेस गरिएको</p>
+          <div class="flex items-baseline gap-2">
+            <p class="text-[28px] font-black leading-none text-indigo-600">{{ digest.hh_submitted_week ?? 0 }}</p>
+            <span v-if="digest.hh_submitted_delta !== undefined"
+              :class="['text-[12px] font-semibold flex items-center gap-0.5',
+                digest.hh_submitted_delta > 0 ? 'text-green-600' : digest.hh_submitted_delta < 0 ? 'text-red-500' : 'text-gray-400']">
+              <i :class="digest.hh_submitted_delta > 0 ? 'fa-solid fa-arrow-trend-up' :
+                         digest.hh_submitted_delta < 0 ? 'fa-solid fa-arrow-trend-down' : 'fa-solid fa-minus'"></i>
+              {{ Math.abs(digest.hh_submitted_delta) }}
+            </span>
+          </div>
+          <p class="text-[10px] text-gray-400 mt-1">घरधुरी सर्वेक्षण</p>
+        </div>
+
+        <!-- Approved this week -->
+        <div class="px-5 py-4">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">अनुमोदित</p>
+          <div class="flex items-baseline gap-2">
+            <p class="text-[28px] font-black leading-none text-amber-600">{{ digest.hh_approved_week ?? 0 }}</p>
+            <span v-if="digest.hh_approved_delta !== undefined"
+              :class="['text-[12px] font-semibold flex items-center gap-0.5',
+                digest.hh_approved_delta > 0 ? 'text-green-600' : digest.hh_approved_delta < 0 ? 'text-red-500' : 'text-gray-400']">
+              <i :class="digest.hh_approved_delta > 0 ? 'fa-solid fa-arrow-trend-up' :
+                         digest.hh_approved_delta < 0 ? 'fa-solid fa-arrow-trend-down' : 'fa-solid fa-minus'"></i>
+              {{ Math.abs(digest.hh_approved_delta) }}
+            </span>
+          </div>
+          <p class="text-[10px] text-gray-400 mt-1">वडाबाट अनुमोदन</p>
+        </div>
+
+        <!-- Published this week -->
+        <div class="px-5 py-4">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">प्रकाशित</p>
+          <div class="flex items-baseline gap-2">
+            <p class="text-[28px] font-black leading-none text-green-600">{{ digest.hh_published_week ?? 0 }}</p>
+            <span v-if="digest.hh_published_delta !== undefined"
+              :class="['text-[12px] font-semibold flex items-center gap-0.5',
+                digest.hh_published_delta > 0 ? 'text-green-600' : digest.hh_published_delta < 0 ? 'text-red-500' : 'text-gray-400']">
+              <i :class="digest.hh_published_delta > 0 ? 'fa-solid fa-arrow-trend-up' :
+                         digest.hh_published_delta < 0 ? 'fa-solid fa-arrow-trend-down' : 'fa-solid fa-minus'"></i>
+              {{ Math.abs(digest.hh_published_delta) }}
+            </span>
+          </div>
+          <p class="text-[10px] text-gray-400 mt-1">सार्वजनिक भएको</p>
+        </div>
+
+        <!-- Top spotlight -->
+        <div class="px-5 py-4 bg-indigo-50/40">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-indigo-400 mb-2">यो हप्ताको</p>
+          <div v-if="digest.top_enumerator" class="flex items-center gap-2 mb-1.5">
+            <i class="fa-solid fa-star text-amber-400 text-[11px] shrink-0"></i>
+            <span class="text-[12px] font-semibold text-gray-800 truncate">{{ digest.top_enumerator }}</span>
+            <span class="text-[11px] text-indigo-600 font-bold shrink-0">{{ digest.top_enumerator_count }} पेस</span>
+          </div>
+          <div v-if="digest.top_ward_number" class="flex items-center gap-2">
+            <i class="fa-solid fa-map-pin text-indigo-400 text-[11px] shrink-0"></i>
+            <span class="text-[12px] text-gray-600">वडा {{ digest.top_ward_number }}</span>
+            <span class="text-[11px] text-indigo-600 font-bold shrink-0">{{ digest.top_ward_count }} पेस</span>
+          </div>
+          <div v-if="!digest.top_enumerator && !digest.top_ward_number"
+            class="text-[11px] text-gray-400 italic">यो हप्ता कुनै गतिविधि छैन</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
          DATA QUALITY BANNER
     ══════════════════════════════════════════════════════════════ -->
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-4 flex flex-wrap items-center gap-4">
@@ -1012,6 +1095,7 @@ const props = defineProps({
   trendData:            { type: Object, default: () => ({}) },
   wardSummary:          { type: Array,  default: () => [] },
   recentActivity:       { type: Array,  default: () => [] },
+  digest:               { type: Object, default: () => ({}) },
 })
 
 // ── Enumerator progress filter/sort ───────────────────────────────────────────

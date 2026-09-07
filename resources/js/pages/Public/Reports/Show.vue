@@ -96,6 +96,7 @@
             :data="freq.data"
             :title="freq.title"
             :title-en="freq.title_en"
+            :comparison="freq.comparison ?? []"
           />
         </div>
       </div>
@@ -179,6 +180,13 @@ const CAT_META = {
   'livestock-detail':    { icon: '🐄', bgRaw: '#fefce8' },
   'land-agriculture':    { icon: '🌱', bgRaw: '#f0fdf4' },
   'development-index':   { icon: '📈', bgRaw: '#f0f9ff' },
+  'crop-production':     { icon: '🌽', bgRaw: '#f0fdf4' },
+  'health-awareness':    { icon: '💊', bgRaw: '#f0fdfa' },
+  'wellbeing':           { icon: '😊', bgRaw: '#fefce8' },
+  'income-breakdown':    { icon: '📊', bgRaw: '#fffbeb' },
+  'social-empowerment':  { icon: '🤝', bgRaw: '#faf5ff' },
+  'family-profile':      { icon: '🏘️', bgRaw: '#eff6ff' },
+  'agri-enterprises':    { icon: '🐝', bgRaw: '#fefce8' },
 }
 const catMeta = computed(() => CAT_META[props.category] ?? { icon: '📊', bgRaw: '#f8f9fb' })
 
@@ -263,6 +271,13 @@ const ALL_CATEGORIES = [
   { route: 'livestock-detail',    href: '/public/reports/livestock-detail',    icon: '🐄', labelKey: 'reports.cat.livestockDetail'    },
   { route: 'land-agriculture',    href: '/public/reports/land-agriculture',    icon: '🌱', labelKey: 'reports.cat.landAgriculture'    },
   { route: 'development-index',   href: '/public/reports/development-index',   icon: '📈', labelKey: 'reports.cat.developmentIndex'   },
+  { route: 'crop-production',     href: '/public/reports/crop-production',     icon: '🌽', labelKey: 'reports.cat.cropProduction'     },
+  { route: 'health-awareness',    href: '/public/reports/health-awareness',    icon: '💊', labelKey: 'reports.cat.healthAwareness'    },
+  { route: 'wellbeing',           href: '/public/reports/wellbeing',           icon: '😊', labelKey: 'reports.cat.wellbeing'          },
+  { route: 'income-breakdown',    href: '/public/reports/income-breakdown',    icon: '📊', labelKey: 'reports.cat.incomeBreakdown'    },
+  { route: 'social-empowerment',  href: '/public/reports/social-empowerment',  icon: '🤝', labelKey: 'reports.cat.socialEmpowerment'  },
+  { route: 'family-profile',      href: '/public/reports/family-profile',      icon: '🏘️', labelKey: 'reports.cat.familyProfile'      },
+  { route: 'agri-enterprises',    href: '/public/reports/agri-enterprises',    icon: '🐝', labelKey: 'reports.cat.agriEnterprises'    },
 ]
 
 const otherCategories = computed(() =>

@@ -1116,10 +1116,7 @@
               <p class="text-[11px] text-gray-400 -mt-0.5">Frequent Illness in the family?</p>
               <select v-model="form.health.illness_frequency" class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-[13px] bg-white focus:ring-2 focus:ring-[#206bc4]/20 focus:border-[#206bc4]">
                 <option value="">-- छान्नुहोस् --</option>
-                <option value="rarely">विरलै (वर्षमा १ पटक भन्दा कम)</option>
-                <option value="1_2">१–२ पटक</option>
-                <option value="3_5">३–५ पटक</option>
-                <option value="6_plus">६ पटक वा बढी</option>
+                <option v-for="opt in (surveyOptions.illness_frequency ?? [])" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
               </select>
             </div>
             <div class="flex flex-col gap-1">

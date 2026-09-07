@@ -21,34 +21,33 @@
     Deny from all
 </FilesMatch>
 
-<IfModule mod_rewrite.c>
-    <IfModule mod_negotiation.c>
-        Options -MultiViews -Indexes
-    </IfModule>
+DirectoryIndex index.php
 
-    Options +FollowSymLinks +SymLinksIfOwnerMatch
+# Not wrapped in <IfModule>: on this cPanel host the IfModule guard is silently
+# skipped, which would leave directory listings enabled. -Indexes is the directive
+# that stops /storage/logos/ and similar being browsable.
+Options -MultiViews -Indexes
 
-    RewriteEngine On
+RewriteEngine On
 
-    # Block access to Laravel internal directories
-    # Note: 'storage' intentionally excluded — public_html/{site}/storage/ is the upload directory
-    RewriteRule ^(app|bootstrap|config|database|resources|routes|tests|vendor)(/|$) - [F,L]
+# Block access to Laravel internal directories
+# Note: 'storage' intentionally excluded — public_html/{site}/storage/ is the upload directory
+RewriteRule ^(app|bootstrap|config|database|resources|routes|tests|vendor)(/|$) - [F,L]
 
-    # Handle Authorization Header
-    RewriteCond %{HTTP:Authorization} .
-    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+# Handle Authorization Header
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-    # Handle X-XSRF-Token Header
-    RewriteCond %{HTTP:x-xsrf-token} .
-    RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
+# Handle X-XSRF-Token Header
+RewriteCond %{HTTP:x-xsrf-token} .
+RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
-    # Redirect Trailing Slashes If Not A Folder...
-    RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteCond %{REQUEST_URI} (.+)/$
-    RewriteRule ^ %1 [L,R=301]
+# Redirect Trailing Slashes If Not A Folder...
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} (.+)/$
+RewriteRule ^ %1 [L,R=301]
 
-    # Send Requests To Front Controller...
-    RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteRule ^ index.php [L]
-</IfModule>
+# Send Requests To Front Controller...
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [L]

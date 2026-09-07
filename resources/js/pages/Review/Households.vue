@@ -108,13 +108,9 @@
                       :title="`${hh.completeness.filled}/${hh.completeness.total} फिल्ड भरिएको`">
                       <i class="fa-solid fa-circle-half-stroke text-[9px]"></i>{{ hh.completeness.score }}%
                     </span>
-                    <span v-if="hh.flags?.missing_gps"
-                      class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-                      <i class="fa-solid fa-location-dot text-[9px]"></i>GPS छैन
-                    </span>
-                    <span v-if="hh.flags?.no_members"
-                      class="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
-                      <i class="fa-solid fa-users text-[9px]"></i>सदस्य छैन
+                    <span v-for="badge in activeFlagBadges(hh.flags)" :key="badge.key"
+                      :class="['inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full', badge.cls]">
+                      <i :class="[badge.icon, 'text-[9px]']"></i>{{ badge.label }}
                     </span>
                   </div>
                   <p class="font-semibold text-gray-900 text-sm">{{ hh.respondent_name }}</p>
@@ -376,7 +372,7 @@ const props = defineProps({
   households:    { type: Object, default: () => ({ data: [], meta: {}, links: {} }) },
   wards:         { type: Array,  default: () => [] },
   filters:       { type: Object, default: () => ({}) },
-  qualityCounts: { type: Object, default: () => ({ missing_gps: 0, no_members: 0, low_completeness: 0 }) },
+  qualityCounts: { type: Object, default: () => ({ missing_gps: 0, no_members: 0, low_completeness: 0, data_flags: 0 }) },
 })
 
 // ── Ward filter ──────────────────────────────────────────────────────────────
@@ -387,13 +383,33 @@ const qualityFilters = ref({
   missing_gps:      props.filters.missing_gps      ?? false,
   no_members:       props.filters.no_members        ?? false,
   low_completeness: props.filters.low_completeness  ?? false,
+  data_flags:       props.filters.data_flags        ?? false,
 })
 
 const qualityChips = [
-  { key: 'missing_gps',      label: 'GPS छैन',       icon: 'fa-solid fa-location-dot',      activeClass: 'bg-red-600 border-red-600 text-white' },
-  { key: 'low_completeness', label: 'अपूर्ण (<75%)',  icon: 'fa-solid fa-circle-half-stroke', activeClass: 'bg-amber-500 border-amber-500 text-white' },
-  { key: 'no_members',       label: 'सदस्य छैन',      icon: 'fa-solid fa-users',             activeClass: 'bg-orange-500 border-orange-500 text-white' },
+  { key: 'missing_gps',      label: 'GPS छैन',         icon: 'fa-solid fa-location-dot',       activeClass: 'bg-red-600 border-red-600 text-white' },
+  { key: 'low_completeness', label: 'अपूर्ण (<75%)',   icon: 'fa-solid fa-circle-half-stroke',  activeClass: 'bg-amber-500 border-amber-500 text-white' },
+  { key: 'no_members',       label: 'सदस्य छैन',       icon: 'fa-solid fa-users',              activeClass: 'bg-orange-500 border-orange-500 text-white' },
+  { key: 'data_flags',       label: 'डेटा समस्या',     icon: 'fa-solid fa-triangle-exclamation', activeClass: 'bg-rose-600 border-rose-600 text-white' },
 ]
+
+// Flag badges shown on each household card — maps flag key → display config
+const FLAG_BADGES = {
+  missing_gps:           { label: 'GPS छैन',                   cls: 'bg-red-100 text-red-700',    icon: 'fa-solid fa-location-dot' },
+  no_members:            { label: 'सदस्य छैन',                  cls: 'bg-orange-100 text-orange-700', icon: 'fa-solid fa-users' },
+  too_many_members:      { label: 'सदस्य धेरै',                 cls: 'bg-amber-100 text-amber-700', icon: 'fa-solid fa-users' },
+  age_over_100:          { label: 'उमेर >१००',                  cls: 'bg-red-100 text-red-700',    icon: 'fa-solid fa-person-cane' },
+  multiple_heads:        { label: 'दोहोरो घरमुली',              cls: 'bg-red-100 text-red-700',    icon: 'fa-solid fa-user-group' },
+  no_household_head:     { label: 'घरमुली छैन',                 cls: 'bg-amber-100 text-amber-700', icon: 'fa-solid fa-user-slash' },
+  member_count_mismatch: { label: 'सदस्य संख्या मेल खाँदैन',   cls: 'bg-amber-100 text-amber-700', icon: 'fa-solid fa-triangle-exclamation' },
+}
+
+function activeFlagBadges(flags) {
+  if (!flags) return []
+  return Object.entries(FLAG_BADGES)
+    .filter(([key]) => flags[key])
+    .map(([key, meta]) => ({ key, ...meta }))
+}
 
 const anyQualityFilter = computed(() => Object.values(qualityFilters.value).some(Boolean))
 
@@ -403,6 +419,7 @@ function applyFilters() {
   if (qualityFilters.value.missing_gps)         params.missing_gps      = 1
   if (qualityFilters.value.no_members)          params.no_members       = 1
   if (qualityFilters.value.low_completeness)    params.low_completeness = 1
+  if (qualityFilters.value.data_flags)          params.data_flags       = 1
   router.get('/review/households', params, { preserveState: true, replace: true })
 }
 
@@ -412,7 +429,7 @@ function toggleQualityFilter(key) {
 }
 
 function clearQualityFilters() {
-  qualityFilters.value = { missing_gps: false, no_members: false, low_completeness: false }
+  qualityFilters.value = { missing_gps: false, no_members: false, low_completeness: false, data_flags: false }
   applyFilters()
 }
 

@@ -217,6 +217,7 @@
             <thead class="bg-gray-50 border-b border-[#e6e7e9]">
               <tr>
                 <th class="px-4 py-3 text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-wide">गणक</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-indigo-400 uppercase tracking-wide text-center">XP</th>
                 <th class="px-4 py-3 text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-wide">तोकिएका वडा</th>
                 <th class="px-4 py-3 text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-wide text-right">मस्यौदा</th>
                 <th class="px-4 py-3 text-[11px] font-semibold text-[#9aa0ac] uppercase tracking-wide text-right">पेश</th>
@@ -244,6 +245,13 @@
                       <span v-if="!e.is_active"
                         class="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-500 font-medium">निष्क्रिय</span>
                     </div>
+                  </div>
+                </td>
+                <!-- XP score -->
+                <td class="px-4 py-3 text-center">
+                  <div class="inline-flex flex-col items-center">
+                    <span class="text-[14px] font-black text-indigo-600 leading-none">{{ enumXp(e) }}</span>
+                    <span class="text-[9px] text-indigo-300 font-semibold uppercase tracking-wide">XP</span>
                   </div>
                 </td>
                 <!-- Assigned wards -->
@@ -314,7 +322,7 @@
               </tr>
 
               <tr v-if="!enumerators.length">
-                <td colspan="10" class="px-5 py-10 text-center text-[#9aa0ac]">
+                <td colspan="11" class="px-5 py-10 text-center text-[#9aa0ac]">
                   <i class="fa-solid fa-users-slash text-3xl text-gray-200 mb-2 block"></i>
                   कुनै गणक छैन
                 </td>
@@ -359,6 +367,12 @@ let   chart       = null
 
 // ── Helpers ───────────────────────────────────────────────────────────
 function fmt(n) { return (n ?? 0).toLocaleString() }
+
+// XP = non-draft submissions × 10 + published × 5
+function enumXp(e) {
+  const nonDraft = (e.hh_submitted ?? 0) + (e.hh_ward_approved ?? 0) + (e.hh_published ?? 0) + (e.hh_rejected ?? 0)
+  return nonDraft * 10 + (e.hh_published ?? 0) * 5
+}
 
 function initials(name) {
   return (name ?? '?').split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()

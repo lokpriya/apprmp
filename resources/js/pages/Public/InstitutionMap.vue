@@ -30,8 +30,8 @@
                  text-[#1d273b] focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4]
                  transition outline-none min-w-[180px]">
           <option value="">{{ locale === 'ne' ? '— सबै प्रकार —' : '— All Types —' }}</option>
-          <option v-for="tp in props.types" :key="tp.id" :value="String(tp.id)">
-            {{ locale === 'ne' ? tp.name_np : tp.name_en }}
+          <option v-for="tp in props.types" :key="tp.value" :value="tp.value">
+            {{ locale === 'ne' ? tp.label_ne : tp.label_en }}
           </option>
         </select>
       </div>
@@ -161,7 +161,7 @@ const props = defineProps({
 // ── State ──────────────────────────────────────────────────────────────────
 const mapEl       = ref(null)
 const selWard     = ref(String(props.filters.ward_id ?? ''))
-const selType     = ref(String(props.filters.type_id ?? ''))
+const selType     = ref(String(props.filters.type ?? ''))
 const cluster     = ref(true)
 const mapError    = ref('')
 const geojsonFailed = ref(false)
@@ -180,22 +180,22 @@ const PALETTE = [
 
 const typeColorMap = computed(() => {
   const m = {}
-  props.types.forEach((tp, i) => { m[tp.id] = PALETTE[i % PALETTE.length] })
+  props.types.forEach((tp, i) => { m[tp.value] = PALETTE[i % PALETTE.length] })
   return m
 })
 
 const typeLabels = computed(() => {
   const m = {}
-  props.types.forEach(tp => { m[tp.id] = locale.value === 'ne' ? tp.name_np : tp.name_en })
+  props.types.forEach(tp => { m[tp.value] = locale.value === 'ne' ? tp.label_ne : tp.label_en })
   return m
 })
 
-// Only types present in current filtered points (coerce to string for safe Set lookup)
+// Only types present in current filtered points
 const visibleTypeColors = computed(() => {
-  const seen = new Set(props.points.map(p => String(p.type_id)))
+  const seen = new Set(props.points.map(p => p.institution_type))
   const result = {}
   props.types.forEach(tp => {
-    if (seen.has(String(tp.id))) result[tp.id] = typeColorMap.value[tp.id]
+    if (seen.has(tp.value)) result[tp.value] = typeColorMap.value[tp.value]
   })
   return result
 })
@@ -211,7 +211,7 @@ function retryMap() {
 function applyFilters() {
   const params = {}
   if (selWard.value) params.ward_id = selWard.value
-  if (selType.value) params.type_id = selType.value
+  if (selType.value) params.type = selType.value
   router.get('/public/institution-map', params, { preserveScroll: false, preserveState: false })
 }
 
@@ -362,7 +362,7 @@ function renderMarkers() {
   })()
 
   props.points.forEach(pt => {
-    const color  = typeColorMap.value[pt.type_id] ?? '#e64980'
+    const color  = typeColorMap.value[pt.institution_type] ?? '#e64980'
     const icon   = makeSvgIcon(color)
     const marker = L.marker([pt.lat, pt.lng], { icon })
     marker.bindPopup(buildPopup(pt), { maxWidth: 260 })
