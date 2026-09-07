@@ -1,5 +1,6 @@
 <?php
 namespace App\Models;
+use App\Casts\TolerantJsonList;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -110,7 +111,14 @@ class HouseholdMember extends Model
         'has_passport'               => 'boolean',
         'has_pan'                    => 'boolean',
         'has_drivers_license'        => 'boolean',
-        'drivers_license_category'   => 'array',
+        // 1,768 rows hold a JSON scalar written by Google Sync, not an array. A
+        // plain 'array' cast reads those back as a string, the form falls through
+        // to [] and the next save erases the answer. See TolerantJsonList.
+        'drivers_license_category'   => TolerantJsonList::class,
+        // Migration destination. 1,668 rows hold a JSON scalar ("भारत") written by
+        // bulk import and Google Sync. See TolerantJsonList — the plain 'array'
+        // cast read those back as a string and the next save erased them.
+        'residing_country'           => TolerantJsonList::class,
         // Lifestyle
         'smoking_drinking'           => 'boolean',
         'smoking_drinking_items'     => 'array',
@@ -131,45 +139,6 @@ class HouseholdMember extends Model
         // Business
         'involveinbusiness'          => 'boolean',
     ];
-
-    /**
-     * The form binds this to a checkbox group (array), but bulk import and Google
-     * Sync write a single plain string, which a plain 'array' cast stores as a JSON
-     * scalar ("भारत") rather than a JSON array. Reading that back as a non-array made
-     * the frontend fall through to [] and silently wipe the value on the next save.
-     * Normalise every shape — JSON array, JSON scalar, bare string — to an array.
-     */
-    protected function residingCountry(): Attribute
-    {
-        return Attribute::make(
-            get: function ($value) {
-                if ($value === null || $value === '') {
-                    return [];
-                }
-                $decoded = json_decode($value, true);
-                if (json_last_error() !== JSON_ERROR_NONE) {
-                    return [$value];
-                }
-                if (is_array($decoded)) {
-                    return array_values(array_filter($decoded, fn ($v) => $v !== null && $v !== ''));
-                }
-                return ($decoded === null || $decoded === '') ? [] : [(string) $decoded];
-            },
-            set: function ($value) {
-                if (is_string($value)) {
-                    $decoded = json_decode($value, true);
-                    if (json_last_error() === JSON_ERROR_NONE) {
-                        $value = $decoded;
-                    }
-                }
-                $list = array_values(array_filter(
-                    is_array($value) ? $value : [$value],
-                    fn ($v) => $v !== null && $v !== ''
-                ));
-                return $list ? json_encode($list, JSON_UNESCAPED_UNICODE) : null;
-            },
-        );
-    }
 
     public function scopeAlive($query) { return $query->where('is_deceased', false); }
 
