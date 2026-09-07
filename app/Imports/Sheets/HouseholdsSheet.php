@@ -4,6 +4,7 @@ namespace App\Imports\Sheets;
 
 use App\Models\Household;
 use App\Models\Settlement;
+use App\Models\User;
 use App\Models\Ward;
 use App\Services\DuplicateDetectionService;
 use App\Services\UniqueCodeService;
@@ -43,11 +44,22 @@ class HouseholdsSheet implements ToCollection, WithChunkReading, WithHeadingRow,
         $codeService = app(UniqueCodeService::class);
 
         if (!$this->preloaded) {
-            // Pre-load all wards once
+            // Pre-load all wards once. Exact-id lookups (the forced-ward flow) may
+            // resolve any ward, but the by-number map must be scoped to the
+            // importing user's local government: ward_number is only unique within
+            // an LG, so an unscoped map lets one municipality's "ward 3" overwrite
+            // another's and silently files households under the wrong municipality.
+            // Only one LG currently has wards, so this is latent — but the LG table
+            // holds all 753 municipalities and the map is keyed purely by number.
+            $importerLgId = User::whereKey($this->enumeratorId)->value('local_government_id');
+
             $wards = Ward::all();
             foreach ($wards as $ward) {
-                $this->wardMap[$ward->ward_number] = $ward;
-                $this->wardById[$ward->id]         = $ward;
+                $this->wardById[$ward->id] = $ward;
+
+                if ($importerLgId === null || $ward->local_government_id === $importerLgId) {
+                    $this->wardMap[$ward->ward_number] = $ward;
+                }
             }
 
             // If force ward, pre-load settlements for that ward only; otherwise all

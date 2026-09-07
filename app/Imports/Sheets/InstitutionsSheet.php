@@ -5,6 +5,7 @@ namespace App\Imports\Sheets;
 use App\Models\Institution;
 use App\Models\Settlement;
 use App\Models\SurveyOption;
+use App\Models\User;
 use App\Models\Ward;
 use App\Services\DuplicateDetectionService;
 use App\Services\UniqueCodeService;
@@ -45,10 +46,19 @@ class InstitutionsSheet implements ToCollection, WithChunkReading, WithHeadingRo
         $codeService = app(UniqueCodeService::class);
 
         if (!$this->preloaded) {
-            // Pre-load wards
+            // Pre-load wards. The by-number map is scoped to the importing user's
+            // local government — see the matching comment in HouseholdsSheet:
+            // ward_number is unique only within an LG, so an unscoped map files
+            // records under the wrong municipality. Exact-id lookups stay global so
+            // the forced-ward flow is unaffected.
+            $importerLgId = User::whereKey($this->enumeratorId)->value('local_government_id');
+
             foreach (Ward::all() as $ward) {
-                $this->wardMap[$ward->ward_number] = $ward;
-                $this->wardById[$ward->id]         = $ward;
+                $this->wardById[$ward->id] = $ward;
+
+                if ($importerLgId === null || $ward->local_government_id === $importerLgId) {
+                    $this->wardMap[$ward->ward_number] = $ward;
+                }
             }
 
             // Pre-load settlements

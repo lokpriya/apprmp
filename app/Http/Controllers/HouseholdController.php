@@ -36,6 +36,13 @@ class HouseholdController extends Controller
             $query->whereIn('ward_id', $wardIds);
         } elseif ($user->isAdmin()) {
             $query->whereHas('ward', fn($q) => $q->where('local_government_id', $lgId));
+        } else {
+            // Fail closed. Without this an unrecognised role falls through with no
+            // scope applied and sees every household in the system. ward_admin was
+            // added to this chain after it was first written, so roles do change
+            // here, and the failure mode of forgetting a branch must be "sees
+            // nothing", never "sees everything".
+            $query->whereRaw('1 = 0');
         }
 
         if ($s = $request->search) {

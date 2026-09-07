@@ -54,6 +54,9 @@ class InstitutionController extends Controller
             $query->whereIn('ward_id', $wardIds);
         } elseif ($user->isAdmin()) {
             $query->whereHas('ward', fn($q) => $q->where('local_government_id', $lgId));
+        } else {
+            // Fail closed — see the matching branch in HouseholdController::index.
+            $query->whereRaw('1 = 0');
         }
 
         if ($s = $request->search) {
