@@ -173,16 +173,29 @@ class CrossTabService
                 $c = $colKeyMap[strtolower($c)] ?? $c;
                 if (isset($matrix[$r][$c])) {
                     $matrix[$r][$c] = (int)$row->cnt;
-                } elseif (!isset($rowDef[$r]) && !empty($rowDef)) {
-                    // skip unknown rows if rowDef was explicitly provided
+                } elseif ($r === '') {
+                    // genuinely blank answer — nothing to report
                 } elseif (!isset($colDef[$c]) && !empty($colDef)) {
-                    // skip unknown cols
+                    // Skip unknown columns only. Column definitions (wards, age
+                    // bands, gender) are exhaustive by construction, so a value
+                    // outside them is malformed rather than a real answer.
                 } else {
-                    // dynamic mode — add to matrix
+                    // An answer with no matching option — previously discarded in
+                    // silence, which understated official statistics. Measured on
+                    // the live Rong data: 31.7% of irrigation_source, 1,527 people's
+                    // ethnicity (864 Bhujel, 629 Sunuwar), 195 Prakriti under
+                    // religion and 40 Kerosene under electricity_source simply did
+                    // not appear, and the totals were wrong with nothing to show it.
+                    //
+                    // These are real answers whose survey option is missing, so they
+                    // are now counted and displayed. The raw value is prettified as
+                    // a fallback label, matching what AnalyticsController already
+                    // does. Surfacing them also tells an administrator which options
+                    // to add, after which they render under their proper label.
                     if (!isset($matrix[$r])) {
                         $matrix[$r] = array_fill_keys($colKeys, 0);
                         $rowKeys[]  = $r;
-                        $rowDef[$r] = $r;
+                        $rowDef[$r] = $rowDef[$r] ?? ucfirst(str_replace('_', ' ', $r));
                     }
                     if (!in_array($c, $colKeys)) {
                         foreach ($matrix as &$matRow) $matRow[$c] = 0;
