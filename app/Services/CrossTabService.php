@@ -193,6 +193,40 @@ class CrossTabService
                 }
             }
 
+            // Merge rows that display the same label.
+            //
+            // optionLabels() deliberately adds Kobo alias keys that carry the *same*
+            // label as the system key — electricity_source maps both 'National_grid'
+            // and 'Grid' onto 'national_grid', so all three read "राष्ट्रिय ग्रिड".
+            // That is needed so data stored in either format still finds a bucket,
+            // but they are alternative spellings of one answer, not separate answers.
+            // Without this, every aliased option rendered as two or three identical
+            // rows — one carrying the counts and the rest showing zeros. Twelve
+            // categories have aliases, so it affected most report tables.
+            //
+            // Counts are summed rather than discarded: real data does live under the
+            // alias keys wherever Google Sync wrote Kobo values.
+            $canonicalForLabel = [];
+            $mergedRowKeys     = [];
+
+            foreach ($rowKeys as $r) {
+                $label = (string) ($rowDef[$r] ?? $r);
+
+                if (isset($canonicalForLabel[$label])) {
+                    $canon = $canonicalForLabel[$label];
+                    foreach ($colKeys as $c) {
+                        $matrix[$canon][$c] = ($matrix[$canon][$c] ?? 0) + ($matrix[$r][$c] ?? 0);
+                    }
+                    unset($matrix[$r], $rowDef[$r]);
+                    continue;
+                }
+
+                $canonicalForLabel[$label] = $r;
+                $mergedRowKeys[]           = $r;
+            }
+
+            $rowKeys = $mergedRowKeys;
+
             // Row totals
             $rowTotals = [];
             foreach ($rowKeys as $r) {
