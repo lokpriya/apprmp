@@ -191,6 +191,9 @@ class FixCorruptedSurveyOptionsSeeder extends Seeder
             ],
             'treatment_place' => [
                 'govt_hospital'    => ['सरकारी अस्पताल', 'Government Hospital'],
+                // Some Kobo forms offer a single combined hospital choice rather than
+                // separate government/private ones; those answers cannot be split.
+                'hospital'         => ['अस्पताल (निजी तथा सरकारी)', 'Hospital (Government or Private)'],
                 'health_post'      => ['स्वास्थ्य चौकी / प्राथमिक स्वास्थ्य केन्द्र', 'Health Post / PHC'],
                 'community_health' => ['सामुदायिक स्वास्थ्य कक्ष', 'Community Health Unit'],
                 'private_clinic'   => ['निजी क्लिनिक / नर्सिङ होम', 'Private Clinic / Nursing Home'],

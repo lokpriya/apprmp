@@ -143,6 +143,19 @@ class GoogleSheetsSyncService
             'वर्षा'            => 'Rainfall',
             'मूल'              => 'Spring',
         ],
+        'treatment_place' => [
+            // Kobo emits the choice label, not the choice name, for this question.
+            'स्वास्थ्य चौकी'              => 'health_post',
+            'अस्पताल (निजि तथा सरकारी)'   => 'hospital',
+            'अस्पताल (निजी तथा सरकारी)'   => 'hospital',
+            'निजि क्लिनीक'                => 'private_clinic',
+            'निजी क्लिनिक'                => 'private_clinic',
+            'लामा, धामी, झाक्री'          => 'traditional',
+            'परम्परागत स्थानीय बैद्य'     => 'traditional',
+            'औषधि पसल'                    => 'pharmacy',
+            'घरेलु उपचार'                 => 'home_remedy',
+            'सामुदायिक स्वास्थ्य कक्ष'    => 'community_health',
+        ],
     ];
 
     /**
@@ -556,7 +569,7 @@ class GoogleSheetsSyncService
                         $household->update(['survey_data' => $sd]);
                     }
 
-                    $this->syncRelated($household, $row['_related'] ?? []);
+                    $this->syncRelated($household, $row['_related'] ?? [], $row);
                 });
 
                 if ($outcome === 'imported') $imported++;
@@ -587,7 +600,7 @@ class GoogleSheetsSyncService
 
     // ── Related table sync ────────────────────────────────────────────────────
 
-    private function syncRelated(Household $household, array $related): void
+    private function syncRelated(Household $household, array $related, array $hhRow = []): void
     {
         // Read survey_data once; accumulate all changes; write once at the end
         $surveyData        = $household->survey_data ?? [];
@@ -713,6 +726,13 @@ class GoogleSheetsSyncService
             $surveyData['hasLandInMunicipality'] = $hasLand;
             $surveyData['landParcels']            = $parcels;
             $surveyDataChanged = true;
+        }
+
+        // Health section — drawn from the Households, Utilities and Economic sheets.
+        $healthPatch = $this->extractHealthData($hhRow, $utilitiesRow, $economicRow);
+        if (!empty($healthPatch)) {
+            $surveyData['health'] = array_merge($surveyData['health'] ?? [], $healthPatch);
+            $surveyDataChanged    = true;
         }
 
         if ($surveyDataChanged) {
@@ -1657,6 +1677,11 @@ class GoogleSheetsSyncService
         $s = strtolower(trim((string)$val));
         if (in_array($s, ['1', 'yes', 'true', 'छ', 'छन्', 'हो'], true))  return true;
         if (in_array($s, ['0', 'no',  'false', 'छैन', 'होइन'], true)) return false;
+        // Kobo's standard yes/no choice labels, which several forms emit verbatim
+        // instead of the choice names. Previously these fell through to null and
+        // the answer was dropped (or defaulted to false).
+        if (in_array($s, ['हो अथवा छ', 'छ अथवा हो'], true))           return true;
+        if (in_array($s, ['होइन अथवा छैन', 'छैन अथवा होइन'], true))  return false;
         return null;
     }
 
@@ -1732,6 +1757,122 @@ class GoogleSheetsSyncService
             $data['bee_fish_silk_select'] = array_values(array_unique($beeTypes));
         }
         return $data;
+    }
+
+    /**
+     * Build survey_data['health'] — the section the household form owns and the
+     * स्वास्थ्य चेतना report reads.
+     *
+     * Two of these answers already reach us on existing sheets (handwashing on
+     * Utilities, has_insurance on Economic) and were being written only to the
+     * related tables / survey_data.social, so the report saw nothing. The rest
+     * are read from optional columns; a municipality whose sheet does not carry
+     * them simply gets fewer keys, never a failed sync.
+     *
+     * Column names are accepted both as the raw Kobo question name and as the
+     * form's own field name, so a sheet may use either.
+     */
+    private function extractHealthData(array $hhRow, ?array $utilitiesRow, ?array $economicRow): array
+    {
+        // First non-empty value among several candidate column names, searched
+        // across the given rows in order. Note the explicit '' comparison: "0" is
+        // a real answer here and must not be skipped as falsy.
+        $pick = function (array $rows, string ...$keys): string {
+            foreach ($rows as $row) {
+                foreach ($keys as $k) {
+                    $v = trim((string)(($row ?? [])[$k] ?? ''));
+                    if ($v !== '') return $v;
+                }
+            }
+            return '';
+        };
+        $yn = fn(string $v) => ($b = $this->parseBool($v)) === null ? null : ($b ? 'yes' : 'no');
+
+        $health = [];
+
+        // ── Handwashing (Utilities.handwashing, else a column on Households) ──
+        // The form's card is a yes/no awareness question while the sheet carries
+        // the three-way handwashing option, so anything other than "no facility"
+        // counts as aware.
+        // Normalised here rather than through opt() because rowToUtilitiesData()
+        // already canonicalises this column — going through opt() a second time
+        // would double-count it in the "unmapped values" report.
+        $wash = $pick([$utilitiesRow, $hhRow], 'handwashing', 'aware_handwashing');
+        if ($wash !== '') {
+            $bool = $this->parseBool($wash);
+            if ($bool !== null) {
+                $health['aware_handwashing'] = $bool ? 'yes' : 'no';
+            } else {
+                // Anything other than "no facility" means they do wash their hands.
+                $canonical = SurveyOption::canonicalize('handwashing', $wash, $this->syncLgId ?: null);
+                if ($canonical === 'none') {
+                    $health['aware_handwashing'] = 'no';
+                } elseif (in_array($canonical, ['soap_water', 'water_only'], true)) {
+                    $health['aware_handwashing'] = 'yes';
+                }
+                // An unrecognised value is left unset rather than guessed at.
+            }
+        }
+
+        // ── Health insurance (Economic.has_insurance) ─────────────────────────
+        $ins = $pick([$economicRow, $hhRow], 'has_insurance', 'has_health_insurance');
+        if ($ins !== '') {
+            $val = $yn($ins);
+            if ($val === null && in_array(mb_strtolower($ins), ['थाहा छैन', 'dont_know', "don't know", 'unknown'], true)) {
+                $val = 'dont_know';
+            }
+            if ($val !== null) $health['has_health_insurance'] = $val;
+        }
+
+        // ── Illness frequency ─────────────────────────────────────────────────
+        // Kobo records a raw count of illnesses per year; the form uses buckets.
+        $illness = $pick([$hhRow], 'yearly_illness_frequency', 'illness_frequency');
+        if ($illness !== '') {
+            if (is_numeric($illness)) {
+                $n = (float)$illness;
+                $health['illness_frequency'] = match (true) {
+                    $n < 1  => 'rarely',
+                    $n <= 2 => '1_2',
+                    $n <= 5 => '3_5',
+                    default => '6_plus',
+                };
+            } else {
+                $health['illness_frequency'] = $this->opt('illness_frequency', $illness);
+            }
+        }
+
+        // ── Treatment place ───────────────────────────────────────────────────
+        $treatment = $pick([$hhRow], 'first_treatment_attempt_at', 'treatment_place');
+        if ($treatment !== '') {
+            $health['treatment_place'] = $this->opt('treatment_place', $treatment);
+        }
+
+        // ── Awareness yes/no questions ────────────────────────────────────────
+        $awareness = [
+            'aware_nutrition'          => ['know_about_nutrition', 'aware_nutrition'],
+            'aware_pregnant_nutrition' => ['know_about_nutrition_for_pregnant', 'aware_pregnant_nutrition'],
+            'aware_iron_capsule'       => ['know_about_iron_tablet_for_pregnant', 'aware_iron_capsule'],
+            'has_pregnant_woman'       => ['pregnant_women_at_home', 'has_pregnant_woman'],
+        ];
+        foreach ($awareness as $field => $columns) {
+            $raw = $pick([$hhRow], ...$columns);
+            if ($raw === '') continue;
+            $val = $yn($raw);
+            if ($val !== null) $health[$field] = $val;
+        }
+
+        // ── Numeric detail fields ─────────────────────────────────────────────
+        $numeric = [
+            'time_to_health_center' => ['distance_health_institution', 'time_to_health_center'],
+            'pregnancy_months'      => ['pregnancy_in_month', 'pregnancy_months'],
+            'pregnant_age'          => ['age_of_pregnant_women', 'pregnant_age'],
+        ];
+        foreach ($numeric as $field => $columns) {
+            $raw = $pick([$hhRow], ...$columns);
+            if ($raw !== '' && is_numeric($raw)) $health[$field] = (int)$raw;
+        }
+
+        return array_filter($health, fn($v) => $v !== null && $v !== '');
     }
 
     private function requiredHouseholdErrors(array $row, int $rowNum): array

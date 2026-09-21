@@ -2150,6 +2150,7 @@ class ReportController extends Controller
 
         $treatmentFreq = $this->surveyDataFreq($wardIds, '$.health.treatment_place', [
             'govt_hospital'    => 'सरकारी अस्पताल',
+            'hospital'         => 'अस्पताल (निजी तथा सरकारी)',
             'health_post'      => 'स्वास्थ्य चौकी / प्रा.स्वा.के.',
             'community_health' => 'सामुदायिक स्वास्थ्य कक्ष',
             'private_clinic'   => 'निजी क्लिनिक / नर्सिङ होम',
@@ -2170,7 +2171,7 @@ class ReportController extends Controller
         $nutritionFreq  = $this->surveyDataFreq($wardIds, '$.health.aware_nutrition',           $yn, $ck . '_nutrition');
         $pregNutrFreq   = $this->surveyDataFreq($wardIds, '$.health.aware_pregnant_nutrition',  $yn, $ck . '_preg_nutr');
         $ironFreq       = $this->surveyDataFreq($wardIds, '$.health.aware_iron_capsule',        $yn, $ck . '_iron');
-        $insuranceFreq  = $this->surveyDataFreq($wardIds, '$.health.has_health_insurance',      $yn, $ck . '_insurance');
+        $insuranceFreq  = $this->surveyDataFreq($wardIds, '$.health.has_health_insurance',      $yn + ['dont_know' => 'थाहा छैन'], $ck . '_insurance');
         $pregnantFreq   = $this->surveyDataFreq($wardIds, '$.health.has_pregnant_woman',        $yn, $ck . '_pregnant');
 
         return Inertia::render('Public/Reports/Show', [
