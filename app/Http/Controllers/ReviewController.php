@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\InertiaPaginator;
 use App\Models\Household;
 use App\Models\Institution;
 use App\Models\MemberBusiness;
@@ -124,7 +125,12 @@ class ReviewController extends Controller
             'data_flags'       => $filterDataFlags,
         ];
 
-        return Inertia::render('Review/Households', compact('households', 'wards', 'filters', 'qualityCounts'));
+        return Inertia::render('Review/Households', [
+            'households'    => InertiaPaginator::format($households),
+            'wards'         => $wards,
+            'filters'       => $filters,
+            'qualityCounts' => $qualityCounts,
+        ]);
     }
 
     public function institutions(Request $request)
@@ -159,7 +165,11 @@ class ReviewController extends Controller
         $wards   = \App\Models\Ward::whereIn('id', $wardIds)->orderBy('ward_number')->get(['id', 'ward_number']);
         $filters = ['ward_id' => $filterWard];
 
-        return Inertia::render('Review/Institutions', compact('institutions', 'wards', 'filters'));
+        return Inertia::render('Review/Institutions', [
+            'institutions' => InertiaPaginator::format($institutions),
+            'wards'        => $wards,
+            'filters'      => $filters,
+        ]);
     }
 
     public function approveHousehold(Request $request, Household $household)
@@ -273,7 +283,11 @@ class ReviewController extends Controller
         $wards   = \App\Models\Ward::whereIn('id', $wardIds)->orderBy('ward_number')->get(['id', 'ward_number']);
         $filters = ['ward_id' => $filterWard];
 
-        return Inertia::render('Review/Businesses', compact('businesses', 'wards', 'filters'));
+        return Inertia::render('Review/Businesses', [
+            'businesses' => InertiaPaginator::format($businesses),
+            'wards'      => $wards,
+            'filters'    => $filters,
+        ]);
     }
 
     public function approveBusiness(Request $request, MemberBusiness $business)

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\InertiaPaginator;
 use App\Models\AuditLog;
 use App\Models\EditRequest;
 use App\Models\Institution;
@@ -65,8 +66,10 @@ class InstitutionController extends Controller
         if ($s = $request->search) {
             $query->where(fn($q) => $q->where('name_np','like',"%$s%")->orWhere('name_en','like',"%$s%")->orWhere('unique_code','like',"%$s%"));
         }
-        if ($request->ward_id) $query->where('ward_id', $request->ward_id);
-        if ($request->status)  $query->where('status', $request->status);
+        if ($request->ward_id)          $query->where('ward_id', $request->ward_id);
+        if ($request->status)           $query->where('status', $request->status);
+        if ($request->institution_type) $query->where('institution_type', $request->institution_type);
+        if ($request->settlement_id)    $query->where('settlement_id', $request->settlement_id);
 
         $institutions = $query->paginate(20)->withQueryString()
             ->through(fn($i) => [
@@ -84,10 +87,27 @@ class InstitutionController extends Controller
                 'completeness'     => CompletenessScoreService::institution($i),
             ]);
 
+        $wards = $this->selectableWards();
+
         return Inertia::render('Institutions/Index', [
-            'institutions' => $institutions,
-            'wards'        => $this->selectableWards(),
-            'filters'      => $request->only('search','ward_id','status'),
+            'institutions' => InertiaPaginator::format($institutions),
+            'wards'        => $wards,
+            // Only the types that actually occur in the records this user can
+            // see, so the filter never offers a choice that returns nothing.
+            'types'        => Institution::query()
+                                ->whereIn('ward_id', $wards->pluck('id'))
+                                ->whereNotNull('institution_type')
+                                ->distinct()
+                                ->orderBy('institution_type')
+                                ->pluck('institution_type')
+                                ->map(fn($v) => ['value' => $v, 'label' => $typeLabels[$v] ?? $v])
+                                ->values(),
+            // Settlements carry ward_id so the tole list can narrow itself when
+            // a ward is picked.
+            'settlements'  => Settlement::whereIn('ward_id', $wards->pluck('id'))
+                                ->orderBy('name_np')
+                                ->get(['id', 'ward_id', 'name_np']),
+            'filters'      => $request->only('search', 'ward_id', 'status', 'institution_type', 'settlement_id'),
         ]);
     }
 

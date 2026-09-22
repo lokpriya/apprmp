@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\InertiaPaginator;
 use App\Models\AuditLog;
 use App\Models\EditRequest;
 use App\Models\Household;
@@ -110,7 +111,7 @@ class BusinessController extends Controller
         $wards = Ward::whereIn('id', $wardIds)->orderBy('ward_number')->pluck('ward_number');
 
         return Inertia::render('Business/Index', [
-            'businesses' => $businesses,
+            'businesses' => InertiaPaginator::format($businesses),
             'wards'      => $wards,
             'filters'    => $request->only(['status', 'ward', 'search']),
         ]);

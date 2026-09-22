@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\InertiaPaginator;
 use App\Models\AuditLog;
 use App\Models\EditRequest;
 use App\Models\Household;
@@ -73,7 +74,7 @@ class HouseholdController extends Controller
             ]);
 
         return Inertia::render('Households/Index', [
-            'households'    => $households,
+            'households'    => InertiaPaginator::format($households),
             // Only the wards this user can actually have results in, so the
             // filter cannot be set to a ward that always returns nothing.
             'wards'         => $this->selectableWards(),

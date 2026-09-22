@@ -35,16 +35,36 @@
       <!-- Filters -->
       <div class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-4">
         <div class="flex flex-col sm:flex-row gap-3">
-          <!-- Search -->
-          <div class="relative flex-1">
+          <!-- Search — narrowed to make room for the type and tole filters -->
+          <div class="relative flex-1 min-w-[180px]">
             <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
             <input
               v-model="searchQuery"
               type="text"
-              placeholder="नाम वा कोड खोज्नुस्..."
+              placeholder="नाम वा कोड..."
               class="w-full rounded-md border border-[#e6e7e9] pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition"
             />
           </div>
+
+          <!-- Organisation type filter -->
+          <select
+            v-model="typeFilter"
+            @change="applyFilters"
+            class="rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition bg-white min-w-[160px] max-w-[220px]"
+          >
+            <option value="">सबै प्रकार</option>
+            <option v-for="t in types" :key="t.value" :value="t.value">{{ t.label }}</option>
+          </select>
+
+          <!-- Tole / settlement filter -->
+          <select
+            v-model="settlementFilter"
+            @change="applyFilters"
+            class="rounded-md border border-[#e6e7e9] px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition bg-white min-w-[150px] max-w-[220px]"
+          >
+            <option value="">सबै टोल</option>
+            <option v-for="s in visibleSettlements" :key="s.id" :value="s.id">{{ s.name_np }}</option>
+          </select>
 
           <!-- Ward filter -->
           <select
@@ -305,17 +325,31 @@ const surveyFrozen = computed(() => page.props.surveyFrozen && page.props.auth?.
 const props = defineProps({
   institutions: { type: Object, default: () => ({ data: [], meta: {}, links: [] }) },
   wards: { type: Array, default: () => [] },
-  filters: { type: Object, default: () => ({ search: '', ward_id: '', status: '' }) },
+  types: { type: Array, default: () => [] },
+  settlements: { type: Array, default: () => [] },
+  filters: { type: Object, default: () => ({ search: '', ward_id: '', status: '', institution_type: '', settlement_id: '' }) },
 })
 
 const searchQuery = ref(props.filters.search || '')
 const wardFilter = ref(props.filters.ward_id || '')
 const statusFilter = ref(props.filters.status || '')
+const typeFilter = ref(props.filters.institution_type || '')
+const settlementFilter = ref(props.filters.settlement_id || '')
 const submitting = ref(null)
 
 let searchTimeout = null
 
-const hasActiveFilters = computed(() => searchQuery.value || wardFilter.value || statusFilter.value)
+// Narrow the tole list to the chosen ward, so a multi-ward user is not scrolling
+// through every tole in the municipality to find one.
+const visibleSettlements = computed(() =>
+  wardFilter.value
+    ? props.settlements.filter(s => String(s.ward_id) === String(wardFilter.value))
+    : props.settlements
+)
+
+const hasActiveFilters = computed(() =>
+  searchQuery.value || wardFilter.value || statusFilter.value || typeFilter.value || settlementFilter.value
+)
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -350,17 +384,29 @@ function statusLabel(s) {
 
 // ── filters ───────────────────────────────────────────────────────────────────
 
-function applyFilters() {
-  router.get(
-    '/institutions',
-    {
-      search: searchQuery.value,
-      ward_id: wardFilter.value,
-      status: statusFilter.value,
-    },
-    { preserveState: true, replace: true },
-  )
+function currentFilters() {
+  return {
+    search: searchQuery.value,
+    ward_id: wardFilter.value,
+    status: statusFilter.value,
+    institution_type: typeFilter.value,
+    settlement_id: settlementFilter.value,
+  }
 }
+
+function applyFilters() {
+  // Changing a filter returns to page 1 — staying on page 5 of a narrower
+  // result set would show an empty table.
+  router.get('/institutions', currentFilters(), { preserveState: true, replace: true })
+}
+
+// A tole belongs to one ward, so a tole chosen under a different ward would
+// return nothing. Clear it when the ward changes.
+watch(wardFilter, () => {
+  if (settlementFilter.value && !visibleSettlements.value.some(s => String(s.id) === String(settlementFilter.value))) {
+    settlementFilter.value = ''
+  }
+})
 
 watch(searchQuery, () => {
   clearTimeout(searchTimeout)
@@ -373,22 +419,15 @@ function clearFilters() {
   searchQuery.value = ''
   wardFilter.value = ''
   statusFilter.value = ''
+  typeFilter.value = ''
+  settlementFilter.value = ''
   applyFilters()
 }
 
 // ── pagination ────────────────────────────────────────────────────────────────
 
 function goToPage(page) {
-  router.get(
-    '/institutions',
-    {
-      search: searchQuery.value,
-      ward_id: wardFilter.value,
-      status: statusFilter.value,
-      page,
-    },
-    { preserveState: true, replace: true },
-  )
+  router.get('/institutions', { ...currentFilters(), page }, { preserveState: true, replace: true })
 }
 
 const visiblePages = computed(() => {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Support\InertiaPaginator;
 use App\Http\Controllers\Controller;
 use App\Models\Household;
 use App\Models\Institution;
@@ -87,9 +88,9 @@ class PublishQueueController extends Controller
             ]);
 
         return Inertia::render('Admin/PublishQueue', [
-            'households'   => $households,
-            'institutions' => $institutions,
-            'businesses'   => $businesses,
+            'households'   => InertiaPaginator::format($households),
+            'institutions' => InertiaPaginator::format($institutions),
+            'businesses'   => InertiaPaginator::format($businesses),
             'tab'          => $request->input('tab', 'households'),
             'counts'       => [
                 'households'   => $households->total(),
