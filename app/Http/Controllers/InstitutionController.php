@@ -12,12 +12,15 @@ use App\Services\CompletenessScoreService;
 use App\Services\DuplicateDetectionService;
 use App\Services\InstitutionService;
 use App\Services\WorkflowService;
+use App\Support\ScopesWardAccess;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class InstitutionController extends Controller
 {
+    use ScopesWardAccess;
+
     public function __construct(private WorkflowService $workflow) {}
 
     /**
@@ -83,7 +86,7 @@ class InstitutionController extends Controller
 
         return Inertia::render('Institutions/Index', [
             'institutions' => $institutions,
-            'wards'        => Ward::where('local_government_id', $lgId)->orderBy('ward_number')->get(['id','ward_number']),
+            'wards'        => $this->selectableWards(),
             'filters'      => $request->only('search','ward_id','status'),
         ]);
     }
@@ -96,9 +99,7 @@ class InstitutionController extends Controller
 
         return Inertia::render('Institutions/Form', [
             'institution'      => null,
-            'wards'            => Ward::where('local_government_id', $lgId)
-                                      ->orderBy('ward_number')
-                                      ->get(['id', 'ward_number']),
+            'wards'            => $this->selectableWards(),
             'settlements'      => Settlement::whereIn('ward_id', $wardIds)
                                             ->orderBy('name_np')
                                             ->get(['id', 'ward_id', 'name_np']),
@@ -117,9 +118,8 @@ class InstitutionController extends Controller
                                                 ->orderBy('category')->orderBy('sort_order')
                                                 ->get(['category', 'value', 'label_ne'])
                                                 ->groupBy('category'),
-            'initialWardId'    => $user->isEnumerator()
-                                       ? $user->assignedWards()->first()?->id
-                                       : null,
+            // Anyone with exactly one ward gets it filled in, not only enumerators.
+            'initialWardId'    => $this->defaultWardId(),
             'mapConfig'        => \App\Models\LocalGovernment::getCached($lgId)?->map_config ?? [],
             'canEditBuildings'  => $user->isAdmin(),
         ]);
@@ -209,9 +209,8 @@ class InstitutionController extends Controller
 
         return Inertia::render('Institutions/Form', [
             'institution'      => $institutionData,
-            'wards'            => Ward::where('local_government_id', $lgId)
-                                      ->orderBy('ward_number')
-                                      ->get(['id', 'ward_number']),
+            // Keep the record's own ward selectable even if assignments changed.
+            'wards'            => $this->selectableWards($institution->ward_id),
             'settlements'      => Settlement::whereIn('ward_id', $wardIds)
                                             ->orderBy('name_np')
                                             ->get(['id', 'ward_id', 'name_np']),
@@ -241,10 +240,12 @@ class InstitutionController extends Controller
         $user = auth()->user();
 
         $request->validate([
-            'ward_id'          => 'required|exists:wards,id',
+            // See ScopesWardAccess: exists:wards,id let a record be filed into a
+            // ward the creator could not afterwards open.
+            'ward_id'          => $this->wardRule(),
             'name_en'          => 'required|string|max:200',
             'institution_type' => $this->institutionTypeRule($user->local_government_id),
-        ]);
+        ], $this->wardRuleMessages());
 
         if (!$user->isAdmin()) {
             $lg = \App\Models\LocalGovernment::getCached($user->local_government_id);
@@ -282,8 +283,11 @@ class InstitutionController extends Controller
         $user = auth()->user();
 
         $request->validate([
+            // ward_id was not validated here at all, so an edit could move a
+            // record into any ward. Its current ward stays permitted.
+            'ward_id'          => $this->wardRule($institution->ward_id),
             'institution_type' => $this->institutionTypeRule($user->local_government_id),
-        ]);
+        ], $this->wardRuleMessages());
 
         if (!$user->isAdmin()) {
             $lg = \App\Models\LocalGovernment::getCached($user->local_government_id);

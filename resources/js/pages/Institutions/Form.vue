@@ -215,9 +215,10 @@
         <div class="flex flex-col gap-1">
           <label class="text-[13px] font-semibold text-[#626976] mb-1.5">वडा नं. <span class="text-red-500">*</span></label>
           <select v-model="form.ward_id" class="w-full rounded-md border border-[#e6e7e9] px-4 py-2.5 text-[14px] focus:ring-2 focus:ring-[#206bc4]/25 focus:border-[#206bc4]">
-            <option value="">-- वडा छान्नुहोस् --</option>
+            <option v-if="!hasSingleWard" value="">-- वडा छान्नुहोस् --</option>
             <option v-for="w in props.wards" :key="w.id" :value="w.id">वडा {{ w.ward_number }}</option>
           </select>
+          <p v-if="hasSingleWard" class="text-[11px] text-gray-400 mt-1">तपाईंलाई तोकिएको वडा स्वतः चयन गरिएको छ।</p>
           <p v-if="form.errors.ward_id" class="text-[11px] text-red-500 mt-1">{{ form.errors.ward_id }}</p>
         </div>
         <!-- Settlement -->
@@ -2401,6 +2402,11 @@ const props = defineProps({
   canEditBuildings: { type: Boolean,  default: true },
 })
 
+// A user assigned to exactly one ward gets no choice to get wrong: the server
+// sends only that ward, so the placeholder option is dropped and it stays
+// selected. Users with several wards still pick one as before.
+const hasSingleWard = computed(() => props.wards.length === 1)
+
 // ── Steps ──────────────────────────────────────────────────────────
 const totalSteps = 7
 const step = ref(1)
@@ -2927,7 +2933,12 @@ async function submitForm() {
 
 // ── Mount ──────────────────────────────────────────────────────────
 onMounted(async () => {
-  if (props.initialWardId) form.ward_id = props.initialWardId
+  if (props.initialWardId) {
+    form.ward_id = props.initialWardId
+  } else if (props.wards.length === 1 && !form.ward_id) {
+    // Fallback for the single-ward case if the server sent no pre-selection.
+    form.ward_id = props.wards[0].id
+  }
 
   try {
     const data = await getDraft(instDraftKey.value)

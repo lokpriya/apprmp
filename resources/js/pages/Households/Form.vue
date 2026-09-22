@@ -224,9 +224,10 @@
             <label class="text-[12px] font-semibold text-[#626976]">वडा नं. <span class="text-red-500">*</span></label>
             <span class="text-[11px] text-gray-400 -mt-0.5">Ward No.</span>
             <select v-model="form.ward_id" class="w-full rounded border border-[#e6e7e9] px-3 py-2 text-[13px] bg-white focus:ring-2 focus:ring-[#206bc4]/20 focus:border-[#206bc4]">
-              <option value="">-- वडा छान्नुहोस् --</option>
+              <option v-if="!hasSingleWard" value="">-- वडा छान्नुहोस् --</option>
               <option v-for="w in wards" :key="w.id" :value="w.id">वडा {{ w.ward_number }}{{ w.name ? ' — ' + w.name : '' }}</option>
             </select>
+            <p v-if="hasSingleWard" class="text-[11px] text-gray-400">तपाईंलाई तोकिएको वडा स्वतः चयन गरिएको छ।</p>
             <p v-if="form.errors.ward_id" class="text-[11px] text-red-500">{{ form.errors.ward_id }}</p>
           </div>
           <div class="flex flex-col gap-1">
@@ -4757,6 +4758,11 @@ const props = defineProps({
   mapConfig:     { type: Object, default: () => ({}) },
 })
 
+// A user assigned to exactly one ward gets no choice to get wrong: the server
+// sends only that ward, so the placeholder option is dropped and it stays
+// selected. Users with several wards still pick one as before.
+const hasSingleWard = computed(() => props.wards.length === 1)
+
 // ── Page meta ──────────────────────────────────────────────────────
 const isEdit = computed(() => props.household !== null)
 const pageTitle = computed(() => isEdit.value ? 'घरधुरी सम्पादन' : 'घरधुरी सिर्जना')
@@ -6241,6 +6247,9 @@ async function saveDraft() {
 onMounted(async () => {
   if (props.initialWardId) {
     form.ward_id = props.initialWardId
+  } else if (props.wards.length === 1 && !form.ward_id) {
+    // Fallback for the single-ward case if the server sent no pre-selection.
+    form.ward_id = props.wards[0].id
   }
   if (form.members.length === 0) {
     addMember()

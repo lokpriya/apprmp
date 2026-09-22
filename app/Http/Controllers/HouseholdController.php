@@ -14,11 +14,14 @@ use App\Services\DataQualityService;
 use App\Services\DuplicateDetectionService;
 use App\Services\HouseholdService;
 use App\Services\WorkflowService;
+use App\Support\ScopesWardAccess;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class HouseholdController extends Controller
 {
+    use ScopesWardAccess;
+
     public function __construct(private WorkflowService $workflow) {}
 
     public function index(Request $request)
@@ -71,7 +74,9 @@ class HouseholdController extends Controller
 
         return Inertia::render('Households/Index', [
             'households'    => $households,
-            'wards'         => Ward::where('local_government_id', $lgId)->orderBy('ward_number')->get(['id','ward_number']),
+            // Only the wards this user can actually have results in, so the
+            // filter cannot be set to a ward that always returns nothing.
+            'wards'         => $this->selectableWards(),
             'filters'       => $request->only('search','ward_id','status','per_page'),
             'surveyOptions' => SurveyOption::allGroupedForVue($lgId),
         ]);
@@ -85,15 +90,13 @@ class HouseholdController extends Controller
 
         return Inertia::render('Households/Form', [
             'household'     => null,
-            'wards'         => Ward::where('local_government_id', $lgId)
-                                   ->orderBy('ward_number')
-                                   ->get(['id', 'ward_number']),
+            'wards'         => $this->selectableWards(),
             'settlements'   => Settlement::whereIn('ward_id', $wardIds)
                                          ->orderBy('name_np')
                                          ->get(['id', 'ward_id', 'name_np']),
-            'initialWardId' => $user->isEnumerator()
-                                   ? $user->assignedWards()->first()?->id
-                                   : null,
+            // Anyone assigned to exactly one ward gets it filled in for them —
+            // not only enumerators, as before. Ward admins are the common case.
+            'initialWardId' => $this->defaultWardId(),
             'surveyOptions' => SurveyOption::allGroupedForVue($lgId),
             'mapConfig'     => \App\Models\LocalGovernment::getCached($lgId)?->map_config ?? [],
         ]);
@@ -165,9 +168,9 @@ class HouseholdController extends Controller
 
         return Inertia::render('Households/Form', [
             'household'     => $household,
-            'wards'         => Ward::where('local_government_id', $lgId)
-                                   ->orderBy('ward_number')
-                                   ->get(['id', 'ward_number']),
+            // Pass the record's own ward so editing never blanks the select,
+            // even if the user's assignments changed since it was created.
+            'wards'         => $this->selectableWards($household->ward_id),
             'settlements'   => Settlement::whereIn('ward_id', $wardIds)
                                          ->orderBy('name_np')
                                          ->get(['id', 'ward_id', 'name_np']),
@@ -180,9 +183,11 @@ class HouseholdController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'ward_id'         => 'required|exists:wards,id',
+            // Not exists:wards,id — that let a ward admin file a record into a
+            // ward they cannot afterwards open, leaving it stranded there.
+            'ward_id'         => $this->wardRule(),
             'respondent_name' => 'required|string|max:200',
-        ]);
+        ], $this->wardRuleMessages());
 
         $user = auth()->user();
         if (!$user->isAdmin()) {
@@ -237,6 +242,14 @@ class HouseholdController extends Controller
     public function update(Request $request, Household $household)
     {
         $this->authorize('update', $household);
+
+        // update() validated nothing, so an edit could move a record into any
+        // ward at all. The record's current ward stays permitted so that saving
+        // an unchanged form never fails.
+        $request->validate([
+            'ward_id'         => $this->wardRule($household->ward_id),
+            'respondent_name' => 'required|string|max:200',
+        ], $this->wardRuleMessages());
 
         $user = auth()->user();
         if (!$user->isAdmin()) {
