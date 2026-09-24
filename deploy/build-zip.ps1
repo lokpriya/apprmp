@@ -44,8 +44,12 @@ $Targets = @{
         LaravelRoot = '/home2/prayaspr/aathrai'
         WebRoot     = 'public_html/aathrai'
         AppUrl      = 'https://aathrai.prayasprarambha.com.np'
-        DbName      = 'prayaspr_aathrai'
-        DbUser      = 'prayaspra_aamchowk'
+        # Read from the live .env on 2026-09-24. Both values here were previously
+        # wrong: the database was listed as prayaspr_aathrai (no "rm" suffix) and
+        # the user as prayaspra_aamchowk, which is neither this site's user nor a
+        # correct prefix. One DB user serves several databases on this account.
+        DbName      = 'prayaspr_aathrairm'
+        DbUser      = 'prayaspr_orionanugraha'
         ZipName     = 'aathrai-deploy.zip'
         InstallUrl  = 'https://aathrai.prayasprarambha.com.np/install.php'
     }
