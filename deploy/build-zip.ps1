@@ -23,11 +23,15 @@ $Targets = @{
         InstallUrl  = 'https://apprmp.prayasnepal.com/install.php'
     }
     'ajirkot' = @{
-        LaravelRoot = '/home2/prayaspra/ajirkot'
+        # Moved to the prayaspr account 2026-09-26, alongside rong, aathrai and
+        # aamchowk. It previously pointed at prayaspra, which is a different
+        # cPanel account — the old root and user here were both wrong for the
+        # new home.
+        LaravelRoot = '/home2/prayaspr/ajirkot'
         WebRoot     = 'public_html/ajirkot'
         AppUrl      = 'https://ajirkot.prayasprarambha.com.np'
-        DbName      = 'prayaspra_ajirkotprofile'
-        DbUser      = 'prayaspra_lokpriya'
+        DbName      = 'prayaspr_ajirkotprofile'
+        DbUser      = 'prayaspr_ajirkotgorkha'
         ZipName     = 'ajirkot-deploy.zip'
         InstallUrl  = 'https://ajirkot.prayasprarambha.com.np/install.php'
     }

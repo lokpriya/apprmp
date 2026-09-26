@@ -64,7 +64,7 @@ const SITE_ROOTS = [
     'aathrai'  => '/home2/prayaspr/aathrai',
     'rongdata' => '/home2/prayaspr/rong',
     'apprmp'   => '/home2/prayasne/apprmp',
-    'ajirkot'  => '/home2/prayaspra/ajirkot',
+    'ajirkot'  => '/home2/prayaspr/ajirkot',   // moved to the prayaspr account 2026-09-26
 ];
 
 $zip = new ZipArchive();
