@@ -1016,10 +1016,28 @@ class GoogleSheetsSyncService
         }
 
         if ($healthRow = $related['healthRow'] ?? null) {
-            $institution->healthDetail()->updateOrCreate(
-                ['institution_id' => $institution->id],
-                $this->rowToHealthData($healthRow)
+            // The Health sheet carries a row for every institution, not only the
+            // health facilities, so this created an all-empty detail row for each
+            // tole development committee and forest user group as well. The public
+            // health report counted those rows as facilities — rong reported 193,
+            // its entire institution count, with every bed and service at zero.
+            //
+            // The report now filters on institution_type, but keep the junk out of
+            // the table too: write a detail row only when the sheet actually said
+            // something. Booleans default to false, so they are not evidence of
+            // data; a real health facility always has at least one non-empty value.
+            $healthData = $this->rowToHealthData($healthRow);
+            $hasAnyValue = (bool) array_filter(
+                $healthData,
+                fn ($v) => $v !== null && $v !== '' && $v !== false && $v !== 0
             );
+
+            if ($hasAnyValue) {
+                $institution->healthDetail()->updateOrCreate(
+                    ['institution_id' => $institution->id],
+                    $healthData
+                );
+            }
         }
 
         // Staff: match by staff_category, update/create/delete

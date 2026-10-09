@@ -20,6 +20,17 @@ use Inertia\Inertia;
 
 class InstitutionReportController extends Controller
 {
+    /**
+     * institution_type slugs that denote a health facility.
+     *
+     * The institution_type options carry no capability flag — InstitutionType,
+     * which had has_health/has_education booleans, was replaced by survey_options
+     * slugs. So the slugs are listed explicitly here, as school() does for its own.
+     * Add any new health-bearing type to this list or it will silently vanish
+     * from the health report.
+     */
+    private const HEALTH_INSTITUTION_TYPES = ['health_post'];
+
     private function defaultLg(): ?LocalGovernment
     {
         // Canonical, cached and deterministic. Resolving this per controller meant
@@ -549,11 +560,34 @@ class InstitutionReportController extends Controller
         $grouped          = SurveyOption::allGrouped($lg->id);
         $healthTypeLabels = $grouped['inst_health_type'] ?? [];
 
-        $healthBase = fn () => InstitutionHealth::whereHas('institution', fn($q) =>
-            $q->whereIn('ward_id', $wardIds)->where('status', 'published')
+        // Only institutions that ARE health facilities, the same way school()
+        // filters on its slug. This was previously missing entirely: the report
+        // counted every row in institution_health, and a health-detail row is
+        // created for every institution the sync touches regardless of type —
+        // all of them empty for a tole development committee or a forest user
+        // group. Rong therefore reported 193 health facilities, which is simply
+        // its total institution count, with every bed and service column zero.
+        //
+        // As in school(): if another health-bearing type is ever added to the
+        // institution_type options it must be added here too, or it will
+        // silently drop out of this report.
+        $instBase = fn () => Institution::whereIn('ward_id', $wardIds)
+            ->where('status', 'published')
+            ->whereIn('institution_type', self::HEALTH_INSTITUTION_TYPES);
+
+        // Facilities are counted from the institutions themselves, so a health
+        // post that has no detail row still appears. The detail aggregates below
+        // are scoped to those same institutions.
+        $totalFacilities = $instBase()->count();
+
+        $healthBase = fn () => InstitutionHealth::whereIn(
+            'institution_id',
+            Institution::whereIn('ward_id', $wardIds)
+                ->where('status', 'published')
+                ->whereIn('institution_type', self::HEALTH_INSTITUTION_TYPES)
+                ->select('id')
         );
 
-        $totalFacilities = $healthBase()->count();
         $totalBeds       = (int) $healthBase()->sum('bed_count');
         $totalOpdDaily   = (int) $healthBase()->sum('opd_daily');
         $totalOpdMonthly = (int) $healthBase()->sum('opd_monthly');
