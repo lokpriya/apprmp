@@ -212,8 +212,24 @@
         </div>
       </div>
 
+      <!-- Facilities exist but nobody filled in the health section. Saying so is
+           honest; a grid of zeros reads as though the figures are genuinely nil,
+           and is indistinguishable from a counting bug. -->
+      <div v-if="healthDetailMissing"
+        class="bg-amber-50 border border-amber-200 rounded-xl p-5 flex items-start gap-3">
+        <i class="fa-solid fa-circle-info text-amber-500 mt-0.5"></i>
+        <div>
+          <p class="text-[13px] font-semibold text-amber-900">
+            {{ t('instReports.healthDetailMissingTitle') }}
+          </p>
+          <p class="text-[12px] text-amber-800 mt-1">
+            {{ t('instReports.healthDetailMissingBody', { n: healthSummary?.total_facilities ?? 0 }) }}
+          </p>
+        </div>
+      </div>
+
       <!-- Bed breakdown -->
-      <div v-if="bedBreakdown" class="bg-white border border-[#e6e7e9] rounded-xl p-5">
+      <div v-if="bedBreakdown && !healthDetailMissing" class="bg-white border border-[#e6e7e9] rounded-xl p-5">
         <h2 class="text-[14px] font-semibold text-[#1d273b] mb-4">{{ t('instReports.bedBreakdownTitle') }}</h2>
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <div v-for="bed in bedCards" :key="bed.key"
@@ -225,7 +241,7 @@
       </div>
 
       <!-- Service availability -->
-      <div v-if="serviceData?.length" class="bg-white border border-[#e6e7e9] rounded-xl p-5">
+      <div v-if="serviceData?.length && !healthDetailMissing" class="bg-white border border-[#e6e7e9] rounded-xl p-5">
         <h2 class="text-[14px] font-semibold text-[#1d273b] mb-1">
           {{ t('instReports.serviceAvailability') }}
         </h2>
@@ -424,6 +440,14 @@ const facilityIcons = {
   has_library:        'fa-solid fa-book',
   has_lab:            'fa-solid fa-flask',
 }
+
+// Facilities were surveyed but none of them has any health detail recorded.
+// Distinguishing this from "the answers really are zero" matters: a page full
+// of zeros looks identical to the counting bug this report used to have.
+const healthDetailMissing = computed(() =>
+  (props.healthSummary?.total_facilities ?? 0) > 0 &&
+  (props.healthSummary?.facilities_with_detail ?? 0) === 0
+)
 
 const healthCards = [
   { key: 'total_facilities', label: t('instReports.totalFacilities'), color: '#d63939' },

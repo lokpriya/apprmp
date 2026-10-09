@@ -592,6 +592,28 @@ class InstitutionReportController extends Controller
         $totalOpdDaily   = (int) $healthBase()->sum('opd_daily');
         $totalOpdMonthly = (int) $healthBase()->sum('opd_monthly');
 
+        // How many of those facilities actually have their detail recorded.
+        // Without this the page cannot tell "nobody filled the health section in"
+        // from "every answer is genuinely zero" — both render as a wall of 0s,
+        // which is precisely what the earlier counting bug looked like. Rong's
+        // nine health posts are all in this state: a detail row exists for each
+        // but every bed, OPD and service column is NULL or false.
+        $facilitiesWithDetail = $healthBase()
+            ->where(function ($q) {
+                $q->where(fn($s) => $s->whereNotNull('health_type')->where('health_type', '!=', ''))
+                  ->orWhere('bed_count', '>', 0)
+                  ->orWhere('opd_daily', '>', 0)
+                  ->orWhere('opd_monthly', '>', 0)
+                  ->orWhere('delivery_service', true)
+                  ->orWhere('emergency_service', true)
+                  ->orWhere('has_lab', true)
+                  ->orWhere('has_xray', true)
+                  ->orWhere('has_ambulance', true)
+                  ->orWhere('vaccine_service', true)
+                  ->orWhere('family_planning', true);
+            })
+            ->count();
+
         $serviceFields = [
             'delivery_service'      => ['प्रसूति सेवा', 'Delivery Service'],
             'emergency_service'     => ['आपतकालीन सेवा', 'Emergency Service'],
@@ -655,10 +677,11 @@ class InstitutionReportController extends Controller
             'tables'        => [],
             'frequencies'   => [],
             'healthSummary' => [
-                'total_facilities' => $totalFacilities,
-                'total_beds'       => $totalBeds,
-                'opd_daily'        => $totalOpdDaily,
-                'opd_monthly'      => $totalOpdMonthly,
+                'total_facilities'      => $totalFacilities,
+                'total_beds'            => $totalBeds,
+                'opd_daily'             => $totalOpdDaily,
+                'opd_monthly'           => $totalOpdMonthly,
+                'facilities_with_detail'=> $facilitiesWithDetail,
             ],
             'serviceData'   => $serviceData,
             'byHealthType'  => $byHealthType,

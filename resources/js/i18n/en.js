@@ -244,6 +244,8 @@ export default {
     opdDaily:            'OPD Daily Avg',
     opdMonthly:          'OPD Monthly Avg',
     serviceAvailability: 'Service Availability',
+    healthDetailMissingTitle: 'Facility details not yet recorded',
+    healthDetailMissingBody:  '{n} health facilities have been surveyed, but none has bed, outpatient or service information recorded yet. Those sections are hidden rather than shown as zero, because no figure has been collected.',
     byHealthTypeTitle:   'Facilities by Health Type',
     bedBreakdownTitle:   'Bed Breakdown',
     bedMaleWard:         'Male Ward',
