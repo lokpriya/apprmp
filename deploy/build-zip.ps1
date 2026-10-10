@@ -39,8 +39,12 @@ $Targets = @{
         LaravelRoot = '/home2/prayaspr/aamchowk'
         WebRoot     = 'public_html/aamchowk'
         AppUrl      = 'https://aamchowk.prayasprarambha.com.np'
-        DbName      = 'prayaspra_aamchowk'
-        DbUser      = 'prayaspra_aamchowk'
+        # Corrected 2026-10-10 from cPanel MySQL Databases. Both values carried
+        # the 'prayaspra' prefix, which belongs to the old ajirkot account — a
+        # prayaspra_* database cannot exist on the prayaspr account this site
+        # lives on, since cPanel prefixes every name with the account.
+        DbName      = 'prayaspr_aamchowk'
+        DbUser      = 'prayaspr_orionanugraha'   # shared with aathrai
         ZipName     = 'aamchowk-deploy.zip'
         InstallUrl  = 'https://aamchowk.prayasprarambha.com.np/install.php'
     }
@@ -67,12 +71,9 @@ $Targets = @{
         # of deploy/rong-migrate.sql (which ran successfully in September), and
         # both prayaspr_rongprofile*.sql.gz dumps.
         DbName      = 'prayaspr_rongprofile'
-        # UNVERIFIED — carried over from the old, wrong DbName. On this account
-        # one user serves several databases (prayaspr_orionanugraha covers both
-        # aathrai and aamchowk), so do not assume it matches DbName. Read it from
-        # /home2/prayaspr/rong/.env before any fresh install:
-        #   grep -E '^DB_(DATABASE|USERNAME)=' /home2/prayaspr/rong/.env
-        DbUser      = 'prayaspr_rongdata'
+        # Confirmed from cPanel MySQL Databases 2026-10-10.
+        # NOTE THE ZEROS: r0ngpr0, not rongpro. Easy to mistype.
+        DbUser      = 'prayaspr_r0ngpr0'
         ZipName     = 'rongdata-deploy.zip'
         InstallUrl  = 'https://rong.prayasprarambha.com.np/install.php'
     }
