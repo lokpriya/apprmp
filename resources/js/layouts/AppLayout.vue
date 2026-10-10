@@ -412,6 +412,11 @@
                 <i class="fa-solid fa-lock w-4 text-[#9aa0ac] text-center text-xs"></i>
                 भूमिका अनुमति
               </a>
+              <a v-if="userRole === 'super_admin'" href="/admin/system-update"
+                class="flex items-center gap-3 px-4 py-2.5 text-[13px] text-[#626976] hover:bg-gray-50 transition-colors">
+                <i class="fa-solid fa-cloud-arrow-up w-4 text-[#9aa0ac] text-center text-xs"></i>
+                प्रणाली अद्यावधिक
+              </a>
               <a href="/admin/settings"
                 class="flex items-center gap-3 px-4 py-2.5 text-[13px] text-[#626976] hover:bg-gray-50 transition-colors">
                 <i class="fa-solid fa-gear w-4 text-[#9aa0ac] text-center text-xs"></i>

@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\PublishQueueController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\SurveyOptionsController;
 use App\Http\Controllers\Admin\RolePermissionsController;
+use App\Http\Controllers\Admin\SystemUpdateController;
 use App\Http\Controllers\Admin\ProgressController;
 use App\Http\Controllers\Admin\DataExportController;
 use App\Http\Controllers\Admin\GoogleSyncController;
@@ -337,6 +338,18 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
             Route::patch('/users/{user}/assign-wards',  [UserController::class, 'assignWards'])  ->name('users.assign-wards');
             Route::get('/role-permissions',              [RolePermissionsController::class, 'index'])->name('role-permissions');
             Route::patch('/role-permissions',            [RolePermissionsController::class, 'update'])->name('role-permissions.update');
+
+            // One-file system update (super_admin only, checked in the controller).
+            // password.confirm: the super admin re-enters their password before
+            // the page opens, and again if they come back after the timeout.
+            Route::middleware('password.confirm')->group(function () {
+                Route::get('/system-update',              [SystemUpdateController::class, 'index'])  ->name('system-update');
+                Route::post('/system-update/upload',      [SystemUpdateController::class, 'upload']) ->name('system-update.upload');
+                Route::post('/system-update/step/{step}', [SystemUpdateController::class, 'step'])
+                    ->whereIn('step', ['prepare', 'extract', 'swap', 'migrate', 'finish', 'rollback'])
+                    ->name('system-update.step');
+                Route::post('/system-update/discard',     [SystemUpdateController::class, 'discard'])->name('system-update.discard');
+            });
 
             // Impersonation start (admin only)
             Route::post('/impersonate/{target}',   [ImpersonateController::class, 'start'])->name('impersonate.start');

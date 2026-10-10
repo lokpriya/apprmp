@@ -40,3 +40,6 @@ database/sql/
 deploy/*.sql
 deploy/*.sql.gz
 deploy/run.php
+
+# One-file update packages built by `php artisan update:build`
+/updates
