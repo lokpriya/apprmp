@@ -299,18 +299,43 @@ class CrossTabService
                 $labelKeyMap[strtolower($k)] = $k;
             }
 
-            $result = [];
+            // Merge rows that resolve to the same label, exactly as tab() does.
+            //
+            // tab() gained this in September for the Kobo alias keys ("राष्ट्रिय
+            // ग्रिड" appearing three times on the development-index report), but
+            // freq() was left emitting one row per distinct value. Any two option
+            // slugs sharing a label therefore split a single real category across
+            // two rows of the same name — visibly wrong, and the totals look
+            // halved. Found on aamchowk, where institution_type carries both
+            // agro_vet_form and agri_vet_group under the identical Nepali label
+            // "कृषि तथा पशुपालन समूह".
+            //
+            // Counts are summed, never dropped: records exist under both slugs.
+            $byLabel = [];
             foreach ($rows as $row) {
                 $key = (string)$row->_val;
                 if (!$key) continue;
                 // Normalize to canonical label key (case-insensitive)
                 $canonKey = $labelKeyMap[strtolower($key)] ?? null;
-                $result[] = [
+                $label    = $canonKey !== null ? ($labelDef[$canonKey] ?? $key) : $key;
+
+                if (isset($byLabel[$label])) {
+                    $byLabel[$label]['count'] += (int)$row->cnt;
+                    continue;
+                }
+
+                $byLabel[$label] = [
                     'key'   => $key,
-                    'label' => ($canonKey !== null ? ($labelDef[$canonKey] ?? $key) : $key),
+                    'label' => $label,
                     'count' => (int)$row->cnt,
                 ];
             }
+
+            // Merging can reorder, so restore the count-descending order freq()
+            // has always returned.
+            $result = array_values($byLabel);
+            usort($result, fn($a, $b) => $b['count'] <=> $a['count']);
+
             return $result;
         };
 
