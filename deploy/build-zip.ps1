@@ -61,7 +61,17 @@ $Targets = @{
         LaravelRoot = '/home2/prayaspr/rong'
         WebRoot     = 'public_html/rong'
         AppUrl      = 'https://rong.prayasprarambha.com.np'
-        DbName      = 'prayaspr_rongdata'
+        # Corrected 2026-10-10. The database was listed as prayaspr_rongdata,
+        # which matches the deploy target name rather than the database. Three
+        # sources agree on prayaspr_rongprofile: the live phpMyAdmin, the header
+        # of deploy/rong-migrate.sql (which ran successfully in September), and
+        # both prayaspr_rongprofile*.sql.gz dumps.
+        DbName      = 'prayaspr_rongprofile'
+        # UNVERIFIED — carried over from the old, wrong DbName. On this account
+        # one user serves several databases (prayaspr_orionanugraha covers both
+        # aathrai and aamchowk), so do not assume it matches DbName. Read it from
+        # /home2/prayaspr/rong/.env before any fresh install:
+        #   grep -E '^DB_(DATABASE|USERNAME)=' /home2/prayaspr/rong/.env
         DbUser      = 'prayaspr_rongdata'
         ZipName     = 'rongdata-deploy.zip'
         InstallUrl  = 'https://rong.prayasprarambha.com.np/install.php'
