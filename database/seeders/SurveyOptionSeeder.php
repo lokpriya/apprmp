@@ -48,6 +48,16 @@ class SurveyOptionSeeder extends Seeder
                 ['school',          'विद्यालय',                    'School'],
                 ['health_post',     'स्वास्थ्य चौकी/अस्पताल',     'Health Post/Hospital'],
                 ['bank',            'बैंक/वित्तीय संस्था',         'Bank/Financial Inst.'],
+                // tole_bikas, agro_vet_form and child_club had been added by hand
+                // through the admin UI on each live site and existed in no seeder,
+                // so a fresh install started without them — yet they are the most
+                // used types in the field. On Rong they account for 90 of 193
+                // institutions (tole_bikas 56, agro_vet_form 28, child_club 6).
+                // Without them an imported institution shows its raw slug instead
+                // of a Nepali label on the संस्था प्रकार report.
+                // Order matches what the live sites display.
+                ['tole_bikas',      'टोल विकास संस्था',            'Tole Bikas Sanstha'],
+                ['agro_vet_form',   'कृषि तथा पशुपालन समूह',      'Agri-Vet Occupation Group'],
                 ['cooperative',     'सहकारी',                      'Cooperative'],
                 ['govt_office',     'सरकारी कार्यालय',             'Govt. Office'],
                 ['ngo_cbo',         'गैसस/एनजीओ/सीबीओ',           'NGO/CBO'],
@@ -59,6 +69,7 @@ class SurveyOptionSeeder extends Seeder
                 ['media',           'मिडिया/सञ्चार',               'Media/Communication'],
                 ['forest_group',    'वन उपभोक्ता समूह',            'Forest User Group'],
                 ['sports_club',     'खेल संस्था/क्लब',             'Sports Club'],
+                ['child_club',      'बाल क्लब',                    'Child Club'],
                 ['other',           'अन्य',                        'Other'],
             ],
 
