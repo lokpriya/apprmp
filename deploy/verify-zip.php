@@ -35,12 +35,18 @@ const RELEASE_CHECKS = [
     'resources/js/pages/Institutions/Index.vue'             => ['visibleSettlements'],
     'resources/js/pages/Households/Form.vue'                => ['hasSingleWard'],
     'deploy/run-health.php'                                 => ['health:backfill'],
+    // ── 8fba0ca + 767f2c9  health facility report ────────────────────────────
+    'app/Http/Controllers/Public/InstitutionReportController.php'
+        => ['HEALTH_INSTITUTION_TYPES', 'facilities_with_detail'],
+    'resources/js/pages/Public/InstitutionReports/Show.vue' => ['healthDetailMissing'],
+    'resources/js/i18n/ne.js'                               => ['healthDetailMissingTitle'],
 ];
 
 /** Strings that must appear in the COMPILED bundle, proving npm run build ran. */
 const BUILT_BUNDLE_CHECKS = [
-    'सबै टोल'                   => 'institution tole filter',
-    'तपाईंलाई तोकिएको वडा'     => 'single-ward auto-select hint',
+    'सबै टोल'                                      => 'institution tole filter',
+    'तपाईंलाई तोकिएको वडा'                        => 'single-ward auto-select hint',
+    'संस्थाको विस्तृत विवरण अभिलेख भएको छैन'      => 'health "not recorded" notice',
 ];
 
 // ── Arguments ────────────────────────────────────────────────────────────────
