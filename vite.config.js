@@ -45,6 +45,15 @@ export default defineConfig({
                 lang: 'ne',
                 scope: '/',
                 start_url: '/public',
+                // Long-press on the installed icon: straight to the field lookup.
+                shortcuts: [
+                    {
+                        name: 'सदस्य खोज',
+                        short_name: 'सदस्य खोज',
+                        url: '/member-search',
+                        icons: [{ src: '/pwa-192.png', sizes: '192x192', type: 'image/png' }],
+                    },
+                ],
                 icons: [
                     {
                         src: '/pwa-192.png',

@@ -187,6 +187,9 @@ class HandleInertiaRequests extends Middleware
                   )
                 : 0,
 
+            // Sidebar link to सदस्य खोज
+            'canMemberSearch' => fn () => (bool) $request->user()?->hasPermission('members.search'),
+
             // User manual gear link visibility — super_admin can toggle; cached 60 s
             'showUserManual' => fn () => $request->user()?->local_government_id
                 ? Cache::remember('show_user_manual_' . $request->user()->local_government_id, 60,

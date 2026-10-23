@@ -90,6 +90,10 @@
           />
         </template>
 
+        <!-- ── Member search (read-only lookup) ── -->
+        <NavItem v-if="canMemberSearch" href="/member-search" icon="fa-solid fa-magnifying-glass"
+                 label="सदस्य खोज" :collapsed="collapsed" />
+
         <!-- ── Review and Publish ── -->
         <template v-if="['ward_reviewer','ward_admin','municipal_admin','super_admin'].includes(userRole)">
           <div class="mb-1 mt-3">
@@ -626,6 +630,13 @@
               <div class="h-px bg-white/10 my-2"></div>
             </template>
 
+            <!-- Member search -->
+            <a v-if="canMemberSearch" href="/member-search" @click="mobileNavOpen = false"
+              :class="['flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-medium transition no-underline',
+                page.url.startsWith('/member-search') ? 'bg-white/12 text-white' : 'text-white/65 hover:bg-white/8 hover:text-white']">
+              <i class="fa-solid fa-magnifying-glass w-4 text-center"></i> सदस्य खोज
+            </a>
+
             <!-- Review -->
             <template v-if="['ward_reviewer','ward_admin','municipal_admin','super_admin'].includes(userRole)">
               <p class="text-[10px] font-semibold text-white/30 uppercase tracking-widest px-3 py-1">Review</p>
@@ -1084,6 +1095,7 @@ function toggleCollapse() {
 
 // ── Feedback badge ─────────────────────────────────────────────────
 const feedbackNewCount     = computed(() => page.props.feedbackNewCount     ?? 0)
+const canMemberSearch      = computed(() => !!page.props.canMemberSearch)
 const pendingReviewsCount  = computed(() => page.props.pendingReviewsCount  ?? 0)
 
 // ── Impersonation ──────────────────────────────────────────────────

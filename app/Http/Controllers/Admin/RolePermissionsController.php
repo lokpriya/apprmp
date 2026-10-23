@@ -20,14 +20,11 @@ class RolePermissionsController extends Controller
     {
         abort_unless(auth()->user()->isSuperAdmin(), 403);
         $lg      = $this->lg();
-        $saved   = $lg->role_permissions ?? [];
-        $defaults = RolePermissions::defaults();
-
-        // Merge saved over defaults so first visit shows sensible defaults
+        // Saved lists over defaults, so the first visit shows sensible defaults
+        // and a permission added since the last save shows as it really applies.
         $rolePerms = [];
         foreach (RolePermissions::roles() as $role) {
-            $name = $role['name'];
-            $rolePerms[$name] = $saved[$name] ?? $defaults[$name] ?? [];
+            $rolePerms[$role['name']] = RolePermissions::effective($role['name'], $lg->role_permissions);
         }
 
         return Inertia::render('Admin/RolePermissions', [
@@ -47,7 +44,10 @@ class RolePermissionsController extends Controller
         ]);
 
         $lg  = $this->lg();
-        $all = $lg->role_permissions ?? RolePermissions::defaults();
+        // Resolve the existing lists first and apply this edit after: done the
+        // other way round, an untick of a newly added permission would be put
+        // straight back as an "undecided" default.
+        $all = RolePermissions::forSaving($lg->role_permissions ?? RolePermissions::defaults());
 
         $all[$request->role] = array_values(array_unique($request->permissions));
 

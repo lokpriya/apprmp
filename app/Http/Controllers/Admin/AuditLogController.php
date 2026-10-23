@@ -28,6 +28,7 @@ class AuditLogController extends Controller
         'impersonation_start' => 'प्रयोगकर्ता स्विच (सुरु)',
         'impersonation_stop'  => 'प्रयोगकर्ता स्विच (अन्त्य)',
         'google_sync'         => 'Google Sheets सिंक',
+        'member_search'       => 'सदस्य खोज',
     ];
 
     public function index(Request $request)

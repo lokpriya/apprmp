@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\HouseholdController;
+use App\Http\Controllers\MemberSearchController;
 use App\Http\Controllers\InstitutionController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\BusinessController;
@@ -226,6 +227,12 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
         Route::get('api/businesses/members',            [BusinessController::class, 'membersForHousehold']) ->name('businesses.api.members');
         Route::get('api/businesses/ward-settlements',   [BusinessController::class, 'settlementsForWard'])  ->name('businesses.api.ward-settlements');
     });
+
+    // ─── Member search (read-only, published households) ───────────────────
+    // Results carry full phone numbers: the controller checks members.search,
+    // scopes by ward and audits every search; the throttle stops scraping.
+    Route::middleware(['role:enumerator,ward_reviewer,ward_admin,municipal_admin,super_admin', 'throttle:30,1'])
+        ->get('member-search', [MemberSearchController::class, 'index'])->name('member-search');
 
     // ─── PDF Export ─────────────────────────────────────────────────────────
     Route::middleware(['role:enumerator,ward_reviewer,ward_admin,municipal_admin,super_admin'])->group(function () {

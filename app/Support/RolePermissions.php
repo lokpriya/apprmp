@@ -55,6 +55,15 @@ class RolePermissions
                 ],
             ],
             [
+                'key'   => 'members',
+                'label' => 'सदस्य खोज',
+                'icon'  => 'fa-solid fa-magnifying-glass',
+                'perms' => [
+                    'members.search'           => ['label' => 'खोज्ने (तोकिएको वडा)', 'en' => 'Search (assigned wards)'],
+                    'members.search_all_wards' => ['label' => 'सबै वडामा खोज्ने',     'en' => 'Search all wards'],
+                ],
+            ],
+            [
                 'key'   => 'users',
                 'label' => 'प्रयोगकर्ता',
                 'icon'  => 'fa-solid fa-users',
@@ -159,6 +168,8 @@ class RolePermissions
                 'households.view','households.create','households.edit','households.delete',
                 'households.submit','households.approve','households.reject','households.publish',
                 'households.mark_deceased',
+                // Member search
+                'members.search','members.search_all_wards',
                 // Institutions
                 'institutions.view','institutions.create','institutions.edit','institutions.delete',
                 'institutions.submit','institutions.approve','institutions.reject','institutions.publish',
@@ -192,6 +203,8 @@ class RolePermissions
                 'households.view','households.create','households.edit','households.delete',
                 'households.submit','households.approve','households.reject','households.publish',
                 'households.mark_deceased',
+                // Member search
+                'members.search',
                 // Institutions
                 'institutions.view','institutions.create','institutions.edit','institutions.delete',
                 'institutions.submit','institutions.approve','institutions.reject','institutions.publish',
@@ -213,6 +226,8 @@ class RolePermissions
             'ward_reviewer' => [
                 // Households
                 'households.view','households.approve','households.reject','households.mark_deceased',
+                // Member search
+                'members.search',
                 // Institutions
                 'institutions.view','institutions.approve','institutions.reject',
                 // Businesses
@@ -228,6 +243,8 @@ class RolePermissions
             'enumerator' => [
                 // Households
                 'households.view','households.create','households.edit','households.submit',
+                // Member search
+                'members.search',
                 // Institutions
                 'institutions.view','institutions.create','institutions.edit','institutions.submit',
                 // Businesses
@@ -236,6 +253,54 @@ class RolePermissions
                 'reports.view',
             ],
         ];
+    }
+
+    /**
+     * Permissions added after sites had already started saving their own lists.
+     *
+     * A saved list holds only what is granted, so a permission it does not
+     * mention reads as refused. For a permission that did not exist when the
+     * list was saved that is wrong: nobody refused it, nobody was ever asked.
+     * Lists saved before `_known` was recorded are taken to have decided every
+     * permission except these.
+     */
+    private const INTRODUCED_LATER = ['members.search', 'members.search_all_wards'];
+
+    /**
+     * The permissions a role actually has: its saved list, plus the defaults for
+     * any permission that list was saved without knowing about.
+     *
+     * @param array|null $saved local_governments.role_permissions
+     */
+    public static function effective(string $role, ?array $saved): array
+    {
+        $defaults = self::defaults()[$role] ?? [];
+        if (!isset($saved[$role])) return $defaults;
+
+        $known     = $saved['_known'] ?? array_diff(self::allPermissions(), self::INTRODUCED_LATER);
+        $undecided = array_diff(self::allPermissions(), $known);
+
+        return array_values(array_unique(array_merge(
+            $saved[$role],
+            array_intersect($defaults, $undecided),
+        )));
+    }
+
+    /**
+     * Prepare role_permissions for saving: every saved role resolved to what it
+     * effectively has today, and `_known` stamped, so that from now on a
+     * permission missing from a list really does mean the admin unticked it.
+     */
+    public static function forSaving(array $all): array
+    {
+        foreach (self::roles() as $role) {
+            if (isset($all[$role['name']])) {
+                $all[$role['name']] = self::effective($role['name'], $all);
+            }
+        }
+        $all['_known'] = self::allPermissions();
+
+        return $all;
     }
 
     public static function allPermissions(): array

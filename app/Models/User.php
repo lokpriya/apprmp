@@ -64,8 +64,7 @@ class User extends Authenticatable
     {
         if ($this->isSuperAdmin()) return true;
         $lg = $this->localGovernment;
-        $saved = $lg?->role_permissions ?? [];
-        $perms = $saved[$this->role] ?? \App\Support\RolePermissions::defaults()[$this->role] ?? [];
+        $perms = \App\Support\RolePermissions::effective($this->role, $lg?->role_permissions);
         return in_array($perm, $perms);
     }
 
