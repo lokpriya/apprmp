@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Imports\SurveyOptionsImport;
 use App\Models\LocalGovernment;
 use App\Models\SurveyOption;
+use App\Support\GuardsSettingsLock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,8 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class SurveyOptionsController extends Controller
 {
+    use GuardsSettingsLock;
+
     public function index(Request $request): \Inertia\Response
     {
         abort_unless(auth()->user()?->isSuperAdmin(), 403);
@@ -78,6 +81,7 @@ class SurveyOptionsController extends Controller
     public function store(Request $request)
     {
         abort_unless(auth()->user()?->isSuperAdmin(), 403);
+        $this->abortIfSettingsLocked();
 
         $data = $request->validate([
             'category'  => 'required|string',
@@ -107,6 +111,7 @@ class SurveyOptionsController extends Controller
     public function update(Request $request, SurveyOption $surveyOption)
     {
         abort_unless(auth()->user()?->isSuperAdmin(), 403);
+        $this->abortIfSettingsLocked();
 
         $data = $request->validate([
             'value'     => 'required|string|max:100|regex:/^[a-zA-Z0-9_\-]+$/',
@@ -133,6 +138,7 @@ class SurveyOptionsController extends Controller
     public function toggle(SurveyOption $surveyOption)
     {
         abort_unless(auth()->user()?->isSuperAdmin(), 403);
+        $this->abortIfSettingsLocked();
 
         $surveyOption->update(['is_active' => !$surveyOption->is_active]);
         $this->clearCaches($surveyOption->category);
@@ -144,6 +150,7 @@ class SurveyOptionsController extends Controller
     public function destroy(SurveyOption $surveyOption)
     {
         abort_unless(auth()->user()?->isSuperAdmin(), 403);
+        $this->abortIfSettingsLocked();
         $category = $surveyOption->category;
         $surveyOption->delete();
         $this->clearCaches($category);
@@ -155,6 +162,7 @@ class SurveyOptionsController extends Controller
     public function bulkDestroy(Request $request)
     {
         abort_unless(auth()->user()?->isSuperAdmin(), 403);
+        $this->abortIfSettingsLocked();
 
         $data = $request->validate([
             'ids'      => 'required|array|min:1|max:500',
@@ -177,6 +185,7 @@ class SurveyOptionsController extends Controller
     public function reorder(Request $request)
     {
         abort_unless(auth()->user()?->isAdmin() || auth()->user()?->isSuperAdmin(), 403);
+        $this->abortIfSettingsLocked();
 
         $data = $request->validate([
             'category'           => 'required|string',
@@ -204,6 +213,7 @@ class SurveyOptionsController extends Controller
     public function import(Request $request)
     {
         abort_unless(auth()->user()?->isSuperAdmin(), 403);
+        $this->abortIfSettingsLocked();
 
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls,csv|max:5120',

@@ -124,7 +124,7 @@
             <!-- Status toggle -->
             <td class="px-4 py-3">
               <button
-                v-if="user.id !== currentUserId"
+                v-if="user.id !== currentUserId && canManage(user)"
                 @click="confirmToggle(user)"
                 :title="user.is_active ? 'निष्क्रिय गर्नुहोस्' : 'सक्रिय गर्नुहोस्'"
                 :class="[
@@ -152,20 +152,20 @@
                   <i class="fa-solid fa-user-secret text-[11px]"></i>
                 </button>
                 <!-- Edit -->
-                <Link :href="`/admin/users/${user.id}/edit`"
+                <Link v-if="canManage(user)" :href="`/admin/users/${user.id}/edit`"
                   class="w-8 h-8 flex items-center justify-center rounded border border-[#e6e7e9] text-[#626976] hover:bg-[#206bc4] hover:text-white hover:border-[#206bc4] transition-colors"
                   title="सम्पादन">
                   <i class="fa-solid fa-pen text-[11px]"></i>
                 </Link>
                 <!-- Reset password -->
-                <button v-if="user.id !== currentUserId"
+                <button v-if="user.id !== currentUserId && canManage(user)"
                   @click="openResetPwd(user)"
                   class="w-8 h-8 flex items-center justify-center rounded border border-[#e6e7e9] text-[#626976] hover:bg-amber-500 hover:text-white hover:border-amber-500 transition-colors"
                   title="पासवर्ड रिसेट">
                   <i class="fa-solid fa-key text-[11px]"></i>
                 </button>
                 <!-- Delete -->
-                <button v-if="user.id !== currentUserId"
+                <button v-if="user.id !== currentUserId && canManage(user)"
                   @click="confirmDelete(user)"
                   class="w-8 h-8 flex items-center justify-center rounded border border-[#e6e7e9] text-[#626976] hover:bg-red-500 hover:text-white hover:border-red-500 transition-colors"
                   title="हटाउनुहोस्">
@@ -312,6 +312,11 @@ const props = defineProps({
 
 const page          = usePage()
 const currentUserId = page.props.auth?.user?.id
+
+// Only a super admin may change a super admin account (the server enforces it).
+function canManage(user) {
+  return user.role !== 'super_admin' || page.props.auth?.user?.role === 'super_admin'
+}
 
 // ── Filters ────────────────────────────────────────────────────────
 const filters = reactive({

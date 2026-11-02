@@ -33,8 +33,10 @@ class BusinessPolicy
         if ($user->isAdmin()) return true;
         if ($user->isWardAdmin())
             return in_array($business->ward_id, $user->getAssignedWardIds());
+        // A reviewer only within their own wards (see HouseholdPolicy::update).
         return in_array($business->status, ['draft', 'rejected', 'submitted'])
-            && ($user->isReviewer() || $business->enumerator_id === $user->id);
+            && (($user->isReviewer() && in_array($business->ward_id, $user->getAssignedWardIds()))
+                || $business->enumerator_id === $user->id);
     }
 
     public function delete(User $user, MemberBusiness $business): bool

@@ -41,7 +41,7 @@ const RELEASE_CHECKS = [
     'resources/js/pages/Public/InstitutionReports/Show.vue' => ['healthDetailMissing'],
     'resources/js/i18n/ne.js'                               => ['healthDetailMissingTitle'],
     // ── 1.8.0  one-file updater (must reach every site via this full ZIP) ────
-    'VERSION'                                               => ['1.8.1'],
+    'VERSION'                                               => ['1.8.2'],
     'config/updates.php'                                    => ["'public_key' => 'lcQX"],
     'app/Services/Updates/UpdateApplier.php'                => ['stepSwap'],
     'app/Http/Controllers/Admin/SystemUpdateController.php' => ['setMaintenance', 'recordFromState'],
@@ -51,6 +51,11 @@ const RELEASE_CHECKS = [
     'app/Http/Controllers/MemberSearchController.php'       => ['members.search_all_wards', 'settlement_id'],
     'app/Support/RolePermissions.php'                       => ['INTRODUCED_LATER', 'forSaving'],
     'public/manifest.webmanifest'                           => ['/member-search'],
+    // ── 1.8.2  permission audit fixes ────────────────────────────────────────
+    'app/Http/Controllers/Admin/UserController.php'         => ['guardTarget'],
+    'app/Support/GuardsSettingsLock.php'                    => ['abortIfSettingsLocked'],
+    'app/Http/Controllers/BusinessController.php'           => ['public function destroy', '$memberWardId'],
+    'resources/js/utils/escapeHtml.js'                      => ['highlightHtml'],
 ];
 
 /** Strings that must appear in the COMPILED bundle, proving npm run build ran. */

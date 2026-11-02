@@ -177,6 +177,16 @@ class BusinessController extends Controller
             'business_field'      => 'nullable|string|max:80',
         ]);
 
+        // The business is filed in the member's household's ward, so that is the
+        // ward to check. Without this an enumerator could post any member id and
+        // file a business into a ward they were never assigned.
+        $memberWardId = HouseholdMember::whereKey($request->household_member_id)
+            ->join('households', 'households.id', '=', 'household_members.household_id')
+            ->value('households.ward_id');
+        if (!in_array((int) $memberWardId, array_map('intval', $this->scopedWardIds()), true)) {
+            return back()->withErrors(['household_member_id' => 'तपाईंलाई यो वडामा विवरण दर्ता गर्ने अनुमति छैन।']);
+        }
+
         // Prevent duplicate
         $exists = MemberBusiness::where('household_member_id', $request->household_member_id)->exists();
         if ($exists) {
@@ -311,7 +321,9 @@ class BusinessController extends Controller
 
     public function submit(Request $request, MemberBusiness $business)
     {
-        $this->authorizeWard($business->ward_id);
+        // As households and institutions do: whoever may edit the record may
+        // submit it — an enumerator their own, a reviewer within their wards.
+        $this->authorize('update', $business);
         abort_unless(in_array($business->status, ['draft', 'rejected']), 422, 'केवल मस्यौदा वा अस्वीकृत रेकर्ड पेस गर्न सकिन्छ।');
 
         $missing = $this->validateForSubmission($business);
@@ -420,6 +432,28 @@ class BusinessController extends Controller
 
     /* ── Publish (admin) ─────────────────────────────────────────────────── */
 
+    /**
+     * Route::resource registered DELETE /businesses/{id} but there was no
+     * method behind it, so every delete was a 500. Same rule as institutions:
+     * drafts only, through the policy.
+     */
+    public function destroy(MemberBusiness $business)
+    {
+        $this->authorize('delete', $business);
+
+        if ($business->status !== 'draft') {
+            return back()->with('error', 'मस्यौदा व्यवसाय मात्र मेटाउन सकिन्छ।');
+        }
+
+        $business->delete();
+
+        // Creating the business set this flag; one business per member, so undo it.
+        HouseholdMember::whereKey($business->household_member_id)->update(['involveinbusiness' => false]);
+
+        return redirect()->route('businesses.index')
+            ->with('success', "व्यवसाय {$business->unique_code} मेटाइयो।");
+    }
+
     public function publish(Request $request, MemberBusiness $business)
     {
         $this->authorize('publish', $business);
@@ -438,6 +472,8 @@ class BusinessController extends Controller
             $biz = MemberBusiness::find($id);
             if (!$biz || $biz->status !== 'draft') { $skipped++; continue; }
             if (!$user->isAdmin() && !in_array($biz->ward_id, $wardIds)) { $skipped++; continue; }
+            // An enumerator submits only their own drafts, as for households.
+            if ($user->isEnumerator() && (int) $biz->enumerator_id !== (int) $user->id) { $skipped++; continue; }
             try { $this->workflow->submit($biz, $user); $count++; }
             catch (\Throwable) { $skipped++; }
         }
@@ -485,12 +521,5 @@ class BusinessController extends Controller
         }
 
         return back()->with('success', "{$count} व्यवसाय अस्वीकार भयो।" . ($skipped ? " ({$skipped} छोडियो)" : ''));
-    }
-
-    /* ── Auth helper ──────────────────────────────────────────────────────── */
-
-    private function authorizeWard(int $wardId): void
-    {
-        abort_unless(in_array($wardId, $this->scopedWardIds()), 403);
     }
 }

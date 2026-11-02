@@ -5,15 +5,19 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\LocalGovernment;
 use App\Models\Ward;
+use App\Support\GuardsSettingsLock;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class SurveyRoundController extends Controller
 {
+    use GuardsSettingsLock;
+
     public function store(Request $request): RedirectResponse
     {
         abort_unless(auth()->user()->hasPermission('settings.general'), 403);
+        $this->abortIfSettingsLocked();
 
         $request->validate([
             'label_np' => 'required|string|max:100',
@@ -106,6 +110,7 @@ class SurveyRoundController extends Controller
     public function destroy(int $number): RedirectResponse
     {
         abort_unless(auth()->user()->hasPermission('settings.general'), 403);
+        $this->abortIfSettingsLocked();
 
         $lg = LocalGovernment::getFirstCached();
         abort_unless($lg, 404);

@@ -263,6 +263,7 @@
 import { ref, reactive, computed, h } from 'vue'
 import { useLocale } from '@/i18n/index.js'
 import PublicLayout from '@/layouts/PublicLayout.vue'
+import { highlightHtml } from '@/utils/escapeHtml.js'
 
 defineOptions({ layout: PublicLayout })
 
@@ -314,9 +315,7 @@ const filtered = computed(() => {
 
 // ── Search highlight ─────────────────────────────────────────────────────────
 function highlight(text) {
-  if (!search.value.trim() || !text) return text
-  const q = search.value.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  return text.replace(new RegExp(q, 'gi'), m => `<mark class="bg-cyan-100 text-cyan-700 rounded px-0.5">${m}</mark>`)
+  return highlightHtml(text, search.value, 'bg-cyan-100 text-cyan-700 rounded px-0.5')
 }
 
 // ── Label helpers ─────────────────────────────────────────────────────────────

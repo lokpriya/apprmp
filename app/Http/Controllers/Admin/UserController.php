@@ -13,6 +13,25 @@ use Inertia\Inertia;
 
 class UserController extends Controller
 {
+    /**
+     * May the signed-in admin act on this account at all?
+     *
+     * Every action below used to take the {user} from the URL as given. A
+     * municipal admin could therefore demote, deactivate, delete, re-email or
+     * reset the password of the super admin — the one account meant to sit
+     * above them. Only a super admin may change a super admin account, and
+     * nobody may reach an account in another municipality.
+     */
+    private function guardTarget(User $user): void
+    {
+        $actor = auth()->user();
+
+        abort_if($user->isSuperAdmin() && !$actor->isSuperAdmin(), 403,
+            'सुपर एडमिनको खाता सुपर एडमिनले मात्र परिवर्तन गर्न सक्छ।');
+        abort_if(!$actor->isSuperAdmin()
+            && (int) $user->local_government_id !== (int) $actor->local_government_id, 403);
+    }
+
     public function index(Request $request)
     {
         $query = User::with('assignedWards')
@@ -93,6 +112,7 @@ class UserController extends Controller
 
     public function show(User $user)
     {
+        $this->guardTarget($user);
         $user->load('assignedWards');
         $wards = Ward::where('local_government_id', auth()->user()->local_government_id)
             ->orderBy('ward_number')->get(['id', 'ward_number', 'ward_chairperson']);
@@ -107,6 +127,7 @@ class UserController extends Controller
 
     public function edit(User $user)
     {
+        $this->guardTarget($user);
         $wards = Ward::where('local_government_id', auth()->user()->local_government_id)
             ->orderBy('ward_number')->get(['id', 'ward_number', 'ward_chairperson']);
         $assignedWardIds = $user->assignedWards()->pluck('wards.id')->toArray();
@@ -120,10 +141,16 @@ class UserController extends Controller
 
     public function update(Request $request, User $user)
     {
+        $this->guardTarget($user);
+
+        // A super admin's role is not editable here: the role list deliberately
+        // has no super_admin, so saving the form would otherwise demote them.
+        $keepsRole = $user->isSuperAdmin();
+
         $data = $request->validate([
             'name'       => 'required|string|max:200',
             'email'      => "required|email|unique:users,email,{$user->id}",
-            'role'       => 'required|in:enumerator,ward_reviewer,ward_admin,municipal_admin',
+            'role'       => $keepsRole ? 'nullable' : 'required|in:enumerator,ward_reviewer,ward_admin,municipal_admin',
             'phone'      => 'nullable|string|max:15',
             'ward_ids'   => 'nullable|array',
             'ward_ids.*' => 'integer|exists:wards,id',
@@ -133,9 +160,10 @@ class UserController extends Controller
         $updateData = [
             'name'      => $data['name'],
             'email'     => $data['email'],
-            'role'      => $data['role'],
+            'role'      => $keepsRole ? $user->role : $data['role'],
             'phone'     => $data['phone'] ?? null,
-            'is_active' => $request->boolean('is_active'),
+            // Nobody can switch off their own account from this form.
+            'is_active' => $user->id === auth()->id() ? true : $request->boolean('is_active'),
         ];
 
         if (!empty($data['password'])) {
@@ -155,6 +183,7 @@ class UserController extends Controller
 
     public function destroy(User $user)
     {
+        $this->guardTarget($user);
         if ($user->id === auth()->id()) {
             return back()->with('error', 'You cannot delete your own account.');
         }
@@ -164,6 +193,7 @@ class UserController extends Controller
 
     public function toggleActive(User $user)
     {
+        $this->guardTarget($user);
         if ($user->id === auth()->id()) {
             return back()->with('error', 'You cannot deactivate your own account.');
         }
@@ -174,6 +204,7 @@ class UserController extends Controller
 
     public function resetPassword(Request $request, User $user)
     {
+        $this->guardTarget($user);
         $data = $request->validate([
             'password' => ['required', 'confirmed', Password::min(8)],
         ]);

@@ -34,8 +34,12 @@ class HouseholdPolicy
         if ($user->isAdmin()) return true;
         if ($user->isWardAdmin())
             return in_array($household->ward_id, $user->getAssignedWardIds());
+        // A reviewer only within their own wards. This used to read
+        // `$user->isReviewer() || …`, which let a reviewer edit any ward's
+        // record the moment the edit permission was ticked for their role.
         return in_array($household->status, ['draft', 'rejected', 'submitted'])
-            && ($user->isReviewer() || $household->enumerator_id === $user->id);
+            && (($user->isReviewer() && in_array($household->ward_id, $user->getAssignedWardIds()))
+                || $household->enumerator_id === $user->id);
     }
 
     public function delete(User $user, Household $household): bool

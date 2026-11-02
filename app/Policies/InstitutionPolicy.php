@@ -34,8 +34,10 @@ class InstitutionPolicy
         if ($user->isAdmin()) return true;
         if ($user->isWardAdmin())
             return in_array($institution->ward_id, $user->getAssignedWardIds());
+        // A reviewer only within their own wards (see HouseholdPolicy::update).
         return in_array($institution->status, ['draft', 'rejected', 'submitted'])
-            && ($user->isReviewer() || $institution->enumerator_id === $user->id);
+            && (($user->isReviewer() && in_array($institution->ward_id, $user->getAssignedWardIds()))
+                || $institution->enumerator_id === $user->id);
     }
 
     public function delete(User $user, Institution $institution): bool

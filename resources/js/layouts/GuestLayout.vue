@@ -89,6 +89,7 @@
 <script setup>
 import { computed } from 'vue'
 import { usePage } from '@inertiajs/vue3'
+import { escapeHtml } from '@/utils/escapeHtml.js'
 
 const page = usePage()
 const lg = computed(() => page.props.lg ?? null)
@@ -99,11 +100,14 @@ const highlightWord = computed(() =>
   (branding.value.highlight_word || 'story').trim()
 )
 
+// The headline is admin-entered and rendered with v-html: escape it before
+// adding the highlight span, or it can run script on the login page.
 function applyHighlight(line) {
-  const word = highlightWord.value
-  if (!word || !line) return line
+  const safe = escapeHtml(line)
+  const word = escapeHtml(highlightWord.value)
+  if (!word || !safe) return safe
   const re = new RegExp(`(${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'i')
-  return line.replace(re, '<span class="text-orange-400">$1</span>')
+  return safe.replace(re, '<span class="text-orange-400">$1</span>')
 }
 
 const headlineLine1Html = computed(() =>

@@ -78,10 +78,12 @@
             <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
               भूमिका <span class="text-red-400">*</span>
             </label>
-            <select v-model="form.role" required
-              class="w-full px-3 py-2.5 rounded-md border text-sm transition-colors focus:ring-2 focus:ring-[#206bc4]/30 focus:border-[#206bc4]"
+            <!-- A super admin's role cannot be changed here (the server keeps it). -->
+            <select v-model="form.role" required :disabled="form.role === 'super_admin'"
+              class="w-full px-3 py-2.5 rounded-md border text-sm transition-colors focus:ring-2 focus:ring-[#206bc4]/30 focus:border-[#206bc4] disabled:bg-gray-50"
               :class="form.errors.role ? 'border-red-400' : 'border-[#e6e7e9]'">
               <option value="">भूमिका छान्नुहोस्</option>
+              <option v-if="form.role === 'super_admin'" value="super_admin">Super Admin</option>
               <option value="municipal_admin">Municipal Admin</option>
               <option value="ward_admin">Ward Admin</option>
               <option value="ward_reviewer">Ward Reviewer</option>

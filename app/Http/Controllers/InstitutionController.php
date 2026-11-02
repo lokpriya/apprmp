@@ -411,6 +411,8 @@ class InstitutionController extends Controller
             $inst = Institution::find($id);
             if (!$inst || $inst->status !== 'draft') { $skipped++; continue; }
             if (!$user->isAdmin() && !in_array($inst->ward_id, $wardIds)) { $skipped++; continue; }
+            // An enumerator submits only their own drafts, as for households.
+            if ($user->isEnumerator() && (int) $inst->enumerator_id !== (int) $user->id) { $skipped++; continue; }
             try { $this->workflow->submit($inst, $user); $count++; }
             catch (\Throwable) { $skipped++; }
         }

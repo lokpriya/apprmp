@@ -1361,6 +1361,7 @@ class SettingsController extends Controller
     public function updateUserManual(Request $request): RedirectResponse
     {
         abort_unless(auth()->user()?->isSuperAdmin(), 403);
+        $this->abortIfLocked();
         $lg      = $this->lg();
         $config  = $lg->welcome_config ?? [];
         $config['show_user_manual'] = $request->boolean('show_user_manual');
@@ -1449,6 +1450,9 @@ class SettingsController extends Controller
     public function importSettings(Request $request): RedirectResponse
     {
         abort_unless(auth()->user()?->isAdmin(), 403);
+        // Import rewrites up to 14 sections at once — the biggest change the
+        // settings page can make, and it was the one action that ignored the lock.
+        $this->abortIfLocked();
 
         $request->validate([
             'file'       => 'required|file|max:2048',
