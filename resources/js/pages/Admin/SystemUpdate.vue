@@ -29,7 +29,7 @@
     </div>
 
     <!-- 1. Upload -->
-    <div v-if="keyConfigured && !state" class="bg-white border border-[#e6e7e9] rounded-md p-5">
+    <div v-if="keyConfigured && canUpload" class="bg-white border border-[#e6e7e9] rounded-md p-5">
       <h2 class="text-[13px] font-semibold text-[#1d273b] mb-1">१. अद्यावधिक प्याकेज छान्नुहोस्</h2>
       <p class="text-[11px] text-[#9aa0ac] mb-4">
         <code>apprmp-update-x.y.z.zip</code> — the package is checked for a valid signature, matching
@@ -88,7 +88,7 @@
     </div>
 
     <!-- 3. Progress -->
-    <div v-if="state && state.status !== 'verified'" class="bg-white border border-[#e6e7e9] rounded-md p-5">
+    <div v-if="state && state.status !== 'verified' && !isHistory" class="bg-white border border-[#e6e7e9] rounded-md p-5">
       <h2 class="text-[13px] font-semibold text-[#1d273b] mb-3">
         ३. {{ state.from_version }} → {{ state.version }}
       </h2>
@@ -219,6 +219,16 @@ const error   = ref(null)
 const fileInput = ref(null)
 
 const canResume   = computed(() => !busy.value && state.value && NEXT[state.value.status] && state.value.status !== 'verified')
+// A finished or rolled-back update is history once the page has been reloaded:
+// its result is in अद्यावधिक इतिहास, and the upload box must come back. Up to
+// 1.9.0 the box stayed hidden after every successful update until the state
+// was discarded by hand, which nothing on the page offered (found on rong).
+// Right after an update ends in this visit, its result panel is still shown.
+const endedHere = ref(false)
+const isHistory = computed(() =>
+  !!state.value && ['finished', 'rolled_back'].includes(state.value.status) && !endedHere.value)
+const canUpload = computed(() => !state.value || isHistory.value)
+
 const canRollback = computed(() => !busy.value && state.value && ['prepared', 'extracted', 'swapped', 'migrated', 'failed'].includes(state.value.status))
 
 function stepStatus(key) {
@@ -317,6 +327,7 @@ async function runStep(step) {
 async function applyAll() {
   busy.value = true
   error.value = null
+  endedHere.value = true
   try {
     while (state.value && NEXT[state.value.status]) {
       const ok = await runStep(NEXT[state.value.status])
@@ -334,6 +345,7 @@ async function applyAll() {
 
 async function rollback() {
   if (!confirm('Restore the files from before this update?')) return
+  endedHere.value = true
   busy.value = true
   error.value = null
   try {

@@ -41,7 +41,7 @@ const RELEASE_CHECKS = [
     'resources/js/pages/Public/InstitutionReports/Show.vue' => ['healthDetailMissing'],
     'resources/js/i18n/ne.js'                               => ['healthDetailMissingTitle'],
     // ── 1.8.0  one-file updater (must reach every site via this full ZIP) ────
-    'VERSION'                                               => ['1.9.0'],
+    'VERSION'                                               => ['1.9.1'],
     'config/updates.php'                                    => ["'public_key' => 'lcQX"],
     'app/Services/Updates/UpdateApplier.php'                => ['stepSwap'],
     'app/Http/Controllers/Admin/SystemUpdateController.php' => ['setMaintenance', 'recordFromState'],
@@ -57,7 +57,7 @@ const RELEASE_CHECKS = [
     'app/Http/Controllers/BusinessController.php'           => ['public function destroy', '$memberWardId'],
     'resources/js/utils/escapeHtml.js'                      => ['highlightHtml'],
     // ── 1.8.3  update page fix + institution empty counts ───────────────────
-    'resources/js/pages/Admin/SystemUpdate.vue'              => ['import axios from', 'describeForeignReply'],
+    'resources/js/pages/Admin/SystemUpdate.vue'              => ['import axios from', 'describeForeignReply', 'isHistory'],
     'app/Services/InstitutionService.php'                   => ['forNewRow'],
     // ── 1.9.0  श्रमदान module, phases 1+2 (off by default) ──────────────────
     'app/Support/Modules.php'                               => ['SHRAMDAAN'],
