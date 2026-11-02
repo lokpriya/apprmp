@@ -41,7 +41,7 @@ const RELEASE_CHECKS = [
     'resources/js/pages/Public/InstitutionReports/Show.vue' => ['healthDetailMissing'],
     'resources/js/i18n/ne.js'                               => ['healthDetailMissingTitle'],
     // ── 1.8.0  one-file updater (must reach every site via this full ZIP) ────
-    'VERSION'                                               => ['1.8.2'],
+    'VERSION'                                               => ['1.8.3'],
     'config/updates.php'                                    => ["'public_key' => 'lcQX"],
     'app/Services/Updates/UpdateApplier.php'                => ['stepSwap'],
     'app/Http/Controllers/Admin/SystemUpdateController.php' => ['setMaintenance', 'recordFromState'],
@@ -56,6 +56,9 @@ const RELEASE_CHECKS = [
     'app/Support/GuardsSettingsLock.php'                    => ['abortIfSettingsLocked'],
     'app/Http/Controllers/BusinessController.php'           => ['public function destroy', '$memberWardId'],
     'resources/js/utils/escapeHtml.js'                      => ['highlightHtml'],
+    // ── 1.8.3  update page fix + institution empty counts ───────────────────
+    'resources/js/pages/Admin/SystemUpdate.vue'              => ['import axios from', 'describeForeignReply'],
+    'app/Services/InstitutionService.php'                   => ['forNewRow'],
 ];
 
 /** Strings that must appear in the COMPILED bundle, proving npm run build ran. */
@@ -65,6 +68,7 @@ const BUILT_BUNDLE_CHECKS = [
     'संस्थाको विस्तृत विवरण अभिलेख भएको छैन'      => 'health "not recorded" notice',
     'प्रणाली अद्यावधिक'                            => 'system update page',
     'टोलका सबै घरधुरी हेर्नुहोस्'                 => 'member search with tole filter',
+    'The page failed before contacting the server' => 'update page error reporting (1.8.3)',
 ];
 
 // ── Arguments ────────────────────────────────────────────────────────────────

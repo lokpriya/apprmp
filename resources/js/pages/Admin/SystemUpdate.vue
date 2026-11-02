@@ -179,6 +179,15 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import axios from 'axios'
+
+// Imported, not window.axios: window.axios is set up only by app.js (the Blade
+// pages). Inertia pages load inertia.js, so on this page window.axios was
+// undefined, the very first upload threw in the browser before any request
+// left, and the page reported it as a server problem. Found on rong, 1.8.1→1.8.2.
+const http = axios.create({
+  headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+})
 
 const props = defineProps({
   currentVersion: { type: String, required: true },
@@ -241,7 +250,36 @@ function handleError(e) {
   if (e?.response?.data?.state) state.value = e.response.data.state
   error.value = e?.response?.data?.message
     ?? e?.response?.data?.errors?.package?.[0]
-    ?? 'The server did not respond as expected. Check the log before retrying.'
+    ?? describeForeignReply(e)
+}
+
+/**
+ * A reply with no Laravel message did not come from the application — a host
+ * firewall (Imunify360 / ModSecurity), a web-server size limit or a resource
+ * kill answered instead, and nothing reaches storage/logs. Show the status and
+ * the page's title so the cause can be named rather than guessed.
+ */
+function describeForeignReply(e) {
+  const status = e?.response?.status
+  // Not an HTTP failure at all: the page itself threw before or while sending.
+  if (!status && !e?.request) {
+    return `The page failed before contacting the server: ${e?.message ?? e}. Nothing was changed.`
+  }
+  if (!status) {
+    return 'No reply from the server (connection closed). A hosting firewall or resource limit may have stopped the request.'
+  }
+  const body  = typeof e.response.data === 'string' ? e.response.data : ''
+  const title = body.match(/<title[^>]*>([^<]{1,120})<\/title>/i)?.[1]?.trim()
+    ?? body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)
+  const hint = {
+    403: 'blocked before reaching the application — usually the hosting firewall',
+    406: 'blocked by the hosting firewall (ModSecurity)',
+    413: 'the upload is larger than the web server allows',
+    503: 'the hosting resource limit stopped the request',
+    508: 'the hosting resource limit stopped the request',
+  }[status]
+  return `Server replied ${status}${hint ? ` — ${hint}` : ''}.` + (title ? ` (“${title}”)` : '') +
+    ' Nothing was changed.'
 }
 
 async function upload() {
@@ -251,7 +289,7 @@ async function upload() {
   try {
     const form = new FormData()
     form.append('package', file.value)
-    const { data } = await window.axios.post('/admin/system-update/upload', form)
+    const { data } = await http.post('/admin/system-update/upload', form)
     state.value = data.state
   } catch (e) {
     handleError(e)
@@ -263,7 +301,7 @@ async function upload() {
 async function runStep(step) {
   running.value = step
   try {
-    const { data } = await window.axios.post(`/admin/system-update/step/${step}`)
+    const { data } = await http.post(`/admin/system-update/step/${step}`)
     state.value = data.state
     return true
   } catch (e) {
@@ -308,7 +346,7 @@ async function rollback() {
 async function discard() {
   busy.value = true
   try {
-    await window.axios.post('/admin/system-update/discard')
+    await http.post('/admin/system-update/discard')
     state.value = null
     file.value = null
     if (fileInput.value) fileInput.value.value = ''

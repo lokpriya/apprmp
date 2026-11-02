@@ -101,7 +101,7 @@ class InstitutionService
             $institution->services()->delete();
             foreach ($data['services'] as $item) {
                 if (!empty($item['service_name'])) {
-                    $institution->services()->create($this->nullifyEmpty($item));
+                    $institution->services()->create($this->forNewRow($item));
                 }
             }
         }
@@ -110,7 +110,7 @@ class InstitutionService
             $institution->staff()->delete();
             foreach ($data['staff'] as $item) {
                 if (!empty($item['staff_category'])) {
-                    $institution->staff()->create($this->nullifyEmpty($item));
+                    $institution->staff()->create($this->forNewRow($item));
                 }
             }
         }
@@ -119,7 +119,7 @@ class InstitutionService
             $institution->education()->delete();
             foreach ($data['education'] as $item) {
                 if (!empty($item['grade'])) {
-                    $institution->education()->create($this->nullifyEmpty($item));
+                    $institution->education()->create($this->forNewRow($item));
                 }
             }
         }
@@ -128,5 +128,17 @@ class InstitutionService
     private function nullifyEmpty(array $data): array
     {
         return array_map(fn($v) => ($v === '' ? null : $v), $data);
+    }
+
+    /**
+     * For a freshly created child row: drop empty fields so the column default
+     * applies. The count columns (students, scholarship, dropout, staff) are
+     * NOT NULL DEFAULT 0, so sending an empty box as NULL failed the whole save
+     * — rong's log shows four of these in September 2026, each one an education
+     * row that was never stored.
+     */
+    private function forNewRow(array $data): array
+    {
+        return array_filter($this->nullifyEmpty($data), fn($v) => $v !== null);
     }
 }
