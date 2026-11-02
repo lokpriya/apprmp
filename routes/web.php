@@ -3,6 +3,9 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\HouseholdController;
 use App\Http\Controllers\MemberSearchController;
+use App\Http\Controllers\ShramdaanController;
+use App\Http\Controllers\ShramdaanManageController;
+use App\Http\Controllers\Admin\ModulesController;
 use App\Http\Controllers\InstitutionController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\BusinessController;
@@ -189,6 +192,11 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
             'enumerator'      => redirect()->route('households.index'),
             'ward_reviewer'   => redirect()->route('review.index'),
             'ward_admin'      => redirect()->route('households.index'),
+            // A coordinator has nothing else to land on; with the module off
+            // they are told so rather than shown a bare 404.
+            'tole_coordinator' => \App\Support\Modules::enabled(\App\Support\Modules::SHRAMDAAN, auth()->user()->local_government_id)
+                ? redirect()->route('shramdaan.index')
+                : abort(403, 'श्रमदान मोड्युल यस पालिकामा अहिले सक्रिय छैन।'),
             'municipal_admin',
             'super_admin'     => redirect()->route('admin.dashboard'),
             default           => view('dashboard'),
@@ -233,6 +241,30 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
     // scopes by ward and audits every search; the throttle stops scraping.
     Route::middleware(['role:enumerator,ward_reviewer,ward_admin,municipal_admin,super_admin', 'throttle:30,1'])
         ->get('member-search', [MemberSearchController::class, 'index'])->name('member-search');
+
+    // ─── श्रमदान पासबुक (optional module) ─────────────────────────────────────
+    // Exists only where a super admin switched the module on (404 otherwise);
+    // the controller checks shramdaan.* permissions and limits every query to
+    // ShramdaanAccess::settlementIds(). Enumerators are deliberately absent.
+    Route::middleware(['role:tole_coordinator,ward_reviewer,ward_admin,municipal_admin,super_admin', 'module:shramdaan'])
+        ->prefix('shramdaan')->name('shramdaan.')->group(function () {
+            Route::get('/', [ShramdaanController::class, 'index'])->name('index');
+            Route::get('/toles/{settlement}', [ShramdaanController::class, 'tole'])->name('tole');
+            Route::get('/households/{household}', [ShramdaanController::class, 'show'])->name('passbook');
+            Route::post('/households/{household}/open', [ShramdaanController::class, 'open'])->name('open');
+            Route::patch('/households/{household}/details', [ShramdaanController::class, 'saveDetails'])->name('details');
+            Route::post('/households/{household}/entries', [ShramdaanController::class, 'storeEntry'])->name('entries.store');
+            Route::patch('/entries/{entry}', [ShramdaanController::class, 'updateEntry'])->name('entries.update');
+            Route::delete('/entries/{entry}', [ShramdaanController::class, 'destroyEntry'])->name('entries.destroy');
+
+            // Ward side (shramdaan.manage, limited to the user's wards)
+            Route::get('/projects', [ShramdaanManageController::class, 'projects'])->name('projects');
+            Route::post('/projects', [ShramdaanManageController::class, 'storeProject'])->name('projects.store');
+            Route::patch('/projects/{project}', [ShramdaanManageController::class, 'updateProject'])->name('projects.update');
+            Route::get('/coordinators', [ShramdaanManageController::class, 'coordinators'])->name('coordinators');
+            Route::post('/coordinators', [ShramdaanManageController::class, 'storeCoordinator'])->name('coordinators.store');
+            Route::patch('/coordinators/{user}/toles', [ShramdaanManageController::class, 'updateCoordinatorToles'])->name('coordinators.toles');
+        });
 
     // ─── PDF Export ─────────────────────────────────────────────────────────
     Route::middleware(['role:enumerator,ward_reviewer,ward_admin,municipal_admin,super_admin'])->group(function () {
@@ -343,6 +375,8 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
             Route::post('/data-export/download',         [DataExportController::class, 'download'])->name('data-export.download');
             Route::get('/audit-logs',                    [AuditLogController::class, 'index'])     ->name('audit-logs');
             Route::patch('/users/{user}/assign-wards',  [UserController::class, 'assignWards'])  ->name('users.assign-wards');
+            Route::get('/modules',                       [ModulesController::class, 'index'])  ->name('modules');
+            Route::patch('/modules/{module}',            [ModulesController::class, 'update']) ->name('modules.update');
             Route::get('/role-permissions',              [RolePermissionsController::class, 'index'])->name('role-permissions');
             Route::patch('/role-permissions',            [RolePermissionsController::class, 'update'])->name('role-permissions.update');
 

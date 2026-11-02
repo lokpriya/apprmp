@@ -93,6 +93,9 @@
         <!-- ── Member search (read-only lookup) ── -->
         <NavItem v-if="canMemberSearch" href="/member-search" icon="fa-solid fa-magnifying-glass"
                  label="सदस्य खोज" :collapsed="collapsed" />
+        <!-- ── श्रमदान (only where the module is on) ── -->
+        <NavItem v-if="canShramdaan" href="/shramdaan" icon="fa-solid fa-hand-holding-heart"
+                 label="श्रमदान पासबुक" :collapsed="collapsed" />
 
         <!-- ── Review and Publish ── -->
         <template v-if="['ward_reviewer','ward_admin','municipal_admin','super_admin'].includes(userRole)">
@@ -416,6 +419,11 @@
                 <i class="fa-solid fa-lock w-4 text-[#9aa0ac] text-center text-xs"></i>
                 भूमिका अनुमति
               </a>
+              <a v-if="userRole === 'super_admin'" href="/admin/modules"
+                class="flex items-center gap-3 px-4 py-2.5 text-[13px] text-[#626976] hover:bg-gray-50 transition-colors">
+                <i class="fa-solid fa-puzzle-piece w-4 text-[#9aa0ac] text-center text-xs"></i>
+                मोड्युलहरू
+              </a>
               <a v-if="userRole === 'super_admin'" href="/admin/system-update"
                 class="flex items-center gap-3 px-4 py-2.5 text-[13px] text-[#626976] hover:bg-gray-50 transition-colors">
                 <i class="fa-solid fa-cloud-arrow-up w-4 text-[#9aa0ac] text-center text-xs"></i>
@@ -635,6 +643,11 @@
               :class="['flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-medium transition no-underline',
                 page.url.startsWith('/member-search') ? 'bg-white/12 text-white' : 'text-white/65 hover:bg-white/8 hover:text-white']">
               <i class="fa-solid fa-magnifying-glass w-4 text-center"></i> सदस्य खोज
+            </a>
+            <a v-if="canShramdaan" href="/shramdaan" @click="mobileNavOpen = false"
+              :class="['flex items-center gap-3 px-3 py-2.5 rounded text-[13px] font-medium transition no-underline',
+                page.url.startsWith('/shramdaan') ? 'bg-white/12 text-white' : 'text-white/65 hover:bg-white/8 hover:text-white']">
+              <i class="fa-solid fa-hand-holding-heart w-4 text-center"></i> श्रमदान पासबुक
             </a>
 
             <!-- Review -->
@@ -1096,6 +1109,7 @@ function toggleCollapse() {
 // ── Feedback badge ─────────────────────────────────────────────────
 const feedbackNewCount     = computed(() => page.props.feedbackNewCount     ?? 0)
 const canMemberSearch      = computed(() => !!page.props.canMemberSearch)
+const canShramdaan         = computed(() => !!page.props.canShramdaan)
 const pendingReviewsCount  = computed(() => page.props.pendingReviewsCount  ?? 0)
 
 // ── Impersonation ──────────────────────────────────────────────────

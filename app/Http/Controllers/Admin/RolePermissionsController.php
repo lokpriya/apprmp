@@ -38,7 +38,7 @@ class RolePermissionsController extends Controller
     {
         abort_unless(auth()->user()->isSuperAdmin(), 403);
         $request->validate([
-            'role'        => 'required|in:super_admin,municipal_admin,ward_admin,ward_reviewer,enumerator',
+            'role'        => 'required|in:super_admin,municipal_admin,ward_admin,ward_reviewer,enumerator,tole_coordinator',
             'permissions' => 'present|array',
             'permissions.*' => 'string',
         ]);
@@ -63,7 +63,9 @@ function roleLabel(string $role): string
         'super_admin'     => 'Super Admin',
         'municipal_admin' => 'Municipal Admin',
         'ward_reviewer'   => 'Ward Reviewer',
+        'ward_admin'      => 'Ward Admin',
         'enumerator'      => 'Enumerator',
+        'tole_coordinator'=> 'Tole Coordinator',
         default           => $role,
     };
 }

@@ -64,6 +64,18 @@ class RolePermissions
                 ],
             ],
             [
+                'key'   => 'shramdaan',
+                'label' => 'श्रमदान पासबुक',
+                'icon'  => 'fa-solid fa-hand-holding-heart',
+                'perms' => [
+                    'shramdaan.view'    => ['label' => 'पासबुक हेर्ने',              'en' => 'View passbooks'],
+                    'shramdaan.edit'    => ['label' => 'विवरण तथा श्रमदान भर्ने',   'en' => 'Enter details & work'],
+                    'shramdaan.verify'  => ['label' => 'श्रमदान प्रमाणित गर्ने',    'en' => 'Verify work'],
+                    'shramdaan.manage'  => ['label' => 'संयोजक तथा योजना व्यवस्थापन', 'en' => 'Manage coordinators & projects'],
+                    'shramdaan.reports' => ['label' => 'रिपोर्ट तथा निर्यात',       'en' => 'Reports & export'],
+                ],
+            ],
+            [
                 'key'   => 'users',
                 'label' => 'प्रयोगकर्ता',
                 'icon'  => 'fa-solid fa-users',
@@ -170,6 +182,8 @@ class RolePermissions
                 'households.mark_deceased',
                 // Member search
                 'members.search','members.search_all_wards',
+                // श्रमदान (only active where the module is switched on)
+                'shramdaan.view','shramdaan.edit','shramdaan.verify','shramdaan.manage','shramdaan.reports',
                 // Institutions
                 'institutions.view','institutions.create','institutions.edit','institutions.delete',
                 'institutions.submit','institutions.approve','institutions.reject','institutions.publish',
@@ -205,6 +219,8 @@ class RolePermissions
                 'households.mark_deceased',
                 // Member search
                 'members.search',
+                // श्रमदान — the ward assigns coordinators and verifies their entries
+                'shramdaan.view','shramdaan.edit','shramdaan.verify','shramdaan.manage','shramdaan.reports',
                 // Institutions
                 'institutions.view','institutions.create','institutions.edit','institutions.delete',
                 'institutions.submit','institutions.approve','institutions.reject','institutions.publish',
@@ -252,6 +268,11 @@ class RolePermissions
                 // Reports
                 'reports.view',
             ],
+
+            // Keeps the श्रमदान passbooks of their assigned toles — nothing else.
+            'tole_coordinator' => [
+                'shramdaan.view','shramdaan.edit',
+            ],
         ];
     }
 
@@ -264,7 +285,10 @@ class RolePermissions
      * Lists saved before `_known` was recorded are taken to have decided every
      * permission except these.
      */
-    private const INTRODUCED_LATER = ['members.search', 'members.search_all_wards'];
+    private const INTRODUCED_LATER = [
+        'members.search', 'members.search_all_wards',
+        'shramdaan.view', 'shramdaan.edit', 'shramdaan.verify', 'shramdaan.manage', 'shramdaan.reports',
+    ];
 
     /**
      * The permissions a role actually has: its saved list, plus the defaults for
@@ -321,6 +345,7 @@ class RolePermissions
             ['name' => 'ward_admin',      'label' => 'Ward Admin',      'icon' => 'fa-solid fa-user-shield'],
             ['name' => 'ward_reviewer',   'label' => 'Ward Reviewer',   'icon' => 'fa-solid fa-eye'],
             ['name' => 'enumerator',      'label' => 'Enumerator',      'icon' => 'fa-solid fa-clipboard-user'],
+            ['name' => 'tole_coordinator','label' => 'Tole Coordinator','icon' => 'fa-solid fa-people-roof'],
         ];
     }
 }

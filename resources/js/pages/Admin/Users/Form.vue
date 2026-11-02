@@ -88,6 +88,7 @@
               <option value="ward_admin">Ward Admin</option>
               <option value="ward_reviewer">Ward Reviewer</option>
               <option value="enumerator">Enumerator</option>
+              <option value="tole_coordinator">Tole Coordinator (श्रमदान)</option>
             </select>
             <p v-if="form.errors.role" class="text-xs text-red-500 mt-1">{{ form.errors.role }}</p>
           </div>
@@ -132,6 +133,39 @@
         </p>
       </div>
 
+      <!-- Tole assignments (tole coordinator only) -->
+      <div v-if="form.role === 'tole_coordinator'"
+        class="bg-white rounded-md border border-[#e6e7e9] shadow-sm p-5">
+        <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-1">
+          <i class="fa-solid fa-people-roof text-emerald-600 text-xs"></i>
+          टोल असाइनमेन्ट
+          <span class="ml-auto text-xs font-normal text-gray-400">{{ form.settlement_ids.length }} टोल छनोट गरिएको</span>
+        </h2>
+        <p class="text-xs text-gray-400 mb-3">
+          टोल संयोजकले यी टोलका प्रकाशित घरधुरीको श्रमदान पासबुक मात्र हेर्न र भर्न सक्छन्।
+        </p>
+        <div v-for="group in tolesByWard" :key="group.ward_number" class="mb-3">
+          <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">वडा {{ group.ward_number }}</p>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <label v-for="tole in group.toles" :key="tole.id"
+              class="flex items-center gap-2.5 p-2.5 rounded-md border cursor-pointer transition-colors"
+              :class="form.settlement_ids.includes(tole.id)
+                ? 'border-emerald-300 bg-emerald-50'
+                : 'border-[#e6e7e9] hover:border-gray-300'">
+              <input type="checkbox" :value="tole.id" v-model="form.settlement_ids"
+                class="rounded text-emerald-600 focus:ring-[#206bc4]/30 w-4 h-4 shrink-0" />
+              <span class="text-sm text-gray-700 truncate">{{ tole.name_np }}</span>
+            </label>
+          </div>
+        </div>
+        <p v-if="!props.settlements.length" class="text-xs text-gray-400 text-center py-4">
+          कुनै टोल छैन — पहिले Settings मा टोल थप्नुहोस्।
+        </p>
+        <p v-if="form.errors['settlement_ids.0'] || form.errors.settlement_ids" class="text-xs text-red-500 mt-1">
+          छनोट गरिएको टोल यस पालिकाको होइन।
+        </p>
+      </div>
+
       <!-- Actions -->
       <div class="flex items-center gap-3 justify-end">
         <Link href="/admin/users"
@@ -158,6 +192,18 @@ const props = defineProps({
   user:            { type: Object,  default: null },
   wards:           { type: Array,   default: () => [] },
   assignedWardIds: { type: Array,   default: () => [] },
+  settlements:     { type: Array,   default: () => [] },
+  assignedSettlementIds: { type: Array, default: () => [] },
+})
+
+/** Toles grouped under their ward for the coordinator picker. */
+const tolesByWard = computed(() => {
+  const groups = new Map()
+  for (const t of props.settlements) {
+    if (!groups.has(t.ward_number)) groups.set(t.ward_number, { ward_number: t.ward_number, toles: [] })
+    groups.get(t.ward_number).toles.push({ ...t, id: Number(t.id) })
+  }
+  return [...groups.values()]
 })
 
 const isEdit = computed(() => !!props.user)
@@ -171,6 +217,7 @@ const form = useForm({
   role:      props.user?.role      ?? '',
   is_active: props.user?.is_active ?? true,
   ward_ids:  [...(props.assignedWardIds ?? [])],
+  settlement_ids: [...(props.assignedSettlementIds ?? [])].map(Number),
 })
 
 function submit() {

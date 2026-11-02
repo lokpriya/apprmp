@@ -24,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'survey.period'  => \App\Http\Middleware\CheckSurveyPeriod::class,
             'public.access'  => \App\Http\Middleware\CheckPublicAccess::class,
             '2fa.require'    => \App\Http\Middleware\RequireTwoFactor::class,
+            'module'         => \App\Http\Middleware\RequireModule::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

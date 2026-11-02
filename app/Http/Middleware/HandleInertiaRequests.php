@@ -190,6 +190,9 @@ class HandleInertiaRequests extends Middleware
             // Sidebar link to सदस्य खोज
             'canMemberSearch' => fn () => (bool) $request->user()?->hasPermission('members.search'),
 
+            // Sidebar link to श्रमदान — module switched on here + permission
+            'canShramdaan' => fn () => \App\Support\ShramdaanAccess::canUse($request->user()),
+
             // User manual gear link visibility — super_admin can toggle; cached 60 s
             'showUserManual' => fn () => $request->user()?->local_government_id
                 ? Cache::remember('show_user_manual_' . $request->user()->local_government_id, 60,

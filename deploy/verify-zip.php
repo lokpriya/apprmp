@@ -41,7 +41,7 @@ const RELEASE_CHECKS = [
     'resources/js/pages/Public/InstitutionReports/Show.vue' => ['healthDetailMissing'],
     'resources/js/i18n/ne.js'                               => ['healthDetailMissingTitle'],
     // ── 1.8.0  one-file updater (must reach every site via this full ZIP) ────
-    'VERSION'                                               => ['1.8.3'],
+    'VERSION'                                               => ['1.9.0'],
     'config/updates.php'                                    => ["'public_key' => 'lcQX"],
     'app/Services/Updates/UpdateApplier.php'                => ['stepSwap'],
     'app/Http/Controllers/Admin/SystemUpdateController.php' => ['setMaintenance', 'recordFromState'],
@@ -59,6 +59,13 @@ const RELEASE_CHECKS = [
     // ── 1.8.3  update page fix + institution empty counts ───────────────────
     'resources/js/pages/Admin/SystemUpdate.vue'              => ['import axios from', 'describeForeignReply'],
     'app/Services/InstitutionService.php'                   => ['forNewRow'],
+    // ── 1.9.0  श्रमदान module, phases 1+2 (off by default) ──────────────────
+    'app/Support/Modules.php'                               => ['SHRAMDAAN'],
+    'app/Support/BsDate.php'                                => ['fiscalYear', 'ENCODED_MONTH_LENGTHS'],
+    'app/Http/Controllers/ShramdaanController.php'          => ['storeEntry', 'authorizeHousehold'],
+    'app/Http/Controllers/ShramdaanManageController.php'    => ['updateCoordinatorToles'],
+    'database/migrations/2026_11_02_000004_create_shramdaan_tables.php' => ['shramdaan_entries'],
+    'routes/web.php'                                        => ['module:shramdaan'],
 ];
 
 /** Strings that must appear in the COMPILED bundle, proving npm run build ran. */
@@ -69,6 +76,7 @@ const BUILT_BUNDLE_CHECKS = [
     'प्रणाली अद्यावधिक'                            => 'system update page',
     'टोलका सबै घरधुरी हेर्नुहोस्'                 => 'member search with tole filter',
     'The page failed before contacting the server' => 'update page error reporting (1.8.3)',
+    'पासबुक खोल्नुहोस्'                             => 'श्रमदान passbook page (1.9.0)',
 ];
 
 // ── Arguments ────────────────────────────────────────────────────────────────

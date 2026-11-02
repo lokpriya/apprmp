@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Settlement;
 use App\Models\User;
 use App\Models\Ward;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 
@@ -74,7 +76,10 @@ class UserController extends Controller
             ->orderBy('ward_number')
             ->get(['id', 'ward_number', 'ward_chairperson']);
 
-        return Inertia::render('Admin/Users/Form', compact('wards'));
+        return Inertia::render('Admin/Users/Form', [
+            'wards'       => $wards,
+            'settlements' => $this->settlementOptions(),
+        ]);
     }
 
     public function store(Request $request)
@@ -83,10 +88,12 @@ class UserController extends Controller
             'name'       => 'required|string|max:200',
             'email'      => 'required|email|unique:users,email',
             'password'   => ['required', Password::min(8)],
-            'role'       => 'required|in:enumerator,ward_reviewer,ward_admin,municipal_admin',
+            'role'       => 'required|in:enumerator,ward_reviewer,ward_admin,municipal_admin,tole_coordinator',
             'phone'      => 'nullable|string|max:15',
             'ward_ids'   => 'nullable|array',
             'ward_ids.*' => 'integer|exists:wards,id',
+            'settlement_ids'   => 'nullable|array',
+            'settlement_ids.*' => ['integer', Rule::in($this->settlementOptions()->pluck('id')->all())],
         ]);
 
         $user = User::create([
@@ -99,13 +106,14 @@ class UserController extends Controller
             'is_active'           => true,
         ]);
 
-        if (!empty($data['ward_ids'])) {
+        if (!empty($data['ward_ids']) && $user->role !== 'tole_coordinator') {
             $user->assignedWards()->attach(
                 collect($data['ward_ids'])->mapWithKeys(fn($id) => [
                     $id => ['assigned_at' => now(), 'assigned_by' => auth()->id()]
                 ])->toArray()
             );
         }
+        $this->syncToles($user, $data['settlement_ids'] ?? []);
 
         return redirect()->route('admin.users.index')->with('success', "User {$user->name} created.");
     }
@@ -122,6 +130,8 @@ class UserController extends Controller
             'user'           => $user->only('id','name','email','role','phone','is_active'),
             'wards'          => $wards,
             'assignedWardIds'=> $assignedWardIds,
+            'settlements'    => $this->settlementOptions(),
+            'assignedSettlementIds' => $user->assignedSettlements()->pluck('settlements.id')->all(),
         ]);
     }
 
@@ -136,6 +146,8 @@ class UserController extends Controller
             'user'           => $user->only('id','name','email','role','phone','is_active'),
             'wards'          => $wards,
             'assignedWardIds'=> $assignedWardIds,
+            'settlements'    => $this->settlementOptions(),
+            'assignedSettlementIds' => $user->assignedSettlements()->pluck('settlements.id')->all(),
         ]);
     }
 
@@ -150,10 +162,12 @@ class UserController extends Controller
         $data = $request->validate([
             'name'       => 'required|string|max:200',
             'email'      => "required|email|unique:users,email,{$user->id}",
-            'role'       => $keepsRole ? 'nullable' : 'required|in:enumerator,ward_reviewer,ward_admin,municipal_admin',
+            'role'       => $keepsRole ? 'nullable' : 'required|in:enumerator,ward_reviewer,ward_admin,municipal_admin,tole_coordinator',
             'phone'      => 'nullable|string|max:15',
             'ward_ids'   => 'nullable|array',
             'ward_ids.*' => 'integer|exists:wards,id',
+            'settlement_ids'   => 'nullable|array',
+            'settlement_ids.*' => ['integer', Rule::in($this->settlementOptions()->pluck('id')->all())],
             'password'   => ['nullable', Password::min(8)],
         ]);
 
@@ -172,13 +186,38 @@ class UserController extends Controller
 
         $user->update($updateData);
 
+        // A coordinator works by tole, never by ward: a leftover ward assignment
+        // would quietly widen what the survey pages let them reach.
         $user->assignedWards()->sync(
-            collect($data['ward_ids'] ?? [])->mapWithKeys(fn($id) => [
+            collect($user->role === 'tole_coordinator' ? [] : ($data['ward_ids'] ?? []))->mapWithKeys(fn($id) => [
                 $id => ['assigned_at' => now(), 'assigned_by' => auth()->id()]
             ])->toArray()
         );
+        $this->syncToles($user, $data['settlement_ids'] ?? []);
 
         return redirect()->route('admin.users.index')->with('success', "User {$user->name} updated.");
+    }
+
+    /** Toles of this municipality, labelled by ward, for the coordinator picker and its validation. */
+    private function settlementOptions()
+    {
+        return Settlement::query()
+            ->join('wards', 'wards.id', '=', 'settlements.ward_id')
+            ->where('wards.local_government_id', auth()->user()->local_government_id)
+            ->orderBy('wards.ward_number')->orderBy('settlements.name_np')
+            ->get(['settlements.id', 'settlements.ward_id', 'settlements.name_np', 'wards.ward_number']);
+    }
+
+    /** Only a tole coordinator holds toles; changing someone's role away from it clears them. */
+    private function syncToles(User $user, array $settlementIds): void
+    {
+        $ids = $user->role === 'tole_coordinator' ? $settlementIds : [];
+
+        $user->assignedSettlements()->sync(
+            collect($ids)->mapWithKeys(fn($id) => [
+                $id => ['assigned_at' => now(), 'assigned_by' => auth()->id()],
+            ])->toArray()
+        );
     }
 
     public function destroy(User $user)

@@ -44,6 +44,7 @@
         <option value="ward_admin">Ward Admin</option>
         <option value="ward_reviewer">Ward Reviewer</option>
         <option value="enumerator">Enumerator</option>
+        <option value="tole_coordinator">Tole Coordinator</option>
       </select>
       <select v-model="filters.active" @change="fetchUsers"
         class="h-9 px-3 rounded border border-[#e6e7e9] text-[13px] text-[#626976] focus:ring-2 focus:ring-[#206bc4]/30 focus:border-[#206bc4] outline-none">
@@ -427,6 +428,7 @@ const ROLE_META = {
   ward_admin:      { badge: 'bg-indigo-100 text-indigo-700',  avatar: 'bg-indigo-100 text-indigo-700',  icon: 'fa-solid fa-user-shield' },
   ward_reviewer:   { badge: 'bg-blue-100 text-blue-700',      avatar: 'bg-blue-100 text-blue-700',      icon: 'fa-solid fa-eye' },
   enumerator:      { badge: 'bg-amber-100 text-amber-700',    avatar: 'bg-amber-100 text-amber-700',    icon: 'fa-solid fa-clipboard-user' },
+  tole_coordinator:{ badge: 'bg-emerald-100 text-emerald-700', avatar: 'bg-emerald-100 text-emerald-700', icon: 'fa-solid fa-people-roof' },
 }
 function roleColor(role) {
   return ROLE_META[role] ?? { badge: 'bg-gray-100 text-[#626976]', avatar: 'bg-gray-100 text-[#626976]', icon: 'fa-solid fa-user' }
@@ -434,7 +436,7 @@ function roleColor(role) {
 
 const ROLE_LABELS = {
   super_admin: 'Super Admin', municipal_admin: 'Municipal Admin',
-  ward_admin: 'Ward Admin', ward_reviewer: 'Ward Reviewer', enumerator: 'Enumerator',
+  ward_admin: 'Ward Admin', ward_reviewer: 'Ward Reviewer', enumerator: 'Enumerator', tole_coordinator: 'Tole Coordinator',
 }
 function roleLabel(role) { return ROLE_LABELS[role] ?? role }
 </script>

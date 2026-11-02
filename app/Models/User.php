@@ -43,6 +43,13 @@ class User extends Authenticatable
             ->withPivot('assigned_at', 'assigned_by');
     }
 
+    /** Toles a tole coordinator looks after (श्रमदान). */
+    public function assignedSettlements(): BelongsToMany
+    {
+        return $this->belongsToMany(Settlement::class, 'user_settlement_assignments')
+            ->withPivot('assigned_at', 'assigned_by');
+    }
+
     public function households(): HasMany
     {
         return $this->hasMany(Household::class, 'enumerator_id');
@@ -59,6 +66,7 @@ class User extends Authenticatable
     public function isWardAdmin(): bool   { return $this->role === 'ward_admin'; }
     public function isReviewer(): bool    { return $this->role === 'ward_reviewer'; }
     public function isEnumerator(): bool  { return $this->role === 'enumerator'; }
+    public function isToleCoordinator(): bool { return $this->role === 'tole_coordinator'; }
 
     public function hasPermission(string $perm): bool
     {
