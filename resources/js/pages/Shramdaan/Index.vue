@@ -9,11 +9,18 @@
           {{ isCoordinator ? 'तपाईंलाई तोकिएका टोलहरू' : 'तपाईंको क्षेत्रका टोलहरू' }} · आ.व. {{ fiscalYear }} · प्रकाशित घरधुरी मात्र
         </p>
       </div>
-      <div v-if="canManage" class="flex gap-2 shrink-0">
-        <Link href="/shramdaan/projects" class="h-9 px-3 inline-flex items-center gap-1.5 border border-[#dadcde] bg-white rounded-md text-[12px] text-[#1d273b]">
+      <div v-if="canManage || canVerify || canReports" class="flex flex-wrap justify-end gap-2 shrink-0">
+        <Link v-if="canVerify" href="/shramdaan/verify" class="h-9 px-3 inline-flex items-center gap-1.5 border border-[#dadcde] bg-white rounded-md text-[12px] text-[#1d273b]">
+          <i class="fa-solid fa-circle-check text-emerald-600"></i> प्रमाणीकरण
+          <span v-if="pendingCount" class="min-w-[1.25rem] h-5 px-1 rounded-full bg-amber-500 text-white text-[10px] font-semibold inline-flex items-center justify-center">{{ pendingCount }}</span>
+        </Link>
+        <Link v-if="canReports" href="/shramdaan/reports" class="h-9 px-3 inline-flex items-center gap-1.5 border border-[#dadcde] bg-white rounded-md text-[12px] text-[#1d273b]">
+          <i class="fa-solid fa-chart-column text-emerald-600"></i> रिपोर्ट
+        </Link>
+        <Link v-if="canManage" href="/shramdaan/projects" class="h-9 px-3 inline-flex items-center gap-1.5 border border-[#dadcde] bg-white rounded-md text-[12px] text-[#1d273b]">
           <i class="fa-solid fa-diagram-project text-emerald-600"></i> योजना
         </Link>
-        <Link href="/shramdaan/coordinators" class="h-9 px-3 inline-flex items-center gap-1.5 border border-[#dadcde] bg-white rounded-md text-[12px] text-[#1d273b]">
+        <Link v-if="canManage" href="/shramdaan/coordinators" class="h-9 px-3 inline-flex items-center gap-1.5 border border-[#dadcde] bg-white rounded-md text-[12px] text-[#1d273b]">
           <i class="fa-solid fa-people-roof text-emerald-600"></i> संयोजक
         </Link>
       </div>
@@ -55,5 +62,8 @@ defineProps({
   isCoordinator: { type: Boolean, default: false },
   fiscalYear:    { type: String,  default: '' },
   canManage:     { type: Boolean, default: false },
+  canVerify:     { type: Boolean, default: false },
+  canReports:    { type: Boolean, default: false },
+  pendingCount:  { type: Number,  default: 0 },
 })
 </script>

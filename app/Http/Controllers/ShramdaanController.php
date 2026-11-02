@@ -80,11 +80,21 @@ class ShramdaanController extends Controller
                 'passbooks'   => (int) $t->passbooks,
             ]);
 
+        $canVerify = $user->hasPermission('shramdaan.verify');
+
         return Inertia::render('Shramdaan/Index', [
             'toles'         => $toles,
             'isCoordinator' => $user->isToleCoordinator(),
             'fiscalYear'    => $fy,
             'canManage'     => (bool) ShramdaanAccess::managedWardIds($user),
+            'canVerify'     => $canVerify,
+            'canReports'    => $user->hasPermission('shramdaan.reports'),
+            // Waiting for this user's verification, every fiscal year.
+            'pendingCount'  => $canVerify
+                ? ShramdaanEntry::where('status', ShramdaanEntry::RECORDED)
+                    ->whereHas('passbook.household', fn($q) => $q->whereIn('settlement_id', $toleIds)->where('status', 'published'))
+                    ->count()
+                : 0,
         ]);
     }
 
@@ -164,7 +174,7 @@ class ShramdaanController extends Controller
             : null;
 
         $entries = $passbook
-            ? $passbook->entries()->where('fiscal_year', $fy)->orderBy('work_date')->orderBy('id')->get()
+            ? $passbook->entries()->where('fiscal_year', $fy)->with('verifier:id,name')->orderBy('work_date')->orderBy('id')->get()
                 ->map(fn(ShramdaanEntry $e) => [
                     'id'                  => $e->id,
                     'work_date'           => $e->work_date->toDateString(),
@@ -178,6 +188,8 @@ class ShramdaanController extends Controller
                     'work_nature'         => $e->work_nature,
                     'supervisor'          => $e->supervisor,
                     'verified'            => $e->isVerified(),
+                    'verified_by'         => $e->verifier?->name,
+                    'own'                 => (int) $e->entered_by === (int) $user->id,
                 ])
             : collect();
 
@@ -215,6 +227,7 @@ class ShramdaanController extends Controller
             'fyRange'     => BsDate::fiscalYearRange($fy),
             'settings'    => Modules::settings(Modules::SHRAMDAAN, $lgId),
             'canEdit'     => $user->hasPermission('shramdaan.edit'),
+            'canVerify'   => $user->hasPermission('shramdaan.verify'),
         ]);
     }
 

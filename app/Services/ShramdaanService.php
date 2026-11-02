@@ -10,6 +10,7 @@ use App\Models\SurveyOption;
 use App\Support\BsDate;
 use App\Support\Modules;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Builds a family's passbook from two sources: who the family is, read live
@@ -91,6 +92,69 @@ class ShramdaanService
             $verifiedDays >= (float) $s['tier_bronze'] => 'bronze',
             default                                    => 'participant',
         };
+    }
+
+    /**
+     * Per-tole summary for one fiscal year: families, passbooks, verified and
+     * pending days, and how many families reached each श्रेणी. Tiers come from
+     * verified days only, the same rule as the passbook.
+     *
+     * @param int[] $toleIds already limited to what the user may see
+     */
+    public function summary(array $toleIds, string $fiscalYear, int $lgId): array
+    {
+        $toles = DB::table('settlements')
+            ->join('wards', 'wards.id', '=', 'settlements.ward_id')
+            ->whereIn('settlements.id', $toleIds)
+            ->orderBy('wards.ward_number')->orderBy('settlements.name_np')
+            ->get(['settlements.id', 'settlements.name_np', 'wards.ward_number']);
+
+        $households = Household::whereIn('settlement_id', $toleIds)->where('status', 'published')
+            ->selectRaw('settlement_id, COUNT(*) as n')->groupBy('settlement_id')->pluck('n', 'settlement_id');
+
+        // One row per passbook: its tole and its verified / pending days this year.
+        $books = ShramdaanPassbook::query()
+            ->join('households', 'households.id', '=', 'shramdaan_passbooks.household_id')
+            ->whereIn('households.settlement_id', $toleIds)
+            ->where('households.status', 'published')->whereNull('households.deleted_at')
+            ->leftJoin('shramdaan_entries as e', function ($j) use ($fiscalYear) {
+                $j->on('e.passbook_id', '=', 'shramdaan_passbooks.id')
+                  ->where('e.fiscal_year', $fiscalYear)->whereNull('e.deleted_at');
+            })
+            ->groupBy('shramdaan_passbooks.id', 'households.settlement_id')
+            ->get([
+                'households.settlement_id',
+                DB::raw("SUM(CASE WHEN e.status = 'verified' THEN e.days ELSE 0 END) as verified"),
+                DB::raw("SUM(CASE WHEN e.status = 'recorded' THEN e.days ELSE 0 END) as pending"),
+            ])
+            ->groupBy('settlement_id');
+
+        $rows = [];
+        foreach ($toles as $t) {
+            $tierCounts = ['gold' => 0, 'silver' => 0, 'bronze' => 0];
+            $verified = $pending = 0.0;
+            $active = 0;
+            foreach ($books->get($t->id, collect()) as $b) {
+                $v = (float) $b->verified;
+                $verified += $v;
+                $pending  += (float) $b->pending;
+                if ($v > 0) $active++;
+                $tier = $this->tier($v, $lgId);
+                if (isset($tierCounts[$tier])) $tierCounts[$tier]++;
+            }
+            $rows[] = [
+                'tole_id'      => (int) $t->id,
+                'tole'         => $t->name_np,
+                'ward_number'  => (int) $t->ward_number,
+                'households'   => (int) ($households[$t->id] ?? 0),
+                'passbooks'    => $books->get($t->id, collect())->count(),
+                'active'       => $active,
+                'verified'     => round($verified, 2),
+                'pending'      => round($pending, 2),
+            ] + $tierCounts;
+        }
+
+        return $rows;
     }
 
     public function currentFiscalYear(): string

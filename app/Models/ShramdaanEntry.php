@@ -34,6 +34,7 @@ class ShramdaanEntry extends Model
     public function passbook(): BelongsTo { return $this->belongsTo(ShramdaanPassbook::class, 'passbook_id'); }
     public function member(): BelongsTo   { return $this->belongsTo(HouseholdMember::class, 'household_member_id'); }
     public function project(): BelongsTo  { return $this->belongsTo(ShramdaanProject::class, 'project_id'); }
+    public function verifier(): BelongsTo { return $this->belongsTo(User::class, 'verified_by'); }
 
     public function isVerified(): bool { return $this->status === self::VERIFIED; }
 }

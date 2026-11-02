@@ -5,6 +5,7 @@ use App\Http\Controllers\HouseholdController;
 use App\Http\Controllers\MemberSearchController;
 use App\Http\Controllers\ShramdaanController;
 use App\Http\Controllers\ShramdaanManageController;
+use App\Http\Controllers\ShramdaanReviewController;
 use App\Http\Controllers\Admin\ModulesController;
 use App\Http\Controllers\InstitutionController;
 use App\Http\Controllers\ReviewController;
@@ -256,6 +257,13 @@ Route::middleware(['auth', 'license', '2fa.require'])->group(function () {
             Route::post('/households/{household}/entries', [ShramdaanController::class, 'storeEntry'])->name('entries.store');
             Route::patch('/entries/{entry}', [ShramdaanController::class, 'updateEntry'])->name('entries.update');
             Route::delete('/entries/{entry}', [ShramdaanController::class, 'destroyEntry'])->name('entries.destroy');
+
+            // Verification and reports (shramdaan.verify / .reports, limited to the user's toles)
+            Route::get('/verify', [ShramdaanReviewController::class, 'queue'])->name('verify');
+            Route::post('/verify', [ShramdaanReviewController::class, 'verify'])->name('verify.store');
+            Route::post('/entries/{entry}/unverify', [ShramdaanReviewController::class, 'unverify'])->name('entries.unverify');
+            Route::get('/reports', [ShramdaanReviewController::class, 'reports'])->name('reports');
+            Route::get('/reports/export', [ShramdaanReviewController::class, 'export'])->name('reports.export');
 
             // Ward side (shramdaan.manage, limited to the user's wards)
             Route::get('/projects', [ShramdaanManageController::class, 'projects'])->name('projects');

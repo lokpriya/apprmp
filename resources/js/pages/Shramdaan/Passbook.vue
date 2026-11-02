@@ -186,8 +186,19 @@
             </div>
           </div>
           <div class="flex items-center gap-2 mt-2">
-            <span v-if="e.verified" class="text-[11px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 font-semibold">✓ प्रमाणित</span>
+            <span v-if="e.verified" class="text-[11px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 font-semibold"
+              :title="e.verified_by ? 'प्रमाणित गर्ने: ' + e.verified_by : ''">✓ प्रमाणित</span>
             <span v-else class="text-[11px] px-2 py-0.5 rounded bg-amber-100 text-amber-700">प्रमाणित हुन बाँकी</span>
+            <span v-if="e.verified && e.verified_by" class="text-[10px] text-[#9aa0ac] truncate">{{ e.verified_by }}</span>
+            <!-- Ward staff verify here too; never their own entries -->
+            <button v-if="canVerify && !e.verified && !e.own" type="button" @click="verifyEntry(e)"
+              class="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[12px] font-semibold">
+              <i class="fa-solid fa-check"></i> प्रमाणित गर्नुहोस्
+            </button>
+            <button v-if="canVerify && e.verified" type="button" @click="unverifyEntry(e)"
+              class="ml-auto h-8 px-3 border border-[#dadcde] rounded text-[12px] text-[#626976]">
+              <i class="fa-solid fa-rotate-left"></i> फिर्ता
+            </button>
             <template v-if="canEdit && !e.verified">
               <button type="button" @click="startEdit(e)" class="ml-auto h-8 px-3 border border-[#dadcde] rounded text-[12px]">
                 <i class="fa-solid fa-pen"></i> सच्याउनुहोस्
@@ -221,6 +232,7 @@ const props = defineProps({
   fyRange:     { type: Array,  default: () => [] },
   settings:    { type: Object, required: true },
   canEdit:     { type: Boolean, default: false },
+  canVerify:   { type: Boolean, default: false },
 })
 
 const card  = 'bg-white border border-[#e6e7e9] rounded-md p-4'
@@ -296,6 +308,14 @@ function saveEntry() {
   if (entry.id) entry.patch(`/shramdaan/entries/${entry.id}`, opts)
   else entry.post(`${url}/entries`, opts)
 }
+function verifyEntry(e) {
+  router.post('/shramdaan/verify', { ids: [e.id] }, { preserveScroll: true })
+}
+function unverifyEntry(e) {
+  if (!confirm(`"${e.project_name}" (${e.work_date_bs}) को प्रमाणीकरण फिर्ता लिने?`)) return
+  router.post(`/shramdaan/entries/${e.id}/unverify`, {}, { preserveScroll: true })
+}
+
 function removeEntry(e) {
   if (!confirm(`"${e.project_name}" (${e.work_date_bs}) हटाउने?`)) return
   router.delete(`/shramdaan/entries/${e.id}`, { preserveScroll: true })

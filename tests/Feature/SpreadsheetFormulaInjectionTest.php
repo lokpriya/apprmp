@@ -90,6 +90,37 @@ class SpreadsheetFormulaInjectionTest extends TestCase
     }
 
     /**
+     * The path the tests above missed: a real Laravel Excel download. Its Writer
+     * resets the cell binder to config('excel.value_binder.default') whenever it
+     * is constructed, which silently undid the global binder for every export
+     * from September to November 2026 while the binder-only tests stayed green.
+     * Writing a file through Laravel Excel and reading it back is the only check
+     * that matches what a municipal officer actually opens.
+     */
+    public function test_a_real_laravel_excel_download_stores_formula_text_as_a_string(): void
+    {
+        $export = new class implements \Maatwebsite\Excel\Concerns\FromArray {
+            public function array(): array
+            {
+                return [['=HYPERLINK("http://evil.example","x")', "=cmd|'/c calc'!A1", 'राम बहादुर', 42]];
+            }
+        };
+
+        // Twice: the reset happens per Writer, so the second export matters as much as the first.
+        foreach ([1, 2] as $run) {
+            $path = tempnam(sys_get_temp_dir(), 'xlsx');
+            file_put_contents($path, \Maatwebsite\Excel\Facades\Excel::raw($export, \Maatwebsite\Excel\Excel::XLSX));
+            $sheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($path)->getActiveSheet();
+            unlink($path);
+
+            $this->assertSame(DataType::TYPE_STRING, $sheet->getCell('A1')->getDataType(), "run {$run}: =HYPERLINK became a formula");
+            $this->assertSame(DataType::TYPE_STRING, $sheet->getCell('B1')->getDataType(), "run {$run}: =cmd became a formula");
+            $this->assertSame('राम बहादुर', $sheet->getCell('C1')->getValue());
+            $this->assertSame(DataType::TYPE_NUMERIC, $sheet->getCell('D1')->getDataType(), 'numbers stay numbers');
+        }
+    }
+
+    /**
      * No export writes a real formula — every setCellValue() in app/Exports is
      * static help text. That is what makes a global binder safe; if an export
      * ever needs a formula it must bind it explicitly.
